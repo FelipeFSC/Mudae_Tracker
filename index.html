@@ -1,0 +1,523 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+
+<head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>mudae</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link
+        href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;600;700;800&family=Inter:wght@400;500;600&display=swap"
+        rel="stylesheet">
+    <link rel="stylesheet" href="style.css" />
+</head>
+
+<body>
+
+    <header class="topbar">
+        <div class="brand">
+            <span class="brand-icon">⚔</span>
+            <span class="brand-name">MUDAE</span>
+        </div>
+        <nav class="tabs">
+            <button class="tab-btn" data-view="config">
+                <span class="tab-ico">⚙</span> CONFIGURAÇÕES
+            </button>
+            <button class="tab-btn" data-view="chars">
+                <span class="tab-ico">☰</span> PERSONAGENS
+            </button>
+            <button class="tab-btn" data-view="analysis">
+                <span class="tab-ico">📊</span> ANÁLISE
+            </button>
+        </nav>
+        <div class="server-badge">
+            <span id="charCountBadge">0</span> chars <span class="dot"></span>
+        </div>
+    </header>
+
+    <main id="app">
+
+        <!-- ============ CONFIGURAÇÕES ============ -->
+        <section id="view-config" class="view">
+            <div class="page-head">
+                <h1><span class="page-icon">⚔</span> MUDAE TRACKER</h1>
+                <p class="subtitle">Configure seus parâmetros para calcular probabilidades</p>
+            </div>
+
+            <div class="panel">
+                <div class="panel-title"><span class="bar cyan"></span>IDENTIFICAÇÃO</div>
+                <div class="grid-2">
+                    <div class="field">
+                        <label>NOME DO SERVIDOR</label>
+                        <input type="text" id="cfgServerName" />
+                    </div>
+                    <div class="field">
+                        <label>SEU NOME / TAG</label>
+                        <input type="text" id="cfgUserTag" />
+                    </div>
+                </div>
+            </div>
+
+            <div class="panel">
+                <div class="panel-title"><span class="bar yellow"></span>CONFIGURAÇÕES DE SERVIDOR</div>
+                <div class="grid-3">
+                    <div class="field">
+                        <label>POOL / LIMROUL $WA</label>
+                        <input type="number" id="cfgPoolWA" min="1" />
+                    </div>
+                    <div class="field">
+                        <label>POOL / LIMROUL $HA</label>
+                        <input type="number" id="cfgPoolHA" min="1" />
+                    </div>
+                    <div class="field">
+                        <label>POOL / LIMROUL $WG</label>
+                        <input type="number" id="cfgPoolWG" min="1" />
+                    </div>
+                    <div class="field">
+                        <label>POOL / LIMROUL $HG</label>
+                        <input type="number" id="cfgPoolHG" min="1" />
+                    </div>
+                    <div class="field">
+                        <label>ROLLS POR HORA</label>
+                        <input type="number" id="cfgRollsPerHour" min="0" />
+                    </div>
+
+                    <div class="field">
+                        <label>TOTAL DE HORAS JOGADAS POR DIA</label>
+                        <input type="number" id="cfgHourGameplay" min="0" placeholder="Ex: 5" />
+                    </div>
+                    <div class="field">
+                        <label>TOTAL DE PERSONAGENS NO HAREM</label>
+                        <input type="number" id="cfgHaremLimit" min="0" placeholder="0 = sem limite" />
+                    </div>
+                </div>
+            </div>
+
+            <div class="panel">
+                <div class="panel-title"><span class="bar purple"></span>BUFFS DO JOGADOR</div>
+                <div class="grid-3">
+                    <div class="field">
+                        <label>PÁGINA ATUAL DO TUTORIAL</label>
+                        <input type="number" id="cfgTutorialPage" min="0" />
+                    </div>
+                    <div class="field">
+                        <label>ROLLS INVESTIDOS EM $BOOSTWISH</label>
+                        <input type="number" id="cfgBoostWishRolls" min="0" />
+                    </div>
+                    <div class="field">
+                        <label>$PERSONALRARE (APROX.)</label>
+                        <input type="number" id="cfgPersonalRare" min="1" max="10" />
+                    </div>
+                    <div class="field">
+                        <label>ROLLS COM COMANDO SLASH</label>
+                        <select id="cfgUseSlashCommands">
+                            <option value="false">Não</option>
+                            <option value="true">Sim (+10% wishes)</option>
+                        </select>
+                    </div>
+
+                    <div class="field">
+                        <label>NIVEL BRONZE</label>
+                        <input type="number" id="cfgLevelBronze" min="0" />
+                    </div>
+                    <div class="field">
+                        <label>NIVEL PRATA</label>
+                        <input type="number" id="cfgLevelPrata" min="0" />
+                    </div>
+                    <div class="field">
+                        <label>NIVEL OURO</label>
+                        <input type="number" id="cfgLevelOuro" min="0" />
+                    </div>
+
+                    <div class="field">
+                        <label>NIVEL SAFIRA</label>
+                        <input type="number" id="cfgLevelSafira" min="0" />
+                    </div>
+                    <div class="field">
+                        <label>NIVEL RUBY</label>
+                        <input type="number" id="cfgLevelRuby" min="0" />
+                    </div>
+                    <div class="field">
+                        <label>NIVEL ESMERALDA</label>
+                        <input type="number" id="cfgLevelEsmeralda" min="0" />
+                    </div>
+
+                    <div class="field">
+                        <label>NIVEL DIAMANTE</label>
+                        <input type="number" id="cfgLevelDiamante" min="0" />
+                    </div>
+                </div>
+            </div>
+
+            <div class="panel">
+                <div class="panel-title"><span class="bar purple"></span>KAKERA TOWER</div>
+                <p class="subtitle tower-summary" id="towerSummary">0 torres · 0 andares comprados</p>
+                <div class="tower-grid" id="towerGrid"></div>
+            </div>
+
+            <div class="panel">
+                <div class="panel-title"><span class="bar cyan"></span>LOJA ($shop)</div>
+                <p class="subtitle">Buffs de perfil (não são por personagem). O item 1 afeta diretamente o spawn. Os itens 2–10 possuem os dez níveis oficiais e são exibidos com seus efeitos econômicos/de recursos; não são somados artificialmente à chance de spawn.</p>
+                <div class="op-buff-list shop-buff-list" id="shopBuffList"></div>
+            </div>
+
+            <!--
+            <div class="panel">
+                <div class="panel-title"><span class="bar green"></span>BACKUP & RESTAURAÇÃO</div>
+                <p class="backup-desc">
+                    Seus dados ficam salvos automaticamente neste navegador (IndexedDB).
+                    Para não perder tudo caso limpe o cache ou troque de dispositivo,
+                    baixe um backup em JSON regularmente.
+                </p>
+                <div class="backup-actions">
+                    <button id="btnExportBackup" class="btn-backup export">⬇ BAIXAR BACKUP (JSON)</button>
+                    <button id="btnImportBackup" class="btn-backup import">⬆ RESTAURAR BACKUP</button>
+                    <input type="file" id="importFileInput" accept="application/json" style="display:none;" />
+                </div>
+                <p class="backup-status" id="backupStatus"></p>
+            </div>
+            -->
+
+            <div class="panel">
+                <div class="grid-3 stat-row">
+                    <div class="stat-box purple">
+                        <div class="stat-value" id="baseChance1d">--</div>
+                        <div class="stat-label">Chance em 1 dia</div>
+                        <div class="stat-sub">por personagem (sem buff)</div>
+                    </div>
+                    <div class="stat-box purple">
+                        <div class="stat-value" id="baseChance7d">--</div>
+                        <div class="stat-label">Chance em 7 dias</div>
+                        <div class="stat-sub">acumulado</div>
+                    </div>
+                    <div class="stat-box purple">
+                        <div class="stat-value" id="baseChance30d">--</div>
+                        <div class="stat-label">Chance em 30 dias</div>
+                        <div class="stat-sub">acumulado</div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="info-box">
+                <span class="info-ico">↻</span>
+                <p>A probabilidade é calculada por roll e acumulada pelo número total de rolls. Medalhas, tutorial, Tower, slash, $boostwish, OP e Shop 1 são somados como bônus aditivos antes do cálculo.</p>
+            </div>
+        </section>
+
+        <!-- ============ PERSONAGENS ============ -->
+        <section id="view-chars" class="view">
+            <div class="page-head split">
+                <div>
+                    <h1 class="pink-title">MEUS PERSONAGENS</h1>
+                    <p class="subtitle"><span id="charsSubCount">0</span> personagens · <span
+                            id="charsSubServer">Servidor Anime</span></p>
+                </div>
+                <div class="pill-row">
+                    <button class="pill cyan" id="btnAddCharacter">➕ ADICIONAR PERSONAGEM</button>
+                    <button class="pill green" id="btnOpenImport">📥 IMPORTAR MUDAE</button>
+                    <button class="pill purple" id="btnOpenWishlistOrder">⇅ REORDENAR WISHLIST</button>
+                    <button class="pill red" id="btnClearHarem">🗑 LIMPAR HAREM</button>
+                </div>
+            </div>
+
+            <div class="panel chars-toolbar">
+                <div class="toolbar-row">
+                    <div class="field toolbar-field toolbar-categories">
+                        <label>CATEGORIA</label>
+                        <div class="cat-toggle-row" id="filterCategoryRow">
+                            <button type="button" class="cat-toggle-btn cat-pink" data-category="favoritos">♥ FAVORITOS</button>
+                            <button type="button" class="cat-toggle-btn cat-yellow" data-category="estrelas">★ ESTRELAS</button>
+                            <button type="button" class="cat-toggle-btn cat-cyan" data-category="comuns">👥 COMUNS</button>
+                        </div>
+                    </div>
+                    <div class="field toolbar-field">
+                        <label>SÉRIE</label>
+                        <select id="filterSeries">
+                            <option value="">Todas</option>
+                        </select>
+                    </div>
+                    <div class="view-controls">
+                        <div class="view-toggle" id="viewToggle" title="Formato de exibição">
+                            <button type="button" class="view-toggle-btn active" data-view-mode="list" title="Lista">☰</button>
+                            <button type="button" class="view-toggle-btn" data-view-mode="grid" title="Grade">▦</button>
+                        </div>
+                        <label class="grid-details-control" id="gridDetailsControl" hidden>
+                            <span class="grid-details-label">INFORMAÇÕES</span>
+                            <input type="checkbox" id="gridDetailsToggle" checked />
+                            <span class="switch-track" aria-hidden="true"><span class="switch-thumb"></span></span>
+                        </label>
+                    </div>
+                </div>
+                <div class="toolbar-row">
+                    <div class="field toolbar-field">
+                        <label>KAKERA MÍNIMO</label>
+                        <input type="number" id="filterKakeraMin" min="0" placeholder="0" />
+                    </div>
+                    <div class="field toolbar-field">
+                        <label>KAKERA MÁXIMO</label>
+                        <input type="number" id="filterKakeraMax" min="0" placeholder="Sem limite" />
+                    </div>
+                    <div class="field toolbar-field">
+                        <label>ORDENAR POR KAKERA</label>
+                        <select id="filterSortKakera">
+                            <option value="">Sem ordenação</option>
+                            <option value="asc">Menor → Maior</option>
+                            <option value="desc">Maior → Menor</option>
+                        </select>
+                    </div>
+                    <div class="field toolbar-field">
+                        <label>ORDENAR POR CHAVES</label>
+                        <select id="filterSortKeys">
+                            <option value="">Sem ordenação</option>
+                            <option value="desc">Mais → Menos</option>
+                            <option value="asc">Menos → Mais</option>
+                        </select>
+                    </div>
+                    <div class="field toolbar-field toolbar-genders">
+                        <label>GÊNEROS</label>
+                        <div class="gender-row" id="filterGenderRow">
+                            <button type="button" class="gender-btn" data-gender="wa">$wa</button>
+                            <button type="button" class="gender-btn" data-gender="wg">$wg</button>
+                            <button type="button" class="gender-btn" data-gender="ha">$ha</button>
+                            <button type="button" class="gender-btn" data-gender="hg">$hg</button>
+                        </div>
+                    </div>
+                    <button id="btnClearFilters" class="btn-clear-filters">LIMPAR FILTROS</button>
+                </div>
+            </div>
+
+            <div id="charGroups"></div>
+        </section>
+
+        <!-- ============ ANÁLISE ============ -->
+        <section id="view-analysis" class="view">
+            <div class="page-head">
+                <h1>ANÁLISE &amp; GRÁFICOS</h1>
+                <p class="subtitle" id="analysisSubtitle">Baseado em 120 rolls/dia · pool de 5.000 personagens</p>
+            </div>
+
+            <div class="grid-4 kpi-row">
+                <div class="kpi-box">
+                    <div class="kpi-ico cyan">☰</div>
+                    <div class="kpi-value cyan" id="kpiCount">0</div>
+                    <div class="kpi-label">PERSONAGENS</div>
+                </div>
+                <div class="kpi-box">
+                    <div class="kpi-ico yellow">⟡</div>
+                    <div class="kpi-value yellow" id="kpiKakera">◈ 0</div>
+                    <div class="kpi-label">KAKERA TOTAL</div>
+                </div>
+                <div class="kpi-box">
+                    <div class="kpi-ico green">◎</div>
+                    <div class="kpi-value green" id="kpiHighChance">0</div>
+                    <div class="kpi-label">ALTA CHANCE (7D)</div>
+                </div>
+                <div class="kpi-box">
+                    <div class="kpi-ico purple">↗</div>
+                    <div class="kpi-value purple" id="kpiBest">0%</div>
+                    <div class="kpi-label">MELHOR CHANCE</div>
+                </div>
+            </div>
+
+            <div class="panel">
+                <div class="panel-title"><span class="bar cyan"></span>PROBABILIDADE POR PERSONAGEM</div>
+                <div id="barChart" class="chart-wrap"></div>
+                <div class="legend">
+                    <span><i class="dotc cyan"></i>1 dia</span>
+                    <span><i class="dotc purple"></i>7 dias</span>
+                    <span><i class="dotc pink"></i>15 dias</span>
+                </div>
+            </div>
+
+            <div class="panel">
+                <div class="panel-title"><span class="bar purple"></span>EVOLUÇÃO CUMULATIVA — TOP 5 (30 DIAS)</div>
+                <div id="lineChart" class="chart-wrap"></div>
+                <div class="legend" id="lineLegend"></div>
+            </div>
+
+            <div class="panel">
+                <div class="panel-title"><span class="bar yellow"></span>RESUMO POR CAMADA</div>
+                <table class="summary-table">
+                    <thead>
+                        <tr>
+                            <th>CAMADA</th>
+                            <th>PERSONAGENS</th>
+                            <th>CHANCE MÉDIA 7D</th>
+                            <th>KAKERA MÉDIO</th>
+                            <th>KAKERA TOTAL</th>
+                        </tr>
+                    </thead>
+                    <tbody id="summaryBody"></tbody>
+                </table>
+            </div>
+        </section>
+
+    </main>
+
+    <footer class="footer">
+        MUDAE TRACKER · PROBABILIDADES CALCULADAS COM BASE EM ROLLS/DIA E TAMANHO DO POOL
+    </footer>
+
+    <!-- ============ MODAL: NOVO PERSONAGEM ============ -->
+    <div id="modalOverlay" class="modal-overlay">
+        <div class="modal">
+            <div class="modal-head">
+                <h2 id="modalTitle">Novo Personagem</h2>
+                <button id="modalClose" class="modal-x">✕</button>
+            </div>
+            <div class="field">
+                <label>FOTO DO PERSONAGEM</label>
+                <div class="photo-upload" id="photoUploadArea">
+                    <img id="photoPreviewImg" style="display:none;" />
+                    <div id="photoPlaceholder">
+                        <span>⬆</span>
+                        <span>Clique ou arraste uma imagem</span>
+                    </div>
+                </div>
+                <input type="file" id="mPhotoInput" accept="image/*" style="display:none;" />
+                <div class="field photo-url-field">
+                    <label>OU COLE O LINK DA FOTO</label>
+                    <input type="text" id="mPhotoUrl" placeholder="https://mudae.net/uploads/..." />
+                </div>
+            </div>
+            <div class="field">
+                <label>NOME DO PERSONAGEM</label>
+                <input type="text" id="mName" placeholder="Ex: Rem" />
+            </div>
+            <div class="field">
+                <label>SÉRIE / ANIME</label>
+                <input type="text" id="mSeries" placeholder="Ex: Re:Zero" />
+            </div>
+            <div class="field">
+                <label>KAKERA</label>
+                <input type="number" id="mKakera" value="500" />
+            </div>
+            <div class="field">
+                <label>CHAVES</label>
+                <input type="number" id="mKeys" min="0" value="0" />
+            </div>
+            <div class="field">
+                <label>STATUS DO PERSONAGEM</label>
+                <select id="mClaimed">
+                    <option value="true" selected>Reivindicado</option>
+                    <option value="false">Não reivindicado</option>
+                </select>
+            </div>
+            <div class="field">
+                <label>CATEGORIA</label>
+                <select id="mCategory">
+                    <option value="favoritos">Favoritos</option>
+                    <option value="estrelas">Estrelas</option>
+                    <option value="comuns" selected>Comuns</option>
+                </select>
+            </div>
+            <div class="field">
+                <label>GÊNEROS</label>
+                <div class="gender-row" id="mGenderRow">
+                    <button type="button" class="gender-btn" data-gender="wa">$wa</button>
+                    <button type="button" class="gender-btn" data-gender="wg">$wg</button>
+                    <button type="button" class="gender-btn" data-gender="ha">$ha</button>
+                    <button type="button" class="gender-btn" data-gender="hg">$hg</button>
+                </div>
+            </div>
+            <button id="modalAdd" class="btn-add">ADICIONAR</button>
+        </div>
+    </div>
+
+    <!-- ============ MODAL: EDITAR TORRE KAKERA ============ -->
+    <div id="towerModalOverlay" class="modal-overlay">
+        <div class="modal tower-modal">
+            <div class="modal-head">
+                <div>
+                    <h2>KAKERA TOWER</h2>
+                    <p class="tower-modal-sub" id="towerModalSub">0 de 12 andares comprados</p>
+                </div>
+                <button id="towerModalClose" class="modal-x">✕</button>
+            </div>
+            <div class="tower-progress-bar">
+                <div class="tower-progress-fill" id="towerProgressFill"></div>
+            </div>
+            <div class="floor-edit-grid" id="floorEditGrid"></div>
+            <div class="tower-modal-actions">
+                <button id="towerCancelBtn" class="btn-cancel">Cancelar</button>
+                <button id="towerSaveBtn" class="btn-save">Salvar</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- ============ MODAL: IMPORTAR DO MUDAE ============ -->
+    <div id="importModalOverlay" class="modal-overlay">
+        <div class="modal import-modal">
+            <div class="modal-head">
+                <h2>Importar do Mudae</h2>
+                <button id="importModalClose" class="modal-x">✕</button>
+            </div>
+            <div class="field">
+                <label>COLE A MENSAGEM DO MUDAE (harem / wishlist)</label>
+                <textarea id="importText" rows="8" placeholder="Cole aqui o texto exportado pelo Mudae..."></textarea>
+            </div>
+            <div class="field">
+                <label>CATEGORIA PARA OS PERSONAGENS IMPORTADOS</label>
+                <select id="importCategory">
+                    <option value="comuns" selected>Comuns</option>
+                    <option value="estrelas">Estrelas</option>
+                    <option value="favoritos">Favoritos</option>
+                </select>
+            </div>
+            <button id="importParseBtn" class="btn-add">ANALISAR TEXTO</button>
+            <div id="importPreview" class="import-preview"></div>
+            <div id="importActions" class="import-actions">
+                <button id="importConfirmBtn" class="btn-add">IMPORTAR <span id="importCount">0</span> PERSONAGENS</button>
+            </div>
+            <p class="backup-status" id="importStatus"></p>
+        </div>
+    </div>
+
+    <!-- ============ MODAL: BUFFS DO PERSONAGEM (OP) ============ -->
+    <div id="opModalOverlay" class="modal-overlay">
+        <div class="modal op-modal">
+            <div class="modal-head">
+                <div>
+                    <h2>OP</h2>
+                    <p class="tower-modal-sub" id="opModalSub">Buffs de —</p>
+                </div>
+                <button id="opModalClose" class="modal-x">✕</button>
+            </div>
+            <div class="op-buff-list" id="opBuffList"></div>
+            <div class="op-modal-footer">
+                <span class="op-save-status" id="opSaveStatus"></span>
+                <button id="opCloseBtn" class="btn-minimal op-close-btn">FECHAR</button>
+                <button id="opSaveBtn" class="btn-cancel op-save-btn">SALVAR</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- ============ MODAL: REORDENAR WISHLIST ============ -->
+    <div id="wishlistOrderModalOverlay" class="modal-overlay">
+        <div class="modal wishlist-order-modal">
+            <div class="modal-head">
+                <div>
+                    <h2>REORDENAR WISHLIST</h2>
+                    <p class="tower-modal-sub">A ordem afeta o perk OP "Spawn na Wishlist": cada personagem com esse
+                        perk aumenta a chance de spawn de quem está imediatamente antes/depois dele aqui. A lista é
+                        circular — o primeiro e o último também contam como vizinhos entre si.</p>
+                </div>
+                <button id="wishlistOrderModalClose" class="modal-x">✕</button>
+            </div>
+            <div class="wishlist-order-list" id="wishlistOrderList"></div>
+            <div class="op-modal-footer">
+                <span class="op-save-status" id="wishlistOrderStatus"></span>
+                <button id="wishlistOrderCloseBtn" class="btn-minimal op-close-btn">FECHAR</button>
+            </div>
+        </div>
+    </div>
+
+    <button id="helpBtn" class="help-btn">?</button>
+
+    <script src="database.js"></script>
+    <script src="formulas.js"></script>
+    <script src="mudae-import.js"></script>
+    <script src="script.js"></script>
+</body>
+
+</html>
