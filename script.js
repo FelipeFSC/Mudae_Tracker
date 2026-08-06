@@ -452,7 +452,7 @@ function renderBoostWishSummary() {
 function renderTotalRollsPerHour() {
     const el = document.getElementById("totalRollsPerHour");
     if (!el) return;
-    el.textContent = `→ Total de rolls: ${formatConfigNumber(totalRollsPerHour(state.config))}`;
+    el.textContent = `→ Total de rolls: ${formatConfigNumber(effectiveRollsPerHour(state.config))}`;
 }
 
 // Salva a configuração no IndexedDB com um pequeno atraso (debounce),
@@ -2114,7 +2114,8 @@ if (importFileInput) {
    ============================================================ */
 function renderAnalysis() {
     const chars = state.characters;
-    const totalKakera = chars.reduce((sum, c) => sum + c.kakera, 0);
+    const totalKakera = chars.reduce((sum, c) => sum + (Number(c.kakera) || 0), 0);
+    const totalKeys = chars.reduce((sum, c) => sum + Math.max(0, Number(c.keys) || 0), 0);
     const withChances = chars.map(c => ({
         ...c,
         c1: chanceForCharacter(c, 1),
@@ -2127,7 +2128,7 @@ function renderAnalysis() {
     document.getElementById("kpiCount").textContent = chars.length;
     document.getElementById("kpiKakera").textContent = formatKakera(totalKakera);
     document.getElementById("kpiHighChance").textContent =
-        withChances.filter(c => c.c7 >= 0.5).length;
+        totalKeys.toLocaleString("pt-BR");
     const best = withChances.reduce((m, c) => Math.max(m, c.c7), 0);
     document.getElementById("kpiBest").textContent = pct(best, 1);
 
