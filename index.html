@@ -9,7 +9,7 @@
     <link
         href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;600;700;800&family=Inter:wght@400;500;600&display=swap"
         rel="stylesheet">
-    <link rel="stylesheet" href="style.css" />
+    <link rel="stylesheet" href="style.css?v=21" />
     <meta name="referrer" content="no-referrer">
 </head>
 
@@ -78,9 +78,12 @@
                         <label>POOL / LIMROUL $HG</label>
                         <input type="number" id="cfgPoolHG" min="1" />
                     </div>
-                    <div class="field">
-                        <label>ROLLS POR HORA</label>
-                        <input type="number" id="cfgRollsPerHour" min="0" />
+                    <div class="field rolls-base-field">
+                        <label>ROLLS POR HORA (BASE)</label>
+                        <div class="rolls-base-row">
+                            <input type="number" id="cfgRollsPerHour" min="0" />
+                            <span id="totalRollsPerHour" class="total-rolls-label" aria-live="polite">→ Total de rolls: 0</span>
+                        </div>
                     </div>
 
                     <div class="field">
@@ -101,9 +104,20 @@
                         <label>PÁGINA ATUAL DO TUTORIAL</label>
                         <input type="number" id="cfgTutorialPage" min="0" />
                     </div>
-                    <div class="field">
-                        <label>ROLLS INVESTIDOS EM $BOOSTWISH</label>
-                        <input type="number" id="cfgBoostWishRolls" min="0" />
+                    <div class="field boostwish-field">
+                        <div class="field-label-with-info">
+                            <label for="cfgBoostWishRolls">ROLLS INVESTIDOS EM $BOOSTWISH</label>
+                            <span class="info-tooltip">
+                                <button type="button" class="info-tooltip-trigger" aria-label="Ver bônus do boostwish" aria-describedby="boostWishSummary">i</button>
+                                <span id="boostWishSummary" class="boostwish-summary" role="tooltip" aria-live="polite">
+                                    <span>Rolls investidos: <strong>0</strong></span>
+                                    <span>Wishes: <strong>+0%</strong></span>
+                                    <span>Starwish adicional: <strong>+0%</strong></span>
+                                    <span>Starwish total: <strong>+0%</strong></span>
+                                </span>
+                            </span>
+                        </div>
+                        <input type="number" id="cfgBoostWishRolls" min="0" step="1" />
                     </div>
                     <div class="field">
                         <label>$PERSONALRARE (APROX.)</label>
@@ -458,8 +472,7 @@
                 <label>(harem): $mmsaty+ri-c+x+ko</label>
                 <label>(wishlist): $wly+ri-c+x+ok</label>
                 <br />
-                <label>Lista de Personagens: </label>
-
+                <label>Lista de Personagens:</label>
                 <textarea id="importText" rows="8" placeholder="Cole aqui o texto exportado pelo Mudae..."></textarea>
             </div>
             <div class="field">
@@ -520,10 +533,10 @@
 
     <button id="helpBtn" class="help-btn">?</button>
 
-    <script src="database.js"></script>
-    <script src="formulas.js"></script>
-    <script src="mudae-import.js"></script>
-    <script src="script.js"></script>
+    <script src="database.js?v=21"></script>
+    <script src="formulas.js?v=21"></script>
+    <script src="mudae-import.js?v=21"></script>
+    <script src="script.js?v=21"></script>
 </body>
 
 </html>

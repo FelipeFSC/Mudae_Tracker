@@ -248,21 +248,47 @@ function getKakeraTowerStats(config) {
 
 function getBoostWishBonuses(rollsInvested) {
     const n = Math.max(0, Math.floor(Number(rollsInvested) || 0));
-    let wish = 0, star = 0;
-    for (let i = 1; i <= n; i++) {
-        wish += i <= 5 ? .20 : i <= 15 ? .15 : i <= 100 ? .10 : i <= 200 ? .05 : .01;
-        star += i <= 100 ? .10 : i <= 200 ? .05 : .01;
-    }
-    return { wish, star };
+
+    // $boostwish é progressivo por faixa. Cada parcela representa somente os
+    // rolls que caem dentro daquela faixa, evitando aplicar a taxa atual a
+    // todos os rolls anteriores.
+    const wish20 = Math.min(n, 5);
+    const wish15 = Math.min(Math.max(n - 5, 0), 10);
+    const wish10 = Math.min(Math.max(n - 15, 0), 85);
+    const wish5 = Math.min(Math.max(n - 100, 0), 100);
+    const wish1 = Math.max(n - 200, 0);
+
+    const star10 = Math.min(n, 100);
+    const star5 = Math.min(Math.max(n - 100, 0), 100);
+    const star1 = Math.max(n - 200, 0);
+
+    const wish = wish20 * .20 + wish15 * .15 + wish10 * .10 + wish5 * .05 + wish1 * .01;
+    const star = star10 * .10 + star5 * .05 + star1 * .01;
+
+    return {
+        rolls: n,
+        wish,
+        star,
+        // Starwish recebe o bônus normal de wish e, além disso, o bônus
+        // exclusivo de starwish.
+        starTotal: wish + star,
+        wishPercent: wish * 100,
+        starPercent: star * 100,
+        starTotalPercent: (wish + star) * 100
+    };
 }
 
-function effectiveRollsPerHour(config) {
+function totalRollsPerHour(config) {
     const tower = getKakeraTowerStats(config);
     const base = Number(config.rollsPerHour) || 0;
     const sapphire = Number(sapphireBadge[clamp(config.levelSafira, 0, 4)] || 0);
     const rubyIV = Number(config.levelRuby) >= 4 ? 2 : 0;
+    return Math.max(0, base + sapphire + rubyIV + tower.extraRollsPerHour);
+}
+
+function effectiveRollsPerHour(config) {
     const invested = Math.max(0, Number(config.boostWishRolls) || 0);
-    return Math.max(0, base + sapphire + rubyIV + tower.extraRollsPerHour - invested);
+    return Math.max(0, totalRollsPerHour(config) - invested);
 }
 
 function effectivePools(config) {
@@ -347,20 +373,28 @@ function ownShopS1Bonus(config, person) {
     return ownPerk1Bonus * shopS1SelfPercent[shopLevel];
 }
 
+function getBoostWishSpawnBonus(config, person) {
+    if (!WISHLIST_CATEGORIES.includes(person?.category)) return 0;
+    const bw = getBoostWishBonuses(config?.boostWishRolls);
+    return bw.wish + (person.category === "estrelas" ? bw.star : 0);
+}
+
 function getCharacterBuffMultiplier(config, person, characters) {
     if (!WISHLIST_CATEGORIES.includes(person?.category)) return 1;
     let bonus = 0;
     bonus += silverBadge[clamp(config.levelPrata, 0, 4)] || 0;
     bonus += rubyWishBonus[clamp(config.levelRuby, 0, 4)] || 0;
     if (config.useSlashCommands) bonus += .10;
-    const bw = getBoostWishBonuses(config.boostWishRolls);
-    bonus += bw.wish;
+
+    // $boostwish é somado ao peso de spawn antes da probabilidade acumulada.
+    // Favoritos recebem o bônus de wish; estrelas recebem wish + starwish adicional.
+    bonus += getBoostWishSpawnBonus(config, person);
+
     if (person.category === "estrelas") {
         const tower = getKakeraTowerStats(config);
         bonus += tower.starwishChanceBonus;
         if (Number(config.tutorialPage) >= 10) bonus += .50;
         if (Number(config.tutorialPage) >= 16) bonus += .50;
-        bonus += bw.star;
     }
     bonus += wishlistAdjacentOpBonus(person, characters);
     bonus += ownShopS1Bonus(config, person);

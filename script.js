@@ -418,6 +418,8 @@ function loadConfigForm() {
     }
     renderKakeraTowers();
     renderShopBuffList();
+    renderBoostWishSummary();
+    renderTotalRollsPerHour();
 }
 
 function renderConfigStats() {
@@ -425,6 +427,32 @@ function renderConfigStats() {
     document.getElementById("baseChance1d").textContent = pct(baseCalcChance(state.config, dummy, 1), 2);
     document.getElementById("baseChance7d").textContent = pct(baseCalcChance(state.config, dummy, 7), 1);
     document.getElementById("baseChance30d").textContent = pct(baseCalcChance(state.config, dummy, 30), 1);
+}
+
+function formatConfigNumber(value) {
+    return Number(value || 0).toLocaleString("pt-BR", {
+        minimumFractionDigits: Number.isInteger(Number(value || 0)) ? 0 : 1,
+        maximumFractionDigits: 2
+    });
+}
+
+function renderBoostWishSummary() {
+    const el = document.getElementById("boostWishSummary");
+    if (!el) return;
+
+    const bw = getBoostWishBonuses(state.config.boostWishRolls);
+    el.innerHTML = `
+        <span>Rolls investidos: <strong>${formatConfigNumber(bw.rolls)}</strong></span>
+        <span>Wishes: <strong>+${formatConfigNumber(bw.wishPercent)}%</strong></span>
+        <span>Starwish adicional: <strong>+${formatConfigNumber(bw.starPercent)}%</strong></span>
+        <span>Starwish total: <strong>+${formatConfigNumber(bw.starTotalPercent)}%</strong></span>
+    `;
+}
+
+function renderTotalRollsPerHour() {
+    const el = document.getElementById("totalRollsPerHour");
+    if (!el) return;
+    el.textContent = `→ Total de rolls: ${formatConfigNumber(totalRollsPerHour(state.config))}`;
 }
 
 // Salva a configuração no IndexedDB com um pequeno atraso (debounce),
@@ -467,6 +495,8 @@ CONFIG_NUMBER_FIELDS.forEach(({ id, key }) => {
         state.config[key] = Math.max(0, parseInt(el.value) || 0);
         if (key === "haremLimit") updateHaremCountDisplay();
         renderConfigStats();
+        renderBoostWishSummary();
+        renderTotalRollsPerHour();
         renderCharacters();
         scheduleSaveConfig();
     });
@@ -549,6 +579,9 @@ function renderKakeraTowers() {
             state.config.kakeraTowers = state.config.kakeraTowers.filter(t => t.id !== tower.id);
             scheduleSaveConfig();
             renderKakeraTowers();
+            renderTotalRollsPerHour();
+            renderConfigStats();
+            renderCharacters();
         });
         towerGrid.appendChild(card);
     });
@@ -675,6 +708,9 @@ document.getElementById("towerSaveBtn").addEventListener("click", () => {
         tower.floors = [...editingFloors];
         scheduleSaveConfig();
         renderKakeraTowers();
+        renderTotalRollsPerHour();
+        renderConfigStats();
+        renderCharacters();
     }
     closeTowerModal();
 });
@@ -1037,6 +1073,8 @@ function renderCharCard(c) {
     const breakdownText = [
         `Pool: ${breakdown.pool}`,
         `Rolls/dia: ${breakdown.rollsPerDay}`,
+        `$boostwish (wishes): +${fmtBuff((breakdown.boostWish || 0) * 100)}%`,
+        ...(c.category === "estrelas" ? [`$boostwish adicional da starwish: +${fmtBuff((breakdown.boostStarwish || 0) * 100)}%`] : []),
         `OP recebido dos adjacentes: +${fmtBuff(adjacentOpPct)}%`,
         `Perk 1 próprio: +${fmtBuff(ownPerk1Pct)}%`,
         `SHOP 1 compartilha: ${fmtBuff(shop1SharePct)}% do Perk 1 próprio`,
