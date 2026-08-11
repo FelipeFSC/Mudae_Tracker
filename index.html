@@ -9,7 +9,7 @@
     <link
         href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;600;700;800&family=Inter:wght@400;500;600&display=swap"
         rel="stylesheet">
-    <link rel="stylesheet" href="style.css?v=22" />
+    <link rel="stylesheet" href="style.css?v=23" />
     <meta name="referrer" content="no-referrer">
 </head>
 
@@ -43,6 +43,28 @@
             <div class="page-head">
                 <h1><span class="page-icon">⚔</span> MUDAE TRACKER</h1>
                 <p class="subtitle">Configure seus parâmetros para calcular probabilidades</p>
+            </div>
+
+            <div class="panel">
+                <div class="panel-title"><span class="bar green"></span>PERFIL</div>
+                <p class="subtitle">Cada perfil tem sua própria lista de personagens e configuração — nada é
+                    compartilhado entre eles. Crie um perfil novo (ex: "Felipe V2") para começar do zero sem perder o
+                    que já está salvo aqui.</p>
+                <div class="grid-2">
+                    <div class="field">
+                        <label>PERFIL ATIVO</label>
+                        <select id="profileSelect"></select>
+                    </div>
+                    <div class="field">
+                        <label>AÇÕES</label>
+                        <div class="pill-row profile-actions-row">
+                            <button type="button" class="pill cyan" id="btnNewProfile">➕ NOVO PERFIL</button>
+                            <button type="button" class="pill purple" id="btnRenameProfile">✎ RENOMEAR</button>
+                            <button type="button" class="pill red" id="btnDeleteProfile">🗑 EXCLUIR</button>
+                        </div>
+                    </div>
+                </div>
+                <p class="backup-status" id="profileStatus"></p>
             </div>
 
             <div class="panel">
@@ -334,6 +356,28 @@
                 </div>
             </div>
 
+            <div class="panel profile-compare-toggle-wrap">
+                <button type="button" class="pill purple" id="btnToggleProfileCompare">👥 VER TODOS OS PERFIS</button>
+                <p class="subtitle profile-compare-hint">Compare quanto de chave, kakera e a maior chance (7 dias)
+                    cada perfil possui, sem sair daqui.</p>
+            </div>
+
+            <div class="panel" id="profileCompareWrap" hidden>
+                <div class="panel-title"><span class="bar green"></span>COMPARATIVO ENTRE PERFIS</div>
+                <table class="summary-table">
+                    <thead>
+                        <tr>
+                            <th>PERFIL</th>
+                            <th>PERSONAGENS</th>
+                            <th>CHAVES</th>
+                            <th>KAKERA TOTAL</th>
+                            <th>MAIOR CHANCE (7D)</th>
+                        </tr>
+                    </thead>
+                    <tbody id="profileCompareBody"></tbody>
+                </table>
+            </div>
+
             <div class="panel">
                 <div class="panel-title"><span class="bar cyan"></span>PROBABILIDADE POR PERSONAGEM</div>
                 <div id="barChart" class="chart-wrap"></div>
@@ -533,10 +577,10 @@
 
     <button id="helpBtn" class="help-btn">?</button>
 
-    <script src="database.js?v=22"></script>
-    <script src="formulas.js?v=22"></script>
-    <script src="mudae-import.js?v=22"></script>
-    <script src="script.js?v=22"></script>
+    <script src="database.js?v=23"></script>
+    <script src="formulas.js?v=23"></script>
+    <script src="mudae-import.js?v=23"></script>
+    <script src="script.js?v=23"></script>
 </body>
 
 </html>

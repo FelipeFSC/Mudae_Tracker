@@ -5,48 +5,59 @@
    Persistência: IndexedDB via database.js (com backup em JSON)
    ============================================================ */
 
+// Valores padrão de configuração. Cada PERFIL (ver PROFILES mais abaixo)
+// guarda a própria cópia dessas configurações + a própria lista de
+// personagens no IndexedDB (database.js já isola tudo isso internamente
+// pelo perfil ativo); aqui só precisamos de uma função pra gerar uma cópia
+// nova e independente sempre que um perfil "vazio" for carregado.
+const DEFAULT_CONFIG = {
+    // Identificação
+    serverName: "Servidor Anime",
+    userTag: "Otaku Master",
+
+    // Configurações de servidor
+    poolWA: 7000,
+    poolHA: 7000,
+    poolWG: 5000,
+    poolHG: 5000,
+    rollsPerHour: 0,
+    gameplayHour: 0,
+    haremLimit: 0, // 0 = sem limite
+
+    // Buffs do jogador
+    tutorialPage: 0,
+    useSlashCommands: false,
+    boostWishRolls: 0,
+    personalRare: 1,
+    levelBronze: 0,
+    levelPrata: 0,
+    levelOuro: 0,
+    levelSafira: 0,
+    levelRuby: 0,
+    levelEsmeralda: 0,
+    levelDiamante: 0,
+
+    // Kakera Tower: lista de torres, cada uma com 12 andares (true = comprado)
+    kakeraTowers: [],
+
+    // Buffs de perfil da $shop: { s1: nivel, s2: nivel, ... } (ver SHOP_DEFS)
+    shopLevels: {},
+
+
+    // Preferência de exibição da lista de personagens: "list" ou "grid"
+    viewMode: "list",
+
+    // Exibe todas as informações nos cards da grade. Quando false, a grade
+    // destaca a imagem e mantém somente nome, kakera e botões de ação.
+    gridDetailsEnabled: true
+};
+
+function cloneDefaultConfig() {
+    return JSON.parse(JSON.stringify(DEFAULT_CONFIG));
+}
+
 const state = {
-    config: {
-        // Identificação
-        serverName: "Servidor Anime",
-        userTag: "Otaku Master",
-
-        // Configurações de servidor
-        poolWA: 7000,
-        poolHA: 7000,
-        poolWG: 5000,
-        poolHG: 5000,
-        rollsPerHour: 0,
-        gameplayHour: 0,
-        haremLimit: 0, // 0 = sem limite
-
-        // Buffs do jogador
-        tutorialPage: 0,
-        useSlashCommands: false,
-        boostWishRolls: 0,
-        personalRare: 1,
-        levelBronze: 0,
-        levelPrata: 0,
-        levelOuro: 0,
-        levelSafira: 0,
-        levelRuby: 0,
-        levelEsmeralda: 0,
-        levelDiamante: 0,
-
-        // Kakera Tower: lista de torres, cada uma com 12 andares (true = comprado)
-        kakeraTowers: [],
-
-        // Buffs de perfil da $shop: { s1: nivel, s2: nivel, ... } (ver SHOP_DEFS)
-        shopLevels: {},
-
-
-        // Preferência de exibição da lista de personagens: "list" ou "grid"
-        viewMode: "list",
-
-        // Exibe todas as informações nos cards da grade. Quando false, a grade
-        // destaca a imagem e mantém somente nome, kakera e botões de ação.
-        gridDetailsEnabled: true
-    },
+    config: cloneDefaultConfig(),
     characters: []
 };
 
@@ -843,24 +854,30 @@ if (filterGenderRow) {
         });
     });
 }
+// Extraído em função própria para poder ser reaproveitado ao trocar de
+// perfil (ver PROFILES): os filtros de um perfil não fazem sentido nos
+// personagens de outro, então são limpos automaticamente na troca.
+function resetCharFilters() {
+    charFilters.categories.clear();
+    charFilters.series = "";
+    charFilters.kakeraMin = null;
+    charFilters.kakeraMax = null;
+    charFilters.sortKakera = "";
+    charFilters.sortKeys = "";
+    charFilters.genders.clear();
+
+    if (filterCategoryRow) filterCategoryRow.querySelectorAll(".cat-toggle-btn").forEach(btn => btn.classList.remove("active"));
+    if (filterSeriesEl) filterSeriesEl.value = "";
+    if (filterKakeraMinEl) filterKakeraMinEl.value = "";
+    if (filterKakeraMaxEl) filterKakeraMaxEl.value = "";
+    if (filterSortKakeraEl) filterSortKakeraEl.value = "";
+    if (filterSortKeysEl) filterSortKeysEl.value = "";
+    if (filterGenderRow) filterGenderRow.querySelectorAll(".gender-btn").forEach(btn => btn.classList.remove("active"));
+}
+
 if (btnClearFilters) {
     btnClearFilters.addEventListener("click", () => {
-        charFilters.categories.clear();
-        charFilters.series = "";
-        charFilters.kakeraMin = null;
-        charFilters.kakeraMax = null;
-        charFilters.sortKakera = "";
-        charFilters.sortKeys = "";
-        charFilters.genders.clear();
-
-        if (filterCategoryRow) filterCategoryRow.querySelectorAll(".cat-toggle-btn").forEach(btn => btn.classList.remove("active"));
-        if (filterSeriesEl) filterSeriesEl.value = "";
-        if (filterKakeraMinEl) filterKakeraMinEl.value = "";
-        if (filterKakeraMaxEl) filterKakeraMaxEl.value = "";
-        if (filterSortKakeraEl) filterSortKakeraEl.value = "";
-        if (filterSortKeysEl) filterSortKeysEl.value = "";
-        if (filterGenderRow) filterGenderRow.querySelectorAll(".gender-btn").forEach(btn => btn.classList.remove("active"));
-
+        resetCharFilters();
         renderCharacters();
     });
 }
@@ -2110,6 +2127,193 @@ if (importFileInput) {
 }
 
 /* ============================================================
+   PERFIS (multi-perfil)
+   ------------------------------------------------------------
+   Cada perfil tem sua PRÓPRIA lista de personagens e configuração,
+   isoladas dentro do database.js (é ele quem filtra tudo pelo perfil
+   ativo). Aqui só cuidamos da interface: listar perfis, trocar,
+   criar, renomear e excluir — e recarregar `state` quando o perfil
+   ativo muda. Nenhum cálculo, listagem ou filtro é alterado por
+   causa disso: eles continuam lendo `state.config`/`state.characters`
+   exatamente como antes, só que agora esses dados pertencem ao
+   perfil selecionado no momento.
+   ============================================================ */
+const profileSelectEl = document.getElementById("profileSelect");
+const btnNewProfile = document.getElementById("btnNewProfile");
+const btnRenameProfile = document.getElementById("btnRenameProfile");
+const btnDeleteProfile = document.getElementById("btnDeleteProfile");
+const profileStatusEl = document.getElementById("profileStatus");
+
+let profileStatusTimeout = null;
+function setProfileStatus(msg, isError = false) {
+    if (!profileStatusEl) return;
+    profileStatusEl.textContent = msg;
+    profileStatusEl.style.color = isError ? "var(--pink)" : "var(--green)";
+    clearTimeout(profileStatusTimeout);
+    if (msg) {
+        profileStatusTimeout = setTimeout(() => { profileStatusEl.textContent = ""; }, 3000);
+    }
+}
+
+// Carrega do IndexedDB tudo que pertence ao perfil ATUALMENTE ativo
+// (config + personagens) para dentro de `state`. É a mesma lógica que
+// já existia dentro de initApp(), só que extraída pra poder ser chamada
+// de novo sempre que o usuário trocar de perfil.
+async function loadActiveProfileData() {
+    const [dbCharacters, dbConfig] = await Promise.all([
+        Database.getAllCharacters(),
+        Database.getConfig()
+    ]);
+
+    state.characters = dbCharacters || [];
+    state.config = cloneDefaultConfig();
+
+    // Migração: personagens antigos de "favoritos" ainda sem wishlistPosition
+    // recebem uma posição agora, na ordem em que já estavam salvos.
+    const charactersToMigrate = ensureWishlistPositions();
+    if (charactersToMigrate.length > 0) {
+        try {
+            await Promise.all(charactersToMigrate.map(c => Database.updateCharacter(c)));
+        } catch (err) {
+            console.error("Erro ao migrar posições da wishlist:", err);
+        }
+    }
+
+    if (dbConfig) {
+        // Mescla com os padrões, garantindo que campos novos não fiquem undefined
+        Object.assign(state.config, dbConfig);
+    } else {
+        // Perfil novo / primeira execução: ainda não existe configuração salva
+        await Database.saveConfig(state.config);
+    }
+
+    const gendersBeforeMigration = state.characters.map(character => JSON.stringify(character.genders ?? []));
+    migrateLegacyConfig();
+    const normalizedGenderCharacters = state.characters.filter((character, index) =>
+        JSON.stringify(character.genders ?? []) !== gendersBeforeMigration[index]
+    );
+    if (normalizedGenderCharacters.length > 0) {
+        try {
+            await Promise.all(normalizedGenderCharacters.map(character => Database.updateCharacter(character)));
+        } catch (err) {
+            console.error("Erro ao normalizar roletas antigas:", err);
+        }
+    }
+}
+
+// Repopula o <select> de perfis a partir do banco, mantendo o perfil
+// ativo selecionado. Também habilita/desabilita o botão de excluir
+// (não é permitido excluir o único perfil existente).
+async function refreshProfileSelector() {
+    if (!profileSelectEl) return;
+    try {
+        const [profiles, activeId] = await Promise.all([
+            Database.listProfiles(),
+            Database.getActiveProfileId()
+        ]);
+        profileSelectEl.innerHTML = profiles.map(p =>
+            `<option value="${p.id}">${escapeXml(p.name)}</option>`
+        ).join("");
+        profileSelectEl.value = String(activeId);
+        if (btnDeleteProfile) btnDeleteProfile.disabled = profiles.length <= 1;
+    } catch (err) {
+        console.error("Erro ao carregar a lista de perfis:", err);
+    }
+}
+
+// Recarrega toda a interface depois de uma troca/criação/exclusão de perfil,
+// sem duplicar a lógica de renderização que já existe em cada view.
+async function refreshAppAfterProfileChange() {
+    resetCharFilters();
+    await loadActiveProfileData();
+    loadConfigForm();
+    renderConfigStats();
+    renderCharacters();
+    if (views.analysis.classList.contains("active")) renderAnalysis();
+}
+
+if (profileSelectEl) {
+    profileSelectEl.addEventListener("change", async () => {
+        const newId = Number(profileSelectEl.value);
+        if (!Number.isFinite(newId)) return;
+        try {
+            await Database.setActiveProfile(newId);
+            await refreshAppAfterProfileChange();
+            await refreshProfileSelector();
+            const profiles = await Database.listProfiles();
+            const active = profiles.find(p => p.id === newId);
+            setProfileStatus(`✓ Perfil "${active ? active.name : ""}" ativado.`);
+        } catch (err) {
+            console.error("Erro ao trocar de perfil:", err);
+            setProfileStatus("Erro ao trocar de perfil.", true);
+        }
+    });
+}
+
+if (btnNewProfile) {
+    btnNewProfile.addEventListener("click", async () => {
+        const name = prompt("Nome do novo perfil:", "");
+        if (name === null) return; // cancelado
+        try {
+            const newId = await Database.createProfile(name);
+            await Database.setActiveProfile(newId);
+            await refreshAppAfterProfileChange();
+            await refreshProfileSelector();
+            setProfileStatus(`✓ Perfil "${(name || "").trim() || "Novo perfil"}" criado e ativado.`);
+        } catch (err) {
+            console.error("Erro ao criar perfil:", err);
+            setProfileStatus("Erro ao criar perfil.", true);
+        }
+    });
+}
+
+if (btnRenameProfile) {
+    btnRenameProfile.addEventListener("click", async () => {
+        try {
+            const activeId = await Database.getActiveProfileId();
+            const profiles = await Database.listProfiles();
+            const current = profiles.find(p => p.id === activeId);
+            const name = prompt("Novo nome para o perfil:", current ? current.name : "");
+            if (name === null) return; // cancelado
+            if (!name.trim()) {
+                setProfileStatus("O nome do perfil não pode ficar vazio.", true);
+                return;
+            }
+            await Database.renameProfile(activeId, name);
+            await refreshProfileSelector();
+            setProfileStatus("✓ Perfil renomeado.");
+        } catch (err) {
+            console.error("Erro ao renomear perfil:", err);
+            setProfileStatus("Erro ao renomear perfil.", true);
+        }
+    });
+}
+
+if (btnDeleteProfile) {
+    btnDeleteProfile.addEventListener("click", async () => {
+        try {
+            const activeId = await Database.getActiveProfileId();
+            const profiles = await Database.listProfiles();
+            const current = profiles.find(p => p.id === activeId);
+            if (profiles.length <= 1) {
+                setProfileStatus("Não é possível excluir o único perfil existente.", true);
+                return;
+            }
+            const confirmed = confirm(`Excluir o perfil "${current ? current.name : ""}"? Todos os personagens e configurações desse perfil serão apagados permanentemente.`);
+            if (!confirmed) return;
+
+            await Database.deleteProfile(activeId);
+            await refreshAppAfterProfileChange();
+            await refreshProfileSelector();
+            setProfileStatus("✓ Perfil excluído.");
+        } catch (err) {
+            console.error("Erro ao excluir perfil:", err);
+            setProfileStatus("Erro ao excluir perfil.", true);
+        }
+    });
+}
+
+/* ============================================================
    VIEW: ANÁLISE
    ============================================================ */
 function renderAnalysis() {
@@ -2135,6 +2339,83 @@ function renderAnalysis() {
     renderBarChart(withChances);
     renderLineChart(withChances);
     renderSummaryTable(withChances);
+
+    // Comparativo entre perfis: só recalcula se o usuário já pediu pra ver
+    // (evita ler todos os perfis do banco toda vez que a aba é aberta).
+    if (profileCompareVisible) renderProfileCompare();
+}
+
+/* ---------- Comparativo entre perfis (opcional) ----------
+   Não mexe nos KPIs/gráficos acima, que continuam mostrando só o perfil
+   ativo. Isso aqui é uma seção à parte, exibida sob demanda, que lê os
+   personagens e a configuração de CADA perfil (via
+   Database.getAllProfilesData) e usa as MESMAS funções de cálculo já
+   existentes em formulas.js pra cada um — então o resultado é sempre
+   consistente com o que aquele perfil mostraria se estivesse ativo. */
+const btnToggleProfileCompare = document.getElementById("btnToggleProfileCompare");
+const profileCompareWrap = document.getElementById("profileCompareWrap");
+const profileCompareBody = document.getElementById("profileCompareBody");
+let profileCompareVisible = false;
+
+if (btnToggleProfileCompare) {
+    btnToggleProfileCompare.addEventListener("click", async () => {
+        profileCompareVisible = !profileCompareVisible;
+        if (profileCompareWrap) profileCompareWrap.hidden = !profileCompareVisible;
+        btnToggleProfileCompare.classList.toggle("is-active", profileCompareVisible);
+        btnToggleProfileCompare.textContent = profileCompareVisible
+            ? "👥 OCULTAR TODOS OS PERFIS"
+            : "👥 VER TODOS OS PERFIS";
+        if (profileCompareVisible) await renderProfileCompare();
+    });
+}
+
+async function renderProfileCompare() {
+    if (!profileCompareBody) return;
+    profileCompareBody.innerHTML = `<tr><td colspan="5">Carregando...</td></tr>`;
+    try {
+        const [allProfilesData, activeId] = await Promise.all([
+            Database.getAllProfilesData(),
+            Database.getActiveProfileId()
+        ]);
+
+        const rows = allProfilesData.map(profile => {
+            const cfg = profile.config || {};
+            const profChars = profile.characters || [];
+            const totalKakera = profChars.reduce((sum, c) => sum + (Number(c.kakera) || 0), 0);
+            const totalKeys = profChars.reduce((sum, c) => sum + Math.max(0, Number(c.keys) || 0), 0);
+            let best = 0;
+            profChars.forEach(c => {
+                const ratio = (Number(buffsCalcChance(cfg, c, 7, profChars)) || 0) / 100;
+                if (ratio > best) best = ratio;
+            });
+            return {
+                id: profile.id,
+                name: profile.name,
+                count: profChars.length,
+                totalKeys,
+                totalKakera,
+                best
+            };
+        });
+
+        if (rows.length === 0) {
+            profileCompareBody.innerHTML = `<tr><td colspan="5">Nenhum perfil encontrado.</td></tr>`;
+            return;
+        }
+
+        profileCompareBody.innerHTML = rows.map(r => `
+      <tr class="${r.id === activeId ? "profile-row-active" : ""}">
+        <td>${escapeXml(r.name)}${r.id === activeId ? ' <span class="profile-active-tag">ATUAL</span>' : ""}</td>
+        <td>${r.count}</td>
+        <td>${r.totalKeys.toLocaleString("pt-BR")}</td>
+        <td class="kakera-val">◈ ${r.totalKakera.toLocaleString("pt-BR")}</td>
+        <td class="chance-val">${pct(r.best, 1)}</td>
+      </tr>
+    `).join("");
+    } catch (err) {
+        console.error("Erro ao montar o comparativo de perfis:", err);
+        profileCompareBody.innerHTML = `<tr><td colspan="5">Erro ao carregar o comparativo de perfis.</td></tr>`;
+    }
 }
 
 /* ---------- Gráfico de barras (SVG) ---------- */
@@ -2311,50 +2592,14 @@ function migrateLegacyConfig() {
 async function initApp() {
     try {
         await Database.init();
-
-        const [dbCharacters, dbConfig] = await Promise.all([
-            Database.getAllCharacters(),
-            Database.getConfig()
-        ]);
-
-        state.characters = dbCharacters || [];
-
-        // Migração: personagens antigos de "favoritos" ainda sem wishlistPosition
-        // recebem uma posição agora, na ordem em que já estavam salvos.
-        const charactersToMigrate = ensureWishlistPositions();
-        if (charactersToMigrate.length > 0) {
-            try {
-                await Promise.all(charactersToMigrate.map(c => Database.updateCharacter(c)));
-            } catch (err) {
-                console.error("Erro ao migrar posições da wishlist:", err);
-            }
-        }
-
-        if (dbConfig) {
-            // Mescla com os padrões, garantindo que campos novos não fiquem undefined
-            Object.assign(state.config, dbConfig);
-        } else {
-            // Primeira execução: ainda não existe configuração salva
-            await Database.saveConfig(state.config);
-        }
-        const gendersBeforeMigration = state.characters.map(character => JSON.stringify(character.genders ?? []));
-        migrateLegacyConfig();
-        const normalizedGenderCharacters = state.characters.filter((character, index) =>
-            JSON.stringify(character.genders ?? []) !== gendersBeforeMigration[index]
-        );
-        if (normalizedGenderCharacters.length > 0) {
-            try {
-                await Promise.all(normalizedGenderCharacters.map(character => Database.updateCharacter(character)));
-            } catch (err) {
-                console.error("Erro ao normalizar roletas antigas:", err);
-            }
-        }
+        await loadActiveProfileData();
     } catch (err) {
         console.error("Erro ao iniciar o banco de dados local:", err);
         state.characters = [];
         setBackupStatus("Não foi possível acessar o armazenamento local deste navegador.", true);
     }
 
+    await refreshProfileSelector();
     loadConfigForm();
     renderConfigStats();
     renderCharacters();
