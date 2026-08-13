@@ -1831,7 +1831,6 @@ function parseMudaeImportText(rawText) {
 
 const importModalOverlay = document.getElementById("importModalOverlay");
 const importText = document.getElementById("importText");
-const importCategory = document.getElementById("importCategory");
 const importParseBtn = document.getElementById("importParseBtn");
 const importPreview = document.getElementById("importPreview");
 const importActions = document.getElementById("importActions");
@@ -1851,7 +1850,6 @@ function setImportStatus(msg, isError = false) {
 function openImportModal() {
     if (!importModalOverlay) return;
     importText.value = "";
-    importCategory.value = "comuns";
     parsedImportItems = [];
     importPreview.innerHTML = "";
     importActions.classList.remove("active");
@@ -1939,7 +1937,10 @@ if (importConfirmBtn) {
     importConfirmBtn.addEventListener("click", async () => {
         if (parsedImportItems.length === 0) return;
 
-        const selectedCategory = importCategory.value;
+        // Personagens do harem entram sempre em "comuns" — a categorização
+        // fina (favoritos/estrelas) já acontece automaticamente pelo import
+        // da wishlist, então não pedimos mais isso aqui.
+        const selectedCategory = "comuns";
         const isWishlistImport = parsedImportItems.every(item => item.importType === "wishlist");
         const importedNames = new Set(parsedImportItems.map(item => normalizeCharacterName(item.name)).filter(Boolean));
         const newItemsCount = parsedImportItems.filter(item => !findExistingCharacterByName(item.name)).length;
@@ -2034,6 +2035,177 @@ if (importConfirmBtn) {
             setImportStatus(`Processados ${updated + inserted + removed} itens antes de um erro ocorrer. Revise os dados e tente novamente.`, true);
         } finally {
             importConfirmBtn.disabled = false;
+        }
+    });
+}
+
+/* ============================================================
+   IMPORTAR BUFFS OP (texto colado do $mmzs — esferas investidas)
+   ------------------------------------------------------------
+   Esse import é diferente do de cima: o texto do $mmzs só traz
+   nome do personagem e quanto foi investido em esferas nele — sem
+   foto, série, gêneros ou chave. Por isso ele NUNCA cria personagem
+   novo, só atualiza (por nome) quem já existe no sistema, ajustando
+   o buff do OP escolhido pra cada um. O padrão sugerido é: quem tem
+   1.000+ esferas investidas ganha o buff 10 (p10); abaixo disso,
+   ganha o buff 1 (p1) — mas o usuário pode trocar antes de importar.
+   ============================================================ */
+const opImportModalOverlay = document.getElementById("opImportModalOverlay");
+const opImportText = document.getElementById("opImportText");
+const opImportParseBtn = document.getElementById("opImportParseBtn");
+const opImportPreview = document.getElementById("opImportPreview");
+const opImportActions = document.getElementById("opImportActions");
+const opImportCount = document.getElementById("opImportCount");
+const opImportConfirmBtn = document.getElementById("opImportConfirmBtn");
+const opImportStatus = document.getElementById("opImportStatus");
+const btnOpenOpImport = document.getElementById("btnOpenOpImport");
+
+let parsedOpImportItems = [];
+
+function setOpImportStatus(msg, isError = false) {
+    if (!opImportStatus) return;
+    opImportStatus.textContent = msg;
+    opImportStatus.style.color = isError ? "var(--pink)" : "var(--green)";
+}
+
+function openOpImportModal() {
+    if (!opImportModalOverlay) return;
+    opImportText.value = "";
+    parsedOpImportItems = [];
+    opImportPreview.innerHTML = "";
+    opImportActions.classList.remove("active");
+    setOpImportStatus("");
+    opImportModalOverlay.classList.add("active");
+    opImportText.focus();
+}
+
+function closeOpImportModal() {
+    if (!opImportModalOverlay) return;
+    opImportModalOverlay.classList.remove("active");
+}
+
+// Sugestão padrão de buff: 1.000+ esferas investidas -> p10, senão -> p1.
+function suggestedOpBuffId(invested) {
+    return Number(invested) >= 1000 ? "p10" : "p1";
+}
+
+function renderOpImportPreview() {
+    if (parsedOpImportItems.length === 0) {
+        opImportPreview.innerHTML = `<div class="import-empty">Nenhum personagem reconhecido. Verifique se o texto colado é o do comando $mmzs.</div>`;
+        opImportActions.classList.remove("active");
+        opImportCount.textContent = "0";
+        return;
+    }
+
+    opImportPreview.innerHTML = parsedOpImportItems.map((item, i) => {
+        const found = Boolean(item.existing);
+        return `
+        <div class="import-item op-import-item${found ? "" : " op-import-item-missing"}">
+            ${found && item.existing.photo ? `<img src="${item.existing.photo}" alt="${escapeXml(item.name)}" />` : `<img alt="" />`}
+            <div class="import-item-info">
+                <div class="import-item-name">${escapeXml(item.name)}</div>
+                <div class="import-item-series">${Number(item.invested).toLocaleString("pt-BR")} esferas investidas</div>
+            </div>
+            <div class="import-item-meta op-import-item-meta">
+                ${found
+                    ? `<span class="tag wishlist-update-tag">↻ Atualizar</span>`
+                    : `<span class="tag wishlist-new-tag" title="Esse import não cria personagens novos">✕ Não encontrado</span>`}
+                <select class="op-import-buff-select" data-idx="${i}" ${found ? "" : "disabled"}>
+                    ${BUFF_DEFS.map(b => `<option value="${b.id}" ${b.id === item.buffId ? "selected" : ""}>${escapeXml(b.title)}</option>`).join("")}
+                </select>
+            </div>
+        </div>
+    `;
+    }).join("");
+
+    const includedCount = parsedOpImportItems.filter(item => item.existing).length;
+    opImportCount.textContent = String(includedCount);
+    opImportActions.classList.add("active");
+
+    opImportPreview.querySelectorAll(".op-import-buff-select").forEach(sel => {
+        sel.addEventListener("change", () => {
+            const idx = Number(sel.dataset.idx);
+            if (parsedOpImportItems[idx]) parsedOpImportItems[idx].buffId = sel.value;
+        });
+    });
+}
+
+if (btnOpenOpImport) btnOpenOpImport.addEventListener("click", openOpImportModal);
+if (document.getElementById("opImportModalClose")) {
+    document.getElementById("opImportModalClose").addEventListener("click", closeOpImportModal);
+}
+if (opImportModalOverlay) {
+    opImportModalOverlay.addEventListener("click", (e) => {
+        if (e.target === opImportModalOverlay) closeOpImportModal();
+    });
+}
+
+if (opImportParseBtn) {
+    opImportParseBtn.addEventListener("click", () => {
+        const text = opImportText.value.trim();
+        if (!text) {
+            setOpImportStatus("Cole o texto do $mmzs antes de analisar.", true);
+            return;
+        }
+
+        const rawItems = MudaeImport.parseOPBuffs(text);
+        parsedOpImportItems = rawItems.map(item => {
+            const existing = findExistingCharacterByName(item.name);
+            return {
+                name: item.name,
+                invested: item.invested,
+                existing,
+                buffId: suggestedOpBuffId(item.invested)
+            };
+        });
+
+        renderOpImportPreview();
+
+        if (parsedOpImportItems.length === 0) {
+            setOpImportStatus("Não foi possível reconhecer personagens nesse texto. Confira se é o texto do $mmzs.", true);
+            return;
+        }
+
+        const foundCount = parsedOpImportItems.filter(item => item.existing).length;
+        const missingCount = parsedOpImportItems.length - foundCount;
+        setOpImportStatus(
+            `✓ ${parsedOpImportItems.length} personagem(ns) reconhecido(s): ${foundCount} existente(s) terão o buff atualizado` +
+            (missingCount ? ` e ${missingCount} não encontrado(s) no sistema serão ignorados (esse import não cria personagens).` : ".")
+        );
+    });
+}
+
+if (opImportConfirmBtn) {
+    opImportConfirmBtn.addEventListener("click", async () => {
+        const toImport = parsedOpImportItems.filter(item => item.existing);
+        if (toImport.length === 0) return;
+
+        opImportConfirmBtn.disabled = true;
+        let updated = 0;
+
+        try {
+            for (const item of toImport) {
+                const existing = item.existing;
+                const currentLevels = normalizeOpLevels(existing.opLevels);
+                // Marca o buff escolhido como obtido (nível 1) — nunca reduz um
+                // nível que o personagem já tivesse mais alto que isso.
+                currentLevels[item.buffId] = Math.max(Number(currentLevels[item.buffId]) || 0, 1);
+
+                const updatedCharacter = { ...existing, opLevels: normalizeOpLevels(currentLevels) };
+                await Database.updateCharacter(updatedCharacter);
+                const stateIndex = state.characters.findIndex(character => String(character.id) === String(existing.id));
+                if (stateIndex >= 0) state.characters[stateIndex] = updatedCharacter;
+                updated++;
+            }
+
+            renderCharacters();
+            closeOpImportModal();
+            setBackupStatus(`✓ Buffs OP importados: ${updated} personagem(ns) atualizado(s).`);
+        } catch (err) {
+            console.error("Erro ao importar buffs OP:", err);
+            setOpImportStatus(`Processados ${updated} de ${toImport.length} antes de um erro ocorrer. Tente novamente.`, true);
+        } finally {
+            opImportConfirmBtn.disabled = false;
         }
     });
 }

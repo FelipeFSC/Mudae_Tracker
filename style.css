@@ -1664,6 +1664,80 @@ select#mCategory {
     display: block;
 }
 
+/* ============ MODAL: IMPORTAR BUFFS OP (maior, texto exige revisão) ============ */
+.op-import-modal {
+    width: 640px;
+}
+
+.op-import-modal textarea {
+    width: 100%;
+    background: var(--bg-panel-2);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    padding: 10px 12px;
+    color: var(--text);
+    font-family: var(--mono);
+    font-size: 12px;
+    outline: none;
+    resize: vertical;
+    min-height: 140px;
+    transition: border-color .15s ease;
+}
+
+.op-import-modal textarea:focus {
+    border-color: var(--cyan);
+}
+
+.op-import-hint {
+    font-size: 11px;
+    line-height: 1.5;
+    color: var(--muted);
+    background: var(--bg-panel-2);
+    border: 1px solid var(--border-soft);
+    border-radius: 8px;
+    padding: 10px 12px;
+    margin: 12px 0;
+}
+
+.op-import-preview {
+    max-height: 360px;
+}
+
+.op-import-item-meta {
+    gap: 8px;
+}
+
+.op-import-item-missing {
+    opacity: .55;
+}
+
+.op-import-buff-select {
+    background: var(--bg-panel);
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    color: var(--text);
+    font-family: var(--mono);
+    font-size: 10.5px;
+    padding: 5px 6px;
+    outline: none;
+    max-width: 150px;
+}
+
+.op-import-buff-select:disabled {
+    opacity: .5;
+    cursor: not-allowed;
+}
+
+.op-import-buff-select:focus {
+    border-color: var(--cyan);
+}
+
+@media (max-width: 680px) {
+    .op-import-modal {
+        width: calc(100vw - 32px);
+    }
+}
+
 /* foto já enviada dentro do card */
 .char-photo.has-image {
     padding: 0;

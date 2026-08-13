@@ -171,6 +171,47 @@
         return results;
     }
 
+    /* ============================================================
+       PARSER DO $mmzs — "esferas investidas" (buffs OP)
+       ------------------------------------------------------------
+       Formato colado (tudo numa linha só ou quebrado, tanto faz):
+
+         Nome do usuário
+         Total invested: 25.200 [emoji opcional]
+         Personagem 1 2.000 sp
+         Personagem 2 1.600 sp
+         ...
+
+       Não tem série, gêneros, chave nem link de imagem — só nome e
+       quantidade de esferas ("sp") investidas nesse personagem. Por
+       isso esse parser devolve só { name, invested }; quem usa esse
+       resultado (script.js) decide o que fazer com um personagem que
+       não exista ainda no sistema (aqui a gente só extrai o texto).
+       ============================================================ */
+    function parseOPBuffsExport(rawText) {
+        const text = String(rawText || "");
+
+        // Pula o cabeçalho ("nome do usuário", "Total invested: N [emoji]")
+        // — a leitura de fato começa depois disso.
+        const headerRegex = /total\s*invested\s*:?\s*[\d.,]+\s*(?::[a-z0-9_]+:)?/i;
+        const headerMatch = headerRegex.exec(text);
+        const body = headerMatch ? text.slice(headerMatch.index + headerMatch[0].length) : text;
+
+        const results = [];
+        // Cada entrada é "Nome do Personagem N.NNN sp": o nome é tudo que vem
+        // antes do primeiro "número + sp" que aparecer, sem depender de \n.
+        const entryRegex = /([\s\S]+?)\s+([\d][\d.,]*)\s*sp(?=\s|$)/g;
+        let match;
+        while ((match = entryRegex.exec(body)) !== null) {
+            const name = (match[1] || "").replace(/\s+/g, " ").trim();
+            const invested = parseInt((match[2] || "0").replace(/[.,]/g, ""), 10) || 0;
+            if (!name) continue;
+            results.push({ name, invested });
+        }
+
+        return results;
+    }
+
     // Faz o parse do texto colado e devolve uma lista de personagens:
     // { position, name, series, nickname, genders, keys, kakera, photo }
     function parseMudaeExport(rawText) {
@@ -217,5 +258,5 @@
         return results;
     }
 
-    return { parse: parseMudaeExport };
+    return { parse: parseMudaeExport, parseOPBuffs: parseOPBuffsExport };
 });
