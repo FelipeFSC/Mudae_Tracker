@@ -356,6 +356,27 @@
                 </div>
             </div>
 
+            <div class="panel">
+                <div class="panel-title"><span class="bar pink"></span>BUFFS DO OP — TOTAIS</div>
+                <div class="grid-3 kpi-row">
+                    <div class="kpi-box">
+                        <div class="kpi-ico cyan">◈</div>
+                        <div class="kpi-value cyan" id="kpiSpheresSpent">0</div>
+                        <div class="kpi-label">ESFERAS GASTAS</div>
+                    </div>
+                    <div class="kpi-box">
+                        <div class="kpi-ico yellow">☀</div>
+                        <div class="kpi-value yellow" id="kpiP10Spheres">0</div>
+                        <div class="kpi-label">ESFERAS DO BÔNUS OP 10 (MÁX/DIA)</div>
+                    </div>
+                    <div class="kpi-box">
+                        <div class="kpi-ico pink">✦</div>
+                        <div class="kpi-value pink" id="kpiP10OqChance">0%</div>
+                        <div class="kpi-label">CHANCE DE $OQ (BÔNUS OP 10)</div>
+                    </div>
+                </div>
+            </div>
+
             <div class="panel profile-compare-toggle-wrap">
                 <button type="button" class="pill purple" id="btnToggleProfileCompare">👥 VER TODOS OS PERFIS</button>
                 <p class="subtitle profile-compare-hint">Compare quanto de chave, kakera e a maior chance (7 dias)
@@ -367,11 +388,11 @@
                 <table class="summary-table">
                     <thead>
                         <tr>
-                            <th>PERFIL</th>
-                            <th>PERSONAGENS</th>
-                            <th>CHAVES</th>
-                            <th>KAKERA TOTAL</th>
-                            <th>MAIOR CHANCE (7D)</th>
+                            <th><button type="button" class="th-sort-btn" data-sort-key="name">PERFIL<span class="sort-ico">⇅</span></button></th>
+                            <th><button type="button" class="th-sort-btn" data-sort-key="count">PERSONAGENS<span class="sort-ico">⇅</span></button></th>
+                            <th><button type="button" class="th-sort-btn" data-sort-key="totalKeys">CHAVES<span class="sort-ico">⇅</span></button></th>
+                            <th><button type="button" class="th-sort-btn" data-sort-key="totalKakera">KAKERA TOTAL<span class="sort-ico">⇅</span></button></th>
+                            <th><button type="button" class="th-sort-btn" data-sort-key="best">MAIOR CHANCE (7D)<span class="sort-ico">⇅</span></button></th>
                         </tr>
                     </thead>
                     <tbody id="profileCompareBody"></tbody>
@@ -380,6 +401,7 @@
 
             <div class="panel">
                 <div class="panel-title"><span class="bar cyan"></span>PROBABILIDADE POR PERSONAGEM</div>
+                <p class="subtitle chart-subtitle">Somente Favoritos e Estrelas (sua $wishlist).</p>
                 <div id="barChart" class="chart-wrap"></div>
                 <div class="legend">
                     <span><i class="dotc cyan"></i>1 dia</span>

@@ -780,6 +780,14 @@ select#mCategory {
     color: var(--purple);
 }
 
+.kpi-ico.pink {
+    color: var(--pink);
+}
+
+.kpi-value.pink {
+    color: var(--pink);
+}
+
 .kpi-label {
     font-size: 10.5px;
     color: var(--muted);
@@ -854,6 +862,45 @@ select#mCategory {
 
 .summary-table tr:last-child td {
     border-bottom: none;
+}
+
+.th-sort-btn {
+    display: inline-flex;
+    align-items: center;
+    gap: 5px;
+    background: none;
+    border: none;
+    padding: 0;
+    margin: 0;
+    color: var(--muted);
+    font-family: var(--mono);
+    font-size: 10.5px;
+    letter-spacing: .5px;
+    font-weight: 600;
+    cursor: pointer;
+    transition: color .15s ease;
+}
+
+.th-sort-btn:hover {
+    color: var(--text);
+}
+
+.th-sort-btn.is-active {
+    color: var(--cyan);
+}
+
+.th-sort-btn .sort-ico {
+    font-size: 11px;
+    opacity: .6;
+}
+
+.th-sort-btn.is-active .sort-ico {
+    opacity: 1;
+}
+
+.chart-subtitle {
+    margin-top: -6px;
+    margin-bottom: 14px;
 }
 
 .cat-label {

@@ -2336,13 +2336,68 @@ function renderAnalysis() {
     const best = withChances.reduce((m, c) => Math.max(m, c.c7), 0);
     document.getElementById("kpiBest").textContent = pct(best, 1);
 
-    renderBarChart(withChances);
+    // O gráfico de probabilidade por personagem só mostra Favoritos/Estrelas
+    // (a $wishlist de verdade do Mudae): com todos os personagens o gráfico
+    // fica ilegível e quebra em contas com muitos personagens.
+    const wishlistChars = withChances.filter(c => WISHLIST_CATEGORIES.includes(c.category));
+    renderBarChart(wishlistChars);
     renderLineChart(withChances);
     renderSummaryTable(withChances);
+
+    // Totais dos buffs do OP (esferas investidas + bônus do perk 10).
+    const totalSpheresSpent = computeTotalSpheresSpent(chars, state.config);
+    const p10Totals = computeP10BonusTotals(chars);
+    const kpiSpheresSpentEl = document.getElementById("kpiSpheresSpent");
+    const kpiP10SpheresEl = document.getElementById("kpiP10Spheres");
+    const kpiP10OqChanceEl = document.getElementById("kpiP10OqChance");
+    if (kpiSpheresSpentEl) kpiSpheresSpentEl.textContent = totalSpheresSpent.toLocaleString("pt-BR");
+    if (kpiP10SpheresEl) kpiP10SpheresEl.textContent = p10Totals.spheres.toLocaleString("pt-BR");
+    if (kpiP10OqChanceEl) kpiP10OqChanceEl.textContent = pct(Math.min(100, p10Totals.oqChancePct), 1);
 
     // Comparativo entre perfis: só recalcula se o usuário já pediu pra ver
     // (evita ler todos os perfis do banco toda vez que a aba é aberta).
     if (profileCompareVisible) renderProfileCompare();
+}
+
+/* ---------- Totais de buffs do OP (esferas gastas + bônus do perk 10) ----------
+   "Esferas gastas" soma o custo (em esferas) de todos os níveis de perk OP já
+   comprados em cada personagem, mais os níveis da $shop do perfil — usando as
+   mesmas funções de custo (opLevelCost/shopLevelCost) já usadas na tela de
+   edição de buffs, então o total bate com o que a UI de compra mostra.
+   O bônus do perk 10 ("O primeiro $oh do dia gera +20 esferas e tem +1% de
+   chance de dar 1 $oq") é por personagem: cada personagem com o perk no nível
+   máximo soma +20 esferas e +1% de chance ao potencial diário do perfil. */
+function computeTotalSpheresSpent(chars, config) {
+    let total = 0;
+
+    (chars || []).forEach(c => {
+        const levels = normalizeOpLevels(c.opLevels);
+        BUFF_DEFS.forEach((buff, i) => {
+            const maxLevel = i < 5 ? 6 : 1;
+            const lvl = Math.min(Math.max(Number(levels[buff.id]) || 0, 0), maxLevel);
+            for (let l = 1; l <= lvl; l++) total += opLevelCost(i, l);
+        });
+    });
+
+    const shopLevelsCfg = (config && config.shopLevels) || {};
+    SHOP_DEFS.forEach(def => {
+        const lvl = Math.min(Math.max(Number(shopLevelsCfg[def.id]) || 0, 0), 10);
+        for (let l = 1; l <= lvl; l++) total += shopLevelCost(l);
+    });
+
+    return total;
+}
+
+function computeP10BonusTotals(chars) {
+    const countMaxed = (chars || []).filter(c => {
+        const levels = normalizeOpLevels(c.opLevels);
+        return Number(levels.p10 || 0) >= 1;
+    }).length;
+    return {
+        count: countMaxed,
+        spheres: countMaxed * 20,
+        oqChancePct: countMaxed * 1
+    };
 }
 
 /* ---------- Comparativo entre perfis (opcional) ----------
@@ -2355,7 +2410,22 @@ function renderAnalysis() {
 const btnToggleProfileCompare = document.getElementById("btnToggleProfileCompare");
 const profileCompareWrap = document.getElementById("profileCompareWrap");
 const profileCompareBody = document.getElementById("profileCompareBody");
+const profileCompareTable = profileCompareWrap ? profileCompareWrap.querySelector(".summary-table") : null;
 let profileCompareVisible = false;
+
+// Ordenação do comparativo entre perfis: cada botão de coluna ordena a lista
+// já carregada (sem precisar buscar tudo de novo no banco). Cada coluna tem
+// sua ordem "natural": Perfil em ordem alfabética, as demais do maior pro menor.
+const PROFILE_COMPARE_SORTERS = {
+    name: (a, b) => a.name.localeCompare(b.name, "pt-BR", { sensitivity: "base" }),
+    count: (a, b) => b.count - a.count,
+    totalKeys: (a, b) => b.totalKeys - a.totalKeys,
+    totalKakera: (a, b) => b.totalKakera - a.totalKakera,
+    best: (a, b) => b.best - a.best
+};
+let profileCompareSortKey = "name";
+let profileCompareRowsCache = [];
+let profileCompareActiveId = null;
 
 if (btnToggleProfileCompare) {
     btnToggleProfileCompare.addEventListener("click", async () => {
@@ -2398,24 +2468,51 @@ async function renderProfileCompare() {
             };
         });
 
-        if (rows.length === 0) {
-            profileCompareBody.innerHTML = `<tr><td colspan="5">Nenhum perfil encontrado.</td></tr>`;
-            return;
-        }
+        profileCompareRowsCache = rows;
+        profileCompareActiveId = activeId;
+        applyProfileCompareSort();
+    } catch (err) {
+        console.error("Erro ao montar o comparativo de perfis:", err);
+        profileCompareBody.innerHTML = `<tr><td colspan="5">Erro ao carregar o comparativo de perfis.</td></tr>`;
+    }
+}
 
+// Reordena a lista já carregada (cache) de acordo com a coluna selecionada
+// e redesenha a tabela, sem precisar buscar os dados de novo.
+function applyProfileCompareSort() {
+    if (!profileCompareBody) return;
+
+    const sorter = PROFILE_COMPARE_SORTERS[profileCompareSortKey];
+    const rows = sorter ? [...profileCompareRowsCache].sort(sorter) : profileCompareRowsCache;
+
+    if (rows.length === 0) {
+        profileCompareBody.innerHTML = `<tr><td colspan="5">Nenhum perfil encontrado.</td></tr>`;
+    } else {
         profileCompareBody.innerHTML = rows.map(r => `
-      <tr class="${r.id === activeId ? "profile-row-active" : ""}">
-        <td>${escapeXml(r.name)}${r.id === activeId ? ' <span class="profile-active-tag">ATUAL</span>' : ""}</td>
+      <tr class="${r.id === profileCompareActiveId ? "profile-row-active" : ""}">
+        <td>${escapeXml(r.name)}${r.id === profileCompareActiveId ? ' <span class="profile-active-tag">ATUAL</span>' : ""}</td>
         <td>${r.count}</td>
         <td>${r.totalKeys.toLocaleString("pt-BR")}</td>
         <td class="kakera-val">◈ ${r.totalKakera.toLocaleString("pt-BR")}</td>
         <td class="chance-val">${pct(r.best, 1)}</td>
       </tr>
     `).join("");
-    } catch (err) {
-        console.error("Erro ao montar o comparativo de perfis:", err);
-        profileCompareBody.innerHTML = `<tr><td colspan="5">Erro ao carregar o comparativo de perfis.</td></tr>`;
     }
+
+    if (profileCompareTable) {
+        profileCompareTable.querySelectorAll(".th-sort-btn").forEach(btn => {
+            btn.classList.toggle("is-active", btn.dataset.sortKey === profileCompareSortKey);
+        });
+    }
+}
+
+if (profileCompareTable) {
+    profileCompareTable.querySelectorAll(".th-sort-btn").forEach(btn => {
+        btn.addEventListener("click", () => {
+            profileCompareSortKey = btn.dataset.sortKey;
+            applyProfileCompareSort();
+        });
+    });
 }
 
 /* ---------- Gráfico de barras (SVG) ---------- */
