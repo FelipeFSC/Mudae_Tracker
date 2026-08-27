@@ -9,7 +9,7 @@
     <link
         href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;600;700;800&family=Inter:wght@400;500;600&display=swap"
         rel="stylesheet">
-    <link rel="stylesheet" href="style.css?v=24" />
+    <link rel="stylesheet" href="style.css?v=28" />
     <meta name="referrer" content="no-referrer">
 </head>
 
@@ -531,23 +531,45 @@
 
     <!-- ============ MODAL: IMPORTAR DO MUDAE ============ -->
     <div id="importModalOverlay" class="modal-overlay">
-        <div class="modal import-modal">
+        <div class="modal import-modal import-modal-combined">
             <div class="modal-head">
-                <h2>Importar do Mudae</h2>
+                <div>
+                    <h2>Importar do Mudae</h2>
+                    <p class="tower-modal-sub">Cole o Harém e a Wishlist. O sistema processará o Harém primeiro e a Wishlist em seguida.</p>
+                </div>
                 <button id="importModalClose" class="modal-x">✕</button>
             </div>
-            <div class="field">
-                <label>COLE A MENSAGEM DO MUDAE PARA IMPORTAR OS DADOS NO SISTEMA</label>
-                <label>(harem): $mmsaty+ri-c+x+ko</label>
-                <label>(wishlist): $wlsy+ri-c+x+ok</label>
-                <br />
-                <label>Lista de Personagens:</label>
-                <textarea id="importText" rows="8" placeholder="Cole aqui o texto exportado pelo Mudae..."></textarea>
+
+            <div class="import-source-block">
+                <div class="import-source-head">
+                    <span class="import-source-step">1</span>
+                    <div>
+                        <strong>HARÉM</strong>
+                        <span>$mmsaty+ri-c+x+ko</span>
+                    </div>
+                </div>
+                <div class="field">
+                    <textarea id="importText" rows="6" placeholder="Cole aqui a mensagem completa do Harém..."></textarea>
+                </div>
             </div>
-            <button id="importParseBtn" class="btn-add">ANALISAR TEXTO</button>
+
+            <div class="import-source-block">
+                <div class="import-source-head">
+                    <span class="import-source-step">2</span>
+                    <div>
+                        <strong>WISHLIST</strong>
+                        <span>$wlsy+ri-c+x+ok · cabeçalho da Wishlist é opcional</span>
+                    </div>
+                </div>
+                <div class="field">
+                    <textarea id="importWishlistText" rows="6" placeholder="Cole aqui os personagens da Wishlist. O cabeçalho ... Wishlist - N/N $wl, N/N $sw é opcional..."></textarea>
+                </div>
+            </div>
+
+            <button id="importCombinedParseBtn" class="btn-add">ANALISAR IMPORTAÇÃO</button>
             <div id="importPreview" class="import-preview"></div>
             <div id="importActions" class="import-actions">
-                <button id="importConfirmBtn" class="btn-add">IMPORTAR <span id="importCount">0</span> PERSONAGENS</button>
+                <button id="importCombinedConfirmBtn" class="btn-add">IMPORTAR <span id="importCount">0</span> PERSONAGENS</button>
             </div>
             <p class="backup-status" id="importStatus"></p>
         </div>
@@ -623,10 +645,10 @@
 
     <button id="helpBtn" class="help-btn">?</button>
 
-    <script src="database.js?v=24"></script>
-    <script src="formulas.js?v=24"></script>
-    <script src="mudae-import.js?v=24"></script>
-    <script src="script.js?v=24"></script>
+    <script src="database.js?v=28"></script>
+    <script src="formulas.js?v=28"></script>
+    <script src="mudae-import.js?v=28"></script>
+    <script src="script.js?v=28"></script>
 </body>
 
 </html>
