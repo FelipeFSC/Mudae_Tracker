@@ -9,7 +9,7 @@
     <link
         href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;600;700;800&family=Inter:wght@400;500;600&display=swap"
         rel="stylesheet">
-    <link rel="stylesheet" href="style.css?v=30" />
+    <link rel="stylesheet" href="style.css?v=33" />
     <meta name="referrer" content="no-referrer">
 </head>
 
@@ -575,7 +575,7 @@
         </div>
     </div>
 
-    <!-- ============ MODAL: IMPORTAR BUFFS OP ($mmzs) ============ -->
+    <!-- ============ MODAL: IMPORTAR BUFFS OP ($mmsz+z!) ============ -->
     <div id="opImportModalOverlay" class="modal-overlay">
         <div class="modal op-import-modal">
             <div class="modal-head">
@@ -583,22 +583,22 @@
                 <button id="opImportModalClose" class="modal-x">✕</button>
             </div>
             <div class="field">
-                <label>COLE A MENSAGEM DO MUDAE PARA IMPORTAR AS ESFERAS INVESTIDAS (OP)</label>
-                <label>(esferas investidas): $mmzs</label>
+                <label>COLE A MENSAGEM DO MUDAE PARA SINCRONIZAR OS PERKS E NÍVEIS DE OP</label>
+                <label>Comando: $mmsz+z!</label>
                 <br />
                 <label>Lista de Personagens:</label>
-                <textarea id="opImportText" rows="8" placeholder="Cole aqui o texto exportado pelo Mudae ($mmzs)..."></textarea>
+                <textarea id="opImportText" rows="8" placeholder="Cole aqui a resposta completa do Mudae para $mmsz+z!..."></textarea>
             </div>
             <p class="op-import-hint">
-                Esse import não traz foto, gêneros ou série — por isso só ATUALIZA personagens que já existem no
-                sistema (comparando pelo nome). Personagens com 1.000 ou mais esferas investidas começam com o
-                buff <strong>10</strong> marcado; abaixo disso, o buff <strong>1</strong>. Ajuste o buff de cada
-                linha antes de importar, se quiser.
+                O comando <strong>$mmsz+z!</strong> informa o total de esferas investidas e a lista exata de perks/níveis
+                de cada personagem (ex.: <strong>1 (x2), 8, 10</strong>). A importação só atualiza personagens reivindicados já
+                existentes no Harém do sistema, comparando pelo nome, e sincroniza o OP exatamente como informado. Personagens
+                que não aparecem no texto não são alterados.
             </p>
             <button id="opImportParseBtn" class="btn-add">ANALISAR TEXTO</button>
             <div id="opImportPreview" class="import-preview op-import-preview"></div>
             <div id="opImportActions" class="import-actions">
-                <button id="opImportConfirmBtn" class="btn-add">IMPORTAR <span id="opImportCount">0</span> BUFFS</button>
+                <button id="opImportConfirmBtn" class="btn-add">IMPORTAR OP DE <span id="opImportCount">0</span> PERSONAGENS</button>
             </div>
             <p class="backup-status" id="opImportStatus"></p>
         </div>
@@ -671,10 +671,10 @@
 
     <button id="helpBtn" class="help-btn">?</button>
 
-    <script src="database.js?v=30"></script>
-    <script src="formulas.js?v=30"></script>
-    <script src="mudae-import.js?v=30"></script>
-    <script src="script.js?v=30"></script>
+    <script src="database.js?v=33"></script>
+    <script src="formulas.js?v=33"></script>
+    <script src="mudae-import.js?v=33"></script>
+    <script src="script.js?v=33"></script>
 </body>
 
 </html>

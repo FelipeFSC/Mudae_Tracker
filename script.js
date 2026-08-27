@@ -311,20 +311,29 @@ const LIST_SECTIONS = [
                   text  -> descrição completa mostrada nesse estado
    ============================================================ */
 function scaledLevels(descPrefix, values, maxValue, unit) {
-    // values = valor de bônus JÁ ATIVO em cada nível 0..6 (nível 0 = ainda não tem o perk)
+    // values = valor de bônus JÁ ATIVO em cada nível 0..6 (nível 0 = ainda não tem o perk).
+    // Os perks 1–5 têm seis níveis compráveis. Ao chegar ao nível 6, a interface
+    // exibe MAX (amarelo) para indicar que não há mais níveis que o usuário possa comprar.
+    // O estado adicional abaixo continua reservado ao bônus automático de personagem
+    // totalmente otimizado e não altera a regra/fórmula já existente.
     const levels = values.map((v, i) => {
         const next = i < values.length - 1 ? values[i + 1] : maxValue;
-        return { label: `LVL ${i}`, text: `${descPrefix}: ${v}${unit} > ${next}${unit}` };
+        const isLastPurchasableLevel = i === values.length - 1;
+        return {
+            label: isLastPurchasableLevel ? "MAX" : `LVL ${i}`,
+            text: `${descPrefix}: ${v}${unit} > ${next}${unit}`
+        };
     });
     levels.push({ label: "MAX", text: `${descPrefix}: ${maxValue}${unit}` });
     return levels;
 }
 
 function fixedLevels(descText, maxLabel) {
-    // Para perks sem escala numérica oficial documentada: só "bloqueado" e "obtido"
+    // Os perks 6–10 possuem apenas um nível comprável. Assim que o perk é obtido,
+    // ele já está no máximo e deve seguir o mesmo padrão visual amarelo do OP 10.
     return [
         { label: "LVL 0", text: "Perk ainda não desbloqueado por este personagem." },
-        { label: maxLabel || "LVL 1", text: descText }
+        { label: maxLabel || "MAX", text: descText }
     ];
 }
 
@@ -1480,11 +1489,28 @@ function closeOpModal() {
 function renderOpBuffList() {
     opBuffList.innerHTML = BUFF_DEFS.map((buff, i) => {
         const maxIdx = buff.levels.length - 1;
-        const purchasedLevel = Math.min(Math.max(editingOpLevels[buff.id] || 0, 0), i < 5 ? 6 : 1);
-        const levelIdx = (i < 5 && isCharacterFullyOptimized({ opLevels: editingOpLevels })) ? maxIdx : purchasedLevel;
+        const purchasableMax = i < 5 ? 6 : 1;
+        const purchasedLevel = Math.min(Math.max(editingOpLevels[buff.id] || 0, 0), purchasableMax);
+        const automaticMaxActive = i < 5 && isCharacterFullyOptimized({ opLevels: editingOpLevels });
+        const levelIdx = automaticMaxActive ? maxIdx : purchasedLevel;
         const levelState = buff.levels[levelIdx];
-        const isMax = levelState.label === "MAX";
-        const isActive = levelIdx > 0;
+
+        // MAX visual significa "todos os níveis compráveis deste perk foram concluídos".
+        // Nos perks 1–5, o bônus automático por otimização total continua sendo calculado
+        // separadamente pela regra existente em formulas.js.
+        const isMax = purchasedLevel >= purchasableMax;
+        const isActive = purchasedLevel > 0;
+
+        let progressionText = "";
+        if (purchasedLevel < purchasableMax) {
+            progressionText = ` · Próximo nível: ${opLevelCost(i, purchasedLevel + 1).toLocaleString("pt-BR")} esferas`;
+        } else if (automaticMaxActive) {
+            progressionText = " · MAX automático ativo";
+        } else if (i < 5) {
+            progressionText = " · Nível máximo comprável atingido";
+        } else {
+            progressionText = " · Perk no nível máximo";
+        }
 
         return `
       <div class="op-buff-row${isActive ? " active" : ""}${isMax ? " maxed" : ""}">
@@ -1492,12 +1518,12 @@ function renderOpBuffList() {
           <span class="op-buff-num">${i + 1}</span>
           <span class="op-buff-title">${escapeXml(buff.title)}</span>
           <div class="op-buff-level-control">
-            <button type="button" class="op-level-btn" data-dir="-1" data-buff="${buff.id}" ${levelIdx === 0 ? "disabled" : ""}>−</button>
+            <button type="button" class="op-level-btn" data-dir="-1" data-buff="${buff.id}" ${purchasedLevel === 0 ? "disabled" : ""}>−</button>
             <span class="op-buff-level-label${isMax ? " max" : ""}">${levelState.label}</span>
-            <button type="button" class="op-level-btn" data-dir="1" data-buff="${buff.id}" ${levelIdx >= (i < 5 ? 6 : 1) ? "disabled" : ""}>+</button>
+            <button type="button" class="op-level-btn" data-dir="1" data-buff="${buff.id}" ${purchasedLevel >= purchasableMax ? "disabled" : ""}>+</button>
           </div>
         </div>
-        <p class="op-buff-desc">${escapeXml(levelState.text)}${levelIdx < (i < 5 ? 6 : 1) ? ` · Próximo nível: ${opLevelCost(i, purchasedLevel + 1).toLocaleString("pt-BR")} esferas` : (isMax ? " · MAX automático ativo" : " · Todos os níveis compráveis concluídos")}</p>
+        <p class="op-buff-desc">${escapeXml(levelState.text)}${progressionText}</p>
       </div>
     `;
     }).join("");
@@ -2286,15 +2312,22 @@ if (importConfirmBtn) {
 }
 
 /* ============================================================
-   IMPORTAR BUFFS OP (texto colado do $mmzs — esferas investidas)
+   IMPORTAR BUFFS OP — snapshot do $mmsz+z!
    ------------------------------------------------------------
-   Esse import é diferente do de cima: o texto do $mmzs só traz
-   nome do personagem e quanto foi investido em esferas nele — sem
-   foto, série, gêneros ou chave. Por isso ele NUNCA cria personagem
-   novo, só atualiza (por nome) quem já existe no sistema, ajustando
-   o buff do OP escolhido pra cada um. O padrão sugerido é: quem tem
-   1.000+ esferas investidas ganha o buff 10 (p10); abaixo disso,
-   ganha o buff 1 (p1) — mas o usuário pode trocar antes de importar.
+   O comando novo já informa quais perks cada personagem possui e
+   quantos níveis foram comprados. Portanto não existe mais sugestão
+   manual de perk: a importação passa a sincronizar exatamente o OP
+   descrito em cada linha do Mudae.
+
+   Regras de sincronização:
+     - nunca cria personagem novo;
+     - procura o personagem existente pelo nome normalizado;
+     - para personagens encontrados, substitui o snapshot de OP pelos
+       perks/níveis informados naquela entrada;
+     - perks ausentes da entrada daquele personagem voltam para nível 0;
+     - personagens que não aparecem no texto não são alterados;
+     - foto, categoria, kakera, chaves, Wishlist e demais dados locais
+       permanecem intactos.
    ============================================================ */
 const opImportModalOverlay = document.getElementById("opImportModalOverlay");
 const opImportText = document.getElementById("opImportText");
@@ -2307,17 +2340,25 @@ const opImportStatus = document.getElementById("opImportStatus");
 const btnOpenOpImport = document.getElementById("btnOpenOpImport");
 
 let parsedOpImportItems = [];
+let parsedOpImportTotalInvested = 0;
+let parsedOpImportSum = 0;
+let parsedOpImportIsConsistent = true;
 
+/** Exibe mensagens de validação/resultado dentro da própria modal de OP. */
 function setOpImportStatus(msg, isError = false) {
     if (!opImportStatus) return;
     opImportStatus.textContent = msg;
     opImportStatus.style.color = isError ? "var(--pink)" : "var(--green)";
 }
 
+/** Reseta e abre a modal de importação do snapshot OP. */
 function openOpImportModal() {
     if (!opImportModalOverlay) return;
     opImportText.value = "";
     parsedOpImportItems = [];
+    parsedOpImportTotalInvested = 0;
+    parsedOpImportSum = 0;
+    parsedOpImportIsConsistent = true;
     opImportPreview.innerHTML = "";
     opImportActions.classList.remove("active");
     setOpImportStatus("");
@@ -2325,40 +2366,63 @@ function openOpImportModal() {
     opImportText.focus();
 }
 
+/** Fecha a modal sem aplicar nenhuma mudança pendente. */
 function closeOpImportModal() {
     if (!opImportModalOverlay) return;
     opImportModalOverlay.classList.remove("active");
 }
 
-// Sugestão padrão de buff: 1.000+ esferas investidas -> p10, senão -> p1.
-function suggestedOpBuffId(invested) {
-    return Number(invested) >= 1000 ? "p10" : "p1";
+/**
+ * Calcula quanto o modelo atual do Tracker entende que os níveis importados
+ * custaram. Serve apenas como conferência visual; o valor exibido pelo Mudae
+ * continua sendo mostrado separadamente e não é recalculado pelo parser.
+ */
+function computeImportedOpLevelCost(levels) {
+    const normalized = normalizeOpLevels(levels);
+    return BUFF_DEFS.reduce((total, buff, perkIndex) => {
+        const maxLevel = perkIndex < 5 ? 6 : 1;
+        const level = Math.min(Math.max(Number(normalized[buff.id]) || 0, 0), maxLevel);
+        for (let nextLevel = 1; nextLevel <= level; nextLevel++) {
+            total += opLevelCost(perkIndex, nextLevel);
+        }
+        return total;
+    }, 0);
 }
 
+/** Gera uma descrição compacta: "OP 1 ×2 · OP 8 · OP 10". */
+function formatImportedOpPerks(perks) {
+    return (Array.isArray(perks) ? perks : [])
+        .map(item => `OP ${Number(item.perk)}${Number(item.level) > 1 ? ` ×${Number(item.level)}` : ""}`)
+        .join(" · ");
+}
+
+/** Renderiza a prévia do snapshot antes de qualquer alteração no banco. */
 function renderOpImportPreview() {
     if (parsedOpImportItems.length === 0) {
-        opImportPreview.innerHTML = `<div class="import-empty">Nenhum personagem reconhecido. Verifique se o texto colado é o do comando $mmzs.</div>`;
+        opImportPreview.innerHTML = `<div class="import-empty">Nenhum personagem reconhecido. Verifique se o texto colado é o do comando $mmsz+z!.</div>`;
         opImportActions.classList.remove("active");
         opImportCount.textContent = "0";
         return;
     }
 
-    opImportPreview.innerHTML = parsedOpImportItems.map((item, i) => {
+    opImportPreview.innerHTML = parsedOpImportItems.map(item => {
         const found = Boolean(item.existing);
+        const calculated = computeImportedOpLevelCost(item.opLevels);
+        const costMatches = calculated === Number(item.invested || 0);
+        const perkText = formatImportedOpPerks(item.perks);
+
         return `
         <div class="import-item op-import-item${found ? "" : " op-import-item-missing"}">
             ${found && item.existing.photo ? `<img src="${item.existing.photo}" alt="${escapeXml(item.name)}" />` : `<img alt="" />`}
             <div class="import-item-info">
                 <div class="import-item-name">${escapeXml(item.name)}</div>
-                <div class="import-item-series">${Number(item.invested).toLocaleString("pt-BR")} esferas investidas</div>
+                <div class="import-item-series">${Number(item.invested).toLocaleString("pt-BR")} esferas · ${escapeXml(perkText)}</div>
+                ${costMatches ? "" : `<div class="op-import-cost-warning">⚠ Custo pelos níveis reconhecidos: ${calculated.toLocaleString("pt-BR")} esferas</div>`}
             </div>
             <div class="import-item-meta op-import-item-meta">
                 ${found
-                    ? `<span class="tag wishlist-update-tag">↻ Atualizar</span>`
-                    : `<span class="tag wishlist-new-tag" title="Esse import não cria personagens novos">✕ Não encontrado</span>`}
-                <select class="op-import-buff-select" data-idx="${i}" ${found ? "" : "disabled"}>
-                    ${BUFF_DEFS.map(b => `<option value="${b.id}" ${b.id === item.buffId ? "selected" : ""}>${escapeXml(b.title)}</option>`).join("")}
-                </select>
+                    ? `<span class="tag wishlist-update-tag">↻ Sincronizar OP</span>`
+                    : `<span class="tag wishlist-new-tag" title="Esse import só atualiza personagens reivindicados do Harém">✕ Não encontrado</span>`}
             </div>
         </div>
     `;
@@ -2366,14 +2430,7 @@ function renderOpImportPreview() {
 
     const includedCount = parsedOpImportItems.filter(item => item.existing).length;
     opImportCount.textContent = String(includedCount);
-    opImportActions.classList.add("active");
-
-    opImportPreview.querySelectorAll(".op-import-buff-select").forEach(sel => {
-        sel.addEventListener("change", () => {
-            const idx = Number(sel.dataset.idx);
-            if (parsedOpImportItems[idx]) parsedOpImportItems[idx].buffId = sel.value;
-        });
-    });
+    opImportActions.classList.toggle("active", includedCount > 0);
 }
 
 if (btnOpenOpImport) btnOpenOpImport.addEventListener("click", openOpImportModal);
@@ -2386,45 +2443,78 @@ if (opImportModalOverlay) {
     });
 }
 
+/** Analisa o texto sem persistir nada e prepara a prévia. */
 if (opImportParseBtn) {
     opImportParseBtn.addEventListener("click", () => {
         const text = opImportText.value.trim();
         if (!text) {
-            setOpImportStatus("Cole o texto do $mmzs antes de analisar.", true);
+            setOpImportStatus("Cole o texto do $mmsz+z! antes de analisar.", true);
             return;
         }
 
         const rawItems = MudaeImport.parseOPBuffs(text);
+        parsedOpImportTotalInvested = Number(rawItems.totalInvested) || 0;
+        parsedOpImportSum = Number(rawItems.parsedInvested) || rawItems.reduce((sum, item) => sum + Number(item.invested || 0), 0);
+
+        // A mensagem pode conter nomes soltos sem SP entre entradas válidas.
+        // O parser nunca cria uma entrada só para esses nomes; quando eles ficam
+        // como prefixo textual do próximo bloco, resolvemos o sufixo contra os
+        // personagens realmente reivindicados do Harém antes de sincronizar.
+        const claimedHaremNames = state.characters
+            .filter(character => character.claimed !== false)
+            .map(character => character.name);
+
         parsedOpImportItems = rawItems.map(item => {
-            const existing = findExistingCharacterByName(item.name);
+            const resolvedName = typeof MudaeImport.resolveOPEntryName === "function"
+                ? MudaeImport.resolveOPEntryName(item.name, claimedHaremNames)
+                : item.name;
+            const displayName = resolvedName || item.name;
+            const existing = resolvedName ? findExistingCharacterByName(resolvedName) : findExistingCharacterByName(item.name);
+            const haremCharacter = existing && existing.claimed !== false ? existing : null;
             return {
-                name: item.name,
-                invested: item.invested,
-                existing,
-                buffId: suggestedOpBuffId(item.invested)
+                name: displayName,
+                rawName: item.name,
+                invested: Number(item.invested) || 0,
+                perks: Array.isArray(item.perks) ? item.perks : [],
+                opLevels: normalizeOpLevels(item.opLevels),
+                existing: haremCharacter
             };
         });
 
         renderOpImportPreview();
 
         if (parsedOpImportItems.length === 0) {
-            setOpImportStatus("Não foi possível reconhecer personagens nesse texto. Confira se é o texto do $mmzs.", true);
+            setOpImportStatus("Não foi possível reconhecer personagens, perks e níveis. Confira se o texto é do comando $mmsz+z!.", true);
             return;
         }
 
         const foundCount = parsedOpImportItems.filter(item => item.existing).length;
         const missingCount = parsedOpImportItems.length - foundCount;
+        const totalText = parsedOpImportTotalInvested
+            ? ` Total informado pelo Mudae: ${parsedOpImportTotalInvested.toLocaleString("pt-BR")} esferas.`
+            : "";
+        const totalMismatch = parsedOpImportTotalInvested > 0 && parsedOpImportTotalInvested !== parsedOpImportSum;
+        parsedOpImportIsConsistent = !totalMismatch;
+        if (totalMismatch) opImportActions.classList.remove("active");
+
         setOpImportStatus(
-            `✓ ${parsedOpImportItems.length} personagem(ns) reconhecido(s): ${foundCount} existente(s) terão o buff atualizado` +
-            (missingCount ? ` e ${missingCount} não encontrado(s) no sistema serão ignorados (esse import não cria personagens).` : ".")
+            `✓ ${parsedOpImportItems.length} personagem(ns) reconhecido(s): ${foundCount} existente(s) terão o OP sincronizado` +
+            (missingCount ? ` e ${missingCount} não encontrado(s) no Harém serão ignorados.` : ".") +
+            totalText +
+            (totalMismatch ? ` ⚠ A soma das entradas reconhecidas é ${parsedOpImportSum.toLocaleString("pt-BR")} esferas. A importação foi bloqueada para evitar uma sincronização parcial.` : ""),
+            totalMismatch
         );
     });
 }
 
+/**
+ * Persiste o snapshot exato dos perks/níveis para cada personagem encontrado.
+ * A cópia do objeto preserva todos os outros campos locais do personagem.
+ */
 if (opImportConfirmBtn) {
     opImportConfirmBtn.addEventListener("click", async () => {
         const toImport = parsedOpImportItems.filter(item => item.existing);
-        if (toImport.length === 0) return;
+        if (toImport.length === 0 || !parsedOpImportIsConsistent) return;
 
         opImportConfirmBtn.disabled = true;
         let updated = 0;
@@ -2432,12 +2522,9 @@ if (opImportConfirmBtn) {
         try {
             for (const item of toImport) {
                 const existing = item.existing;
-                const currentLevels = normalizeOpLevels(existing.opLevels);
-                // Marca o buff escolhido como obtido (nível 1) — nunca reduz um
-                // nível que o personagem já tivesse mais alto que isso.
-                currentLevels[item.buffId] = Math.max(Number(currentLevels[item.buffId]) || 0, 1);
+                const importedLevels = normalizeOpLevels(item.opLevels);
+                const updatedCharacter = { ...existing, opLevels: importedLevels };
 
-                const updatedCharacter = { ...existing, opLevels: normalizeOpLevels(currentLevels) };
                 await Database.updateCharacter(updatedCharacter);
                 const stateIndex = state.characters.findIndex(character => String(character.id) === String(existing.id));
                 if (stateIndex >= 0) state.characters[stateIndex] = updatedCharacter;
@@ -2446,7 +2533,7 @@ if (opImportConfirmBtn) {
 
             renderCharacters();
             closeOpImportModal();
-            setBackupStatus(`✓ Buffs OP importados: ${updated} personagem(ns) atualizado(s).`);
+            setBackupStatus(`✓ OP importado do $mmsz+z!: ${updated} personagem(ns) sincronizado(s).`);
         } catch (err) {
             console.error("Erro ao importar buffs OP:", err);
             setOpImportStatus(`Processados ${updated} de ${toImport.length} antes de um erro ocorrer. Tente novamente.`, true);

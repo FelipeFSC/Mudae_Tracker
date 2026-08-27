@@ -6,14 +6,16 @@
      1) Parser do Harém;
      2) Parser da Wishlist (inclusive Markdown do Discord);
      3) Detecção/validação da origem do texto;
-     4) Parser do $mmzs para buffs OP;
+     4) Parser do $mmsz+z! para esferas, perks e níveis OP;
+     5) Resolução segura de nomes OP quando houver nomes sem SP misturados;
      5) Prévia e sincronização combinada Harém -> Wishlist.
 
    MAPA RÁPIDO DOS PRINCIPAIS MÉTODOS
    ------------------------------------------------------------
    findFirstSeriesTitle()       Localiza o primeiro bloco de série do Harém.
    parseWishlistExport()        Faz o parse do formato simples/legado da Wishlist.
-   parseOPBuffsExport()         Extrai personagem + esferas do comando $mmzs.
+   parseOPBuffsExport()         Extrai personagem, esferas, perks e níveis do $mmsz+z!.
+   resolveOPEntryName()         Resolve o personagem válido pelo sufixo usando nomes conhecidos do Harém.
    parseMudaeExport()           Parser-base usado para Harém e Wishlist simples.
    normalizeMarkdownishText()   Normaliza Markdown copiado do Discord.
    parseWishlistFlexible()      Lê Wishlist rica, com ou sem cabeçalho.
@@ -26,7 +28,7 @@
    ============================================================ */
 
 /* ============================================================
-   SEÇÃO 1 — PARSERS-BASE (HARÉM, WISHLIST SIMPLES E $mmzs)
+   SEÇÃO 1 — PARSERS-BASE (HARÉM, WISHLIST SIMPLES E $mmsz+z!)
    ============================================================ */
 (function (root, factory) {
     if (typeof module === "object" && module.exports) {
@@ -149,48 +151,203 @@
     }
 
     /* ============================================================
-       PARSER DO $mmzs — "esferas investidas" (buffs OP)
+       PARSER DO $mmsz+z! — investimento + perks/níveis do OP
        ------------------------------------------------------------
-       Formato colado (tudo numa linha só ou quebrado, tanto faz):
+       O novo comando informa, para cada personagem:
 
-         Nome do usuário
-         Total invested: 25.200 [emoji opcional]
-         Personagem 1 2.000 sp
-         Personagem 2 1.600 sp
-         ...
+         Personagem 2.600 sp - 1 (x2), 8, 10
 
-       Não tem série, gêneros, chave nem link de imagem — só nome e
-       quantidade de esferas ("sp") investidas nesse personagem. Por
-       isso esse parser devolve só { name, invested }; quem usa esse
-       resultado (script.js) decide o que fazer com um personagem que
-       não exista ainda no sistema (aqui a gente só extrai o texto).
+       Regras do formato:
+         - "2.600 sp" é o total de esferas investidas no personagem;
+         - "1 (x2)" significa Perk 1 comprado em 2 níveis;
+         - "8" e "10" significam Perks 8 e 10 obtidos (nível 1);
+         - o cabeçalho traz "Total invested: N" e pode conter Markdown
+           e links de emoji do Discord.
+
+       O parser NÃO altera personagens. Ele apenas transforma o texto
+       em dados estruturados para que script.js sincronize o OP de quem
+       já existe no Harém.
        ============================================================ */
+
     /**
-     * Extrai o investimento de esferas do comando $mmzs.
-     * Retorna objetos no formato { name, invested } e nunca cria personagens.
+     * Converte números exibidos pelo Mudae (1.000, 31.600, 1,000) para inteiro.
+     * Pontos e vírgulas do texto são tratados como separadores visuais.
+     */
+    function parseOPInteger(value) {
+        return parseInt(String(value || "0").replace(/[^0-9]/g, ""), 10) || 0;
+    }
+
+    /**
+     * Remove decoração de Markdown/Discord sem apagar nomes de personagens.
+     * Links do tipo [:sp:](URL) viram apenas ":sp:" e espaços invisíveis
+     * são normalizados para que o parser funcione tanto em uma linha quanto
+     * em mensagens quebradas pelo Discord.
+     */
+    function normalizeOPExportText(rawText) {
+        return String(rawText || "")
+            .replace(/[\u200B-\u200D\u2060\uFEFF]/g, " ")
+            .replace(/\[([^\]]+)\]\((?:https?:\/\/[^\s)]+)(?:\s+"[^"]*")?\)/g, "$1")
+            .replace(/\\([_*`~\[\]()])/g, "$1")
+            .replace(/\*\*|__|~~|`/g, "")
+            .replace(/(^|\s)[*_](?=\S)/g, "$1")
+            .replace(/([*_])(?=\s|$)/g, "")
+            .replace(/\s+/g, " ")
+            .trim();
+    }
+
+    /**
+     * Interpreta a lista de perks de uma entrada do $mmsz+z!.
+     * Ex.: "1 (x2), 8, 10" => p1=2, p8=1, p10=1.
+     *
+     * O modelo atual do Tracker permite 6 níveis compráveis nos perks 1–5
+     * e um estado obtido/não obtido nos perks 6–10; por isso valores vindos
+     * do texto são limitados a esses máximos antes de chegar à interface.
+     */
+    function parseOPPerkList(rawPerks) {
+        const opLevels = {};
+        const perks = [];
+
+        String(rawPerks || "")
+            .split(",")
+            .map(part => part.trim())
+            .filter(Boolean)
+            .forEach(part => {
+                const match = part.match(/^(\d{1,2})(?:\s*\(x\s*(\d+)\s*\))?$/i);
+                if (!match) return;
+
+                const perkNumber = Number(match[1]);
+                if (perkNumber < 1 || perkNumber > 10) return;
+
+                const requestedLevel = match[2] ? Number(match[2]) : 1;
+                const maxLevel = perkNumber <= 5 ? 6 : 1;
+                const level = Math.max(1, Math.min(maxLevel, requestedLevel || 1));
+                const key = `p${perkNumber}`;
+
+                // Caso o mesmo perk apareça mais de uma vez, preserva o maior nível.
+                opLevels[key] = Math.max(Number(opLevels[key]) || 0, level);
+            });
+
+        Object.keys(opLevels)
+            .sort((a, b) => Number(a.slice(1)) - Number(b.slice(1)))
+            .forEach(key => {
+                perks.push({
+                    perk: Number(key.slice(1)),
+                    level: Number(opLevels[key]) || 0
+                });
+            });
+
+        return { opLevels, perks };
+    }
+
+    /**
+     * Extrai o snapshot de OP gerado pelo comando $mmsz+z!.
+     *
+     * Retorno por personagem:
+     *   {
+     *     name: "Hatsune Miku",
+     *     invested: 2600,
+     *     perks: [{ perk: 1, level: 2 }, { perk: 8, level: 1 }, ...],
+     *     opLevels: { p1: 2, p8: 1, p10: 1 }
+     *   }
+     *
+     * O array retornado também recebe a propriedade `totalInvested`, lida do
+     * cabeçalho. Isso mantém compatibilidade com o contrato antigo (um array)
+     * e permite à UI exibir/validar o total informado pelo Mudae.
      */
     function parseOPBuffsExport(rawText) {
-        const text = String(rawText || "");
-
-        // Pula o cabeçalho ("nome do usuário", "Total invested: N [emoji]")
-        // — a leitura de fato começa depois disso.
-        const headerRegex = /total\s*invested\s*:?\s*[\d.,]+\s*(?::[a-z0-9_]+:)?/i;
-        const headerMatch = headerRegex.exec(text);
-        const body = headerMatch ? text.slice(headerMatch.index + headerMatch[0].length) : text;
-
+        const text = normalizeOPExportText(rawText);
         const results = [];
-        // Cada entrada é "Nome do Personagem N.NNN sp": o nome é tudo que vem
-        // antes do primeiro "número + sp" que aparecer, sem depender de \n.
-        const entryRegex = /([\s\S]+?)\s+([\d][\d.,]*)\s*sp(?=\s|$)/g;
+
+        const headerMatch = /total\s*invested\s*:?\s*([\d.,]+)/i.exec(text);
+        const totalInvested = headerMatch ? parseOPInteger(headerMatch[1]) : 0;
+
+        // Tudo antes de "Total invested" é nome/título do usuário e não faz
+        // parte das entradas. O :sp: imediatamente após o total também é ruído.
+        let body = headerMatch
+            ? text.slice(headerMatch.index + headerMatch[0].length)
+            : text;
+        body = body.replace(/^\s*(?::sp:)?\s*/i, "");
+
+        /*
+         * Só existe entrada válida quando o Mudae informa explicitamente:
+         *
+         *   Nome + valor de SP + "sp -" + lista de perks
+         *
+         * A lista de perks é separada por vírgulas no formato oficial. Isso é
+         * intencionalmente mais restritivo do que aceitar números soltos por
+         * espaço: evita que nomes como "2B" ou "9S" sejam confundidos com
+         * perks quando aparecem sem SP no fim da mensagem.
+         *
+         * Nomes sem SP não geram item. Se estiverem ENTRE duas entradas válidas,
+         * eles podem aparecer como prefixo textual do próximo nome capturado; a
+         * função resolveOPEntryName(), usada pela UI com os nomes reais do Harém,
+         * remove esse ruído de forma segura antes de sincronizar qualquer OP.
+         */
+        const perkToken = String.raw`\d{1,2}(?:\s*\(x\s*\d+\s*\))?`;
+        const entryRegex = new RegExp(
+            String.raw`([\s\S]+?)\s+([\d][\d.,]*)\s*sp\s*-\s*(${perkToken}(?:\s*,\s*${perkToken})*)`,
+            "gi"
+        );
         let match;
+        let lastMatchedEnd = 0;
+
         while ((match = entryRegex.exec(body)) !== null) {
-            const name = (match[1] || "").replace(/\s+/g, " ").trim();
-            const invested = parseInt((match[2] || "0").replace(/[.,]/g, ""), 10) || 0;
-            if (!name) continue;
-            results.push({ name, invested });
+            const name = String(match[1] || "").replace(/\s+/g, " ").trim();
+            const invested = parseOPInteger(match[2]);
+            const parsedPerks = parseOPPerkList(match[3]);
+            lastMatchedEnd = entryRegex.lastIndex;
+
+            if (!name || parsedPerks.perks.length === 0) continue;
+
+            results.push({
+                name,
+                invested,
+                perks: parsedPerks.perks,
+                opLevels: parsedPerks.opLevels
+            });
         }
 
+        // Qualquer sobra depois da última entrada completa não tem valor de SP e
+        // portanto é apenas informativa para diagnóstico: nunca vira personagem.
+        results.ignoredTrailingText = body.slice(lastMatchedEnd).trim();
+        results.totalInvested = totalInvested;
+        results.parsedInvested = results.reduce((sum, item) => sum + Number(item.invested || 0), 0);
         return results;
+    }
+
+    /**
+     * Resolve um nome capturado pelo parser contra a lista real de personagens
+     * conhecidos do Harém. É a proteção para mensagens em que o Discord/Mudae
+     * coloca nomes SEM SP entre duas entradas válidas na mesma linha.
+     *
+     * Exemplo de segmento capturado:
+     *   "Bulbasaur Ivysaur Ada Wong" + "1.000 sp - 10"
+     *
+     * Se "Ada Wong" existir no Harém, o sufixo mais longo que coincidir com um
+     * nome conhecido é escolhido. "Bulbasaur Ivysaur" é ignorado, pois não há
+     * SP associado a esses nomes. Caso não exista correspondência, devolve null
+     * e a entrada continua sendo tratada como personagem não encontrado.
+     */
+    function resolveOPEntryName(rawName, knownNames) {
+        const normalizeName = value => String(value || "")
+            .normalize("NFD")
+            .replace(/[\u0300-\u036f]/g, "")
+            .toLocaleLowerCase("pt-BR")
+            .replace(/\s+/g, " ")
+            .trim();
+
+        const normalizedRaw = normalizeName(rawName);
+        if (!normalizedRaw) return null;
+
+        const candidates = (Array.isArray(knownNames) ? knownNames : [])
+            .map(name => ({ original: String(name || "").trim(), normalized: normalizeName(name) }))
+            .filter(item => item.original && item.normalized)
+            .filter(item => normalizedRaw === item.normalized || normalizedRaw.endsWith(` ${item.normalized}`))
+            // O nome mais longo vence para evitar casar "Mona" quando existe
+            // "Ditto Mona", por exemplo.
+            .sort((a, b) => b.normalized.length - a.normalized.length);
+
+        return candidates.length > 0 ? candidates[0].original : null;
     }
 
     // Faz o parse do texto colado e devolve uma lista de personagens:
@@ -243,7 +400,7 @@
         return results;
     }
 
-    return { parse: parseMudaeExport, parseOPBuffs: parseOPBuffsExport };
+    return { parse: parseMudaeExport, parseOPBuffs: parseOPBuffsExport, resolveOPEntryName };
 });
 
 /* ============================================================

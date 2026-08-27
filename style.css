@@ -1664,7 +1664,7 @@ select#mCategory {
     display: block;
 }
 
-/* ============ MODAL: IMPORTAR BUFFS OP (maior, texto exige revisão) ============ */
+/* ============ MODAL: IMPORTAR BUFFS OP (snapshot do $mmsz+z!) ============ */
 .op-import-modal {
     width: 640px;
 }
@@ -1707,30 +1707,18 @@ select#mCategory {
     gap: 8px;
 }
 
+.op-import-cost-warning {
+    margin-top: 3px;
+    color: var(--yellow);
+    font-size: 9.5px;
+    line-height: 1.35;
+    white-space: normal;
+}
+
 .op-import-item-missing {
     opacity: .55;
 }
 
-.op-import-buff-select {
-    background: var(--bg-panel);
-    border: 1px solid var(--border);
-    border-radius: 6px;
-    color: var(--text);
-    font-family: var(--mono);
-    font-size: 10.5px;
-    padding: 5px 6px;
-    outline: none;
-    max-width: 150px;
-}
-
-.op-import-buff-select:disabled {
-    opacity: .5;
-    cursor: not-allowed;
-}
-
-.op-import-buff-select:focus {
-    border-color: var(--cyan);
-}
 
 @media (max-width: 680px) {
     .op-import-modal {
