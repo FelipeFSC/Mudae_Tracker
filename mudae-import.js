@@ -997,7 +997,14 @@ function initializeMudaeImportFlow() {
         const finalCount = projectedFinalCount();
 
         if (limit > 0 && finalCount > limit) {
-            alert(`Limite do harem atingido: após Harém + Wishlist, a importação deixaria ${finalCount}/${limit} personagens.`);
+            showSystemAlert(
+                `Limite do harem atingido: após Harém + Wishlist, a importação deixaria ${finalCount}/${limit} personagens.`,
+                {
+                    title: "Limite do Harém",
+                    type: "warning",
+                    confirmText: "ENTENDI"
+                }
+            );
             return;
         }
 

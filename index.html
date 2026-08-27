@@ -9,7 +9,7 @@
     <link
         href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;600;700;800&family=Inter:wght@400;500;600&display=swap"
         rel="stylesheet">
-    <link rel="stylesheet" href="style.css?v=28" />
+    <link rel="stylesheet" href="style.css?v=30" />
     <meta name="referrer" content="no-referrer">
 </head>
 
@@ -643,12 +643,38 @@
         </div>
     </div>
 
+
+    <!-- ============ MODAL: MENSAGENS DO SISTEMA ============ -->
+    <div id="systemDialogOverlay" class="modal-overlay system-dialog-overlay" aria-hidden="true">
+        <div id="systemDialogModal" class="modal system-dialog-modal" role="dialog" aria-modal="true" aria-labelledby="systemDialogTitle" aria-describedby="systemDialogMessage">
+            <div class="modal-head">
+                <div class="system-dialog-heading">
+                    <span id="systemDialogIcon" class="system-dialog-icon" aria-hidden="true">◆</span>
+                    <h2 id="systemDialogTitle">Mudae Tracker</h2>
+                </div>
+                <button id="systemDialogClose" class="modal-x" type="button" aria-label="Fechar">✕</button>
+            </div>
+
+            <p id="systemDialogMessage" class="system-dialog-message"></p>
+
+            <div id="systemDialogInputWrap" class="field system-dialog-input-wrap" hidden>
+                <label id="systemDialogInputLabel" for="systemDialogInput">VALOR</label>
+                <input id="systemDialogInput" type="text" autocomplete="off" />
+            </div>
+
+            <div class="system-dialog-actions">
+                <button id="systemDialogCancel" class="btn-cancel system-dialog-cancel" type="button">CANCELAR</button>
+                <button id="systemDialogConfirm" class="btn-add system-dialog-confirm" type="button">OK</button>
+            </div>
+        </div>
+    </div>
+
     <button id="helpBtn" class="help-btn">?</button>
 
-    <script src="database.js?v=28"></script>
-    <script src="formulas.js?v=28"></script>
-    <script src="mudae-import.js?v=28"></script>
-    <script src="script.js?v=28"></script>
+    <script src="database.js?v=30"></script>
+    <script src="formulas.js?v=30"></script>
+    <script src="mudae-import.js?v=30"></script>
+    <script src="script.js?v=30"></script>
 </body>
 
 </html>

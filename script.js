@@ -61,6 +61,208 @@ const state = {
     characters: []
 };
 
+
+/* ============================================================
+   MODAL GLOBAL DE MENSAGENS DO SISTEMA
+   ------------------------------------------------------------
+   Centraliza avisos, confirmações e entradas de texto que antes
+   dependiam dos diálogos nativos. As funções retornam Promises para
+   manter a mesma semântica dos diálogos nativos sem bloquear a UI.
+
+   API pública:
+     showSystemAlert(message, options)
+       -> exibe mensagem informativa; resolve quando for fechada.
+
+     showSystemConfirm(message, options)
+       -> resolve true ao confirmar e false ao cancelar/fechar.
+
+     showSystemPrompt(message, options)
+       -> resolve o texto digitado ou null ao cancelar/fechar.
+
+   options:
+     title        -> título da modal.
+     type         -> "info", "warning" ou "danger".
+     confirmText  -> texto do botão principal.
+     cancelText   -> texto do botão secundário.
+     defaultValue -> valor inicial do input (prompt).
+     inputLabel   -> label do input (prompt).
+     placeholder  -> placeholder do input (prompt).
+   ============================================================ */
+const systemDialogOverlay = document.getElementById("systemDialogOverlay");
+const systemDialogModal = document.getElementById("systemDialogModal");
+const systemDialogTitle = document.getElementById("systemDialogTitle");
+const systemDialogIcon = document.getElementById("systemDialogIcon");
+const systemDialogMessage = document.getElementById("systemDialogMessage");
+const systemDialogInputWrap = document.getElementById("systemDialogInputWrap");
+const systemDialogInputLabel = document.getElementById("systemDialogInputLabel");
+const systemDialogInput = document.getElementById("systemDialogInput");
+const systemDialogCancel = document.getElementById("systemDialogCancel");
+const systemDialogConfirm = document.getElementById("systemDialogConfirm");
+const systemDialogClose = document.getElementById("systemDialogClose");
+
+let activeSystemDialog = null;
+let systemDialogLastFocus = null;
+
+const SYSTEM_DIALOG_ICONS = {
+    info: "◆",
+    warning: "!",
+    danger: "✕"
+};
+
+/**
+ * Fecha a modal global e devolve o valor adequado à operação pendente.
+ * O foco volta ao elemento que estava ativo antes da abertura.
+ */
+function closeSystemDialog(result) {
+    if (!activeSystemDialog || !systemDialogOverlay) return;
+
+    const { resolve } = activeSystemDialog;
+    activeSystemDialog = null;
+
+    systemDialogOverlay.classList.remove("active");
+    systemDialogOverlay.setAttribute("aria-hidden", "true");
+
+    const previousFocus = systemDialogLastFocus;
+    systemDialogLastFocus = null;
+
+    resolve(result);
+
+    if (previousFocus && typeof previousFocus.focus === "function" && document.contains(previousFocus)) {
+        requestAnimationFrame(() => previousFocus.focus());
+    }
+}
+
+/**
+ * Abre a modal global em um dos três modos: alert, confirm ou prompt.
+ * Apenas uma instância pode ficar aberta por vez.
+ */
+function openSystemDialog({
+    mode = "alert",
+    title = "Mudae Tracker",
+    message = "",
+    type = "info",
+    confirmText = "OK",
+    cancelText = "CANCELAR",
+    defaultValue = "",
+    inputLabel = "VALOR",
+    placeholder = ""
+} = {}) {
+    if (!systemDialogOverlay || !systemDialogModal) {
+        // Fallback sem popup nativo: registra a falha e resolve de forma segura.
+        console.error("[SystemDialog] Estrutura da modal não encontrada.", { mode, title, message });
+        return Promise.resolve(mode === "confirm" ? false : mode === "prompt" ? null : true);
+    }
+
+    // Se uma chamada inesperadamente ocorrer enquanto outra está aberta,
+    // cancela a anterior para nunca deixar uma Promise pendente.
+    if (activeSystemDialog) {
+        closeSystemDialog(activeSystemDialog.mode === "alert" ? true :
+            activeSystemDialog.mode === "confirm" ? false : null);
+    }
+
+    const normalizedType = ["info", "warning", "danger"].includes(type) ? type : "info";
+    systemDialogLastFocus = document.activeElement;
+
+    systemDialogModal.classList.remove("dialog-info", "dialog-warning", "dialog-danger");
+    systemDialogModal.classList.add(`dialog-${normalizedType}`);
+
+    systemDialogTitle.textContent = String(title || "Mudae Tracker");
+    systemDialogMessage.textContent = String(message || "");
+    systemDialogIcon.textContent = SYSTEM_DIALOG_ICONS[normalizedType];
+    systemDialogConfirm.textContent = String(confirmText || "OK");
+    systemDialogCancel.textContent = String(cancelText || "CANCELAR");
+
+    const isPrompt = mode === "prompt";
+    const isAlert = mode === "alert";
+    systemDialogInputWrap.hidden = !isPrompt;
+    systemDialogCancel.hidden = isAlert;
+
+    if (isPrompt) {
+        systemDialogInputLabel.textContent = String(inputLabel || "VALOR");
+        systemDialogInput.value = String(defaultValue ?? "");
+        systemDialogInput.placeholder = String(placeholder || "");
+    }
+
+    systemDialogOverlay.classList.add("active");
+    systemDialogOverlay.setAttribute("aria-hidden", "false");
+
+    return new Promise(resolve => {
+        activeSystemDialog = { mode, resolve };
+
+        requestAnimationFrame(() => {
+            if (isPrompt) {
+                systemDialogInput.focus();
+                systemDialogInput.select();
+            } else {
+                systemDialogConfirm.focus();
+            }
+        });
+    });
+}
+
+/** Exibe uma mensagem e aguarda o usuário fechá-la. */
+function showSystemAlert(message, options = {}) {
+    return openSystemDialog({ ...options, mode: "alert", message });
+}
+
+/** Solicita confirmação usando a modal visual do sistema. */
+function showSystemConfirm(message, options = {}) {
+    return openSystemDialog({ ...options, mode: "confirm", message });
+}
+
+/** Solicita texto usando a modal visual do sistema. */
+function showSystemPrompt(message, options = {}) {
+    return openSystemDialog({ ...options, mode: "prompt", message });
+}
+
+/** Converte fechar/X/backdrop/ESC no resultado de cancelamento correto. */
+function cancelActiveSystemDialog() {
+    if (!activeSystemDialog) return;
+    if (activeSystemDialog.mode === "alert") closeSystemDialog(true);
+    else if (activeSystemDialog.mode === "confirm") closeSystemDialog(false);
+    else closeSystemDialog(null);
+}
+
+if (systemDialogConfirm) {
+    systemDialogConfirm.addEventListener("click", () => {
+        if (!activeSystemDialog) return;
+        if (activeSystemDialog.mode === "prompt") {
+            closeSystemDialog(systemDialogInput.value);
+        } else {
+            closeSystemDialog(true);
+        }
+    });
+}
+
+if (systemDialogCancel) {
+    systemDialogCancel.addEventListener("click", cancelActiveSystemDialog);
+}
+
+if (systemDialogClose) {
+    systemDialogClose.addEventListener("click", cancelActiveSystemDialog);
+}
+
+if (systemDialogOverlay) {
+    systemDialogOverlay.addEventListener("click", event => {
+        if (event.target === systemDialogOverlay) cancelActiveSystemDialog();
+    });
+
+    systemDialogOverlay.addEventListener("keydown", event => {
+        if (!activeSystemDialog) return;
+
+        if (event.key === "Escape") {
+            event.preventDefault();
+            cancelActiveSystemDialog();
+            return;
+        }
+
+        if (event.key === "Enter" && activeSystemDialog.mode === "prompt" && event.target === systemDialogInput) {
+            event.preventDefault();
+            closeSystemDialog(systemDialogInput.value);
+        }
+    });
+}
+
 const CAT_META = {
     favoritos: { label: "FAVORITOS", icon: "♥", color: "var(--pink)" },
     estrelas: { label: "ESTRELAS", icon: "★", color: "var(--yellow)" },
@@ -583,9 +785,17 @@ function renderKakeraTowers() {
             if (e.target.closest(".tower-remove")) return;
             openTowerModal(tower.id);
         });
-        card.querySelector(".tower-remove").addEventListener("click", (e) => {
+        card.querySelector(".tower-remove").addEventListener("click", async (e) => {
             e.stopPropagation();
-            const confirmado = confirm(`Remover a Torre ${idx + 1}? Isso vai apagar o progresso registrado nela.`);
+            const confirmado = await showSystemConfirm(
+                `Remover a Torre ${idx + 1}? Isso vai apagar o progresso registrado nela.`,
+                {
+                    title: "Remover Torre",
+                    type: "danger",
+                    confirmText: "REMOVER",
+                    cancelText: "CANCELAR"
+                }
+            );
             if (!confirmado) return;
             state.config.kakeraTowers = state.config.kakeraTowers.filter(t => t.id !== tower.id);
             scheduleSaveConfig();
@@ -939,8 +1149,14 @@ if (btnClearHarem) {
             setBackupStatus("O harem já está vazio.");
             return;
         }
-        const confirmado = confirm(
-            `Isso vai remover TODOS os ${state.characters.length} personagens cadastrados. Essa ação não pode ser desfeita. Deseja continuar?`
+        const confirmado = await showSystemConfirm(
+            `Isso vai remover TODOS os ${state.characters.length} personagens cadastrados. Essa ação não pode ser desfeita. Deseja continuar?`,
+            {
+                title: "Limpar Harém",
+                type: "danger",
+                confirmText: "REMOVER TODOS",
+                cancelText: "CANCELAR"
+            }
         );
         if (!confirmado) return;
 
@@ -1188,7 +1404,15 @@ function renderCharCard(c) {
     });
 
     card.querySelector(".delete-btn").addEventListener("click", async () => {
-        const confirmado = confirm(`Remover "${c.name}" da lista de personagens?`);
+        const confirmado = await showSystemConfirm(
+            `Remover "${c.name}" da lista de personagens?`,
+            {
+                title: "Remover Personagem",
+                type: "danger",
+                confirmText: "REMOVER",
+                cancelText: "CANCELAR"
+            }
+        );
         if (!confirmado) return;
         try {
             await Database.deleteCharacter(c.id);
@@ -1621,9 +1845,14 @@ function haremLimitReached() {
 
 function openModal(defaultCat) {
     if (haremLimitReached()) {
-        alert(
+        showSystemAlert(
             `Limite do harem atingido (${state.characters.length}/${state.config.haremLimit}).\n` +
-            `Aumente o valor em "TOTAL DE PERSONAGENS NO HAREM" nas Configurações, ou remova algum personagem antes de adicionar um novo.`
+            `Aumente o valor em "TOTAL DE PERSONAGENS NO HAREM" nas Configurações, ou remova algum personagem antes de adicionar um novo.`,
+            {
+                title: "Limite do Harém",
+                type: "warning",
+                confirmText: "ENTENDI"
+            }
         );
         return;
     }
@@ -1686,8 +1915,13 @@ document.getElementById("modalAdd").addEventListener("click", async () => {
 
     // O limite do harem só se aplica ao criar um personagem novo, não ao editar
     if (!isEditing && haremLimitReached()) {
-        alert(
-            `Limite do harem atingido (${state.characters.length}/${state.config.haremLimit}). Não é possível adicionar mais personagens.`
+        showSystemAlert(
+            `Limite do harem atingido (${state.characters.length}/${state.config.haremLimit}). Não é possível adicionar mais personagens.`,
+            {
+                title: "Limite do Harém",
+                type: "warning",
+                confirmText: "ENTENDI"
+            }
         );
         return;
     }
@@ -1761,7 +1995,14 @@ document.getElementById("modalAdd").addEventListener("click", async () => {
         renderCharacters();
     } catch (err) {
         console.error("Erro ao salvar personagem:", err);
-        alert("Não foi possível salvar o personagem. Tente novamente.");
+        showSystemAlert(
+            "Não foi possível salvar o personagem. Tente novamente.",
+            {
+                title: "Erro ao Salvar",
+                type: "danger",
+                confirmText: "FECHAR"
+            }
+        );
     } finally {
         addBtn.disabled = false;
     }
@@ -1951,9 +2192,14 @@ if (importConfirmBtn) {
         const limit = state.config.haremLimit;
         const projectedCount = state.characters.length - removableClaimed.length + newItemsCount;
         if (limit > 0 && projectedCount > limit) {
-            alert(
+            showSystemAlert(
                 `Limite do harem atingido: após sincronizar, a importação deixaria ${projectedCount}/${limit} personagens. ` +
-                `Personagens reivindicados ausentes seriam removidos antes da inclusão dos novos.`
+                `Personagens reivindicados ausentes seriam removidos antes da inclusão dos novos.`,
+                {
+                    title: "Limite do Harém",
+                    type: "warning",
+                    confirmText: "ENTENDI"
+                }
             );
             return;
         }
@@ -2263,8 +2509,14 @@ if (importFileInput) {
         const file = e.target.files[0];
         if (!file) return;
 
-        const confirmado = confirm(
-            "Restaurar este backup vai substituir todos os personagens e configurações salvos atualmente. Deseja continuar?"
+        const confirmado = await showSystemConfirm(
+            "Restaurar este backup vai substituir todos os personagens e configurações salvos atualmente. Deseja continuar?",
+            {
+                title: "Restaurar Backup",
+                type: "warning",
+                confirmText: "RESTAURAR",
+                cancelText: "CANCELAR"
+            }
         );
         if (!confirmado) {
             importFileInput.value = "";
@@ -2424,7 +2676,17 @@ if (profileSelectEl) {
 
 if (btnNewProfile) {
     btnNewProfile.addEventListener("click", async () => {
-        const name = prompt("Nome do novo perfil:", "");
+        const name = await showSystemPrompt(
+            "Digite o nome do novo perfil.",
+            {
+                title: "Novo Perfil",
+                type: "info",
+                confirmText: "CRIAR",
+                cancelText: "CANCELAR",
+                inputLabel: "NOME DO PERFIL",
+                placeholder: "Ex: Principal"
+            }
+        );
         if (name === null) return; // cancelado
         try {
             const newId = await Database.createProfile(name);
@@ -2445,7 +2707,17 @@ if (btnRenameProfile) {
             const activeId = await Database.getActiveProfileId();
             const profiles = await Database.listProfiles();
             const current = profiles.find(p => p.id === activeId);
-            const name = prompt("Novo nome para o perfil:", current ? current.name : "");
+            const name = await showSystemPrompt(
+                "Digite o novo nome do perfil.",
+                {
+                    title: "Renomear Perfil",
+                    type: "info",
+                    confirmText: "RENOMEAR",
+                    cancelText: "CANCELAR",
+                    defaultValue: current ? current.name : "",
+                    inputLabel: "NOVO NOME"
+                }
+            );
             if (name === null) return; // cancelado
             if (!name.trim()) {
                 setProfileStatus("O nome do perfil não pode ficar vazio.", true);
@@ -2471,7 +2743,15 @@ if (btnDeleteProfile) {
                 setProfileStatus("Não é possível excluir o único perfil existente.", true);
                 return;
             }
-            const confirmed = confirm(`Excluir o perfil "${current ? current.name : ""}"? Todos os personagens e configurações desse perfil serão apagados permanentemente.`);
+            const confirmed = await showSystemConfirm(
+                `Excluir o perfil "${current ? current.name : ""}"? Todos os personagens e configurações desse perfil serão apagados permanentemente.`,
+                {
+                    title: "Excluir Perfil",
+                    type: "danger",
+                    confirmText: "EXCLUIR",
+                    cancelText: "CANCELAR"
+                }
+            );
             if (!confirmed) return;
 
             await Database.deleteProfile(activeId);
@@ -2830,7 +3110,18 @@ function renderSummaryTable(chars) {
    MODAL DE AJUDA
    ============================================================ */
 document.getElementById("helpBtn").addEventListener("click", () => {
-    alert("Mudae Tracker\n\nConfigure seus dados na aba Configurações — tudo é salvo automaticamente.\nAdicione personagens na aba Personagens (Favoritos, Estrelas ou Comuns) e envie uma foto ao criá-los.\nOs pools WA/HA/WG/HG, slash, tutorial, boostwish e personalrare afetam as estimativas. O campo de harem limita quantos personagens podem ser cadastrados (0 = sem limite).\nVeja gráficos e estatísticas na aba Análise.\n\nUse o botão de backup na aba Configurações para baixar/restaurar uma cópia em JSON.");
+    showSystemAlert(
+        "Configure seus dados na aba Configurações — tudo é salvo automaticamente.\n\n" +
+        "Adicione personagens na aba Personagens (Favoritos, Estrelas ou Comuns) e envie uma foto ao criá-los.\n\n" +
+        "Os pools WA/HA/WG/HG, slash, tutorial, boostwish e personalrare afetam as estimativas. O campo de harem limita quantos personagens podem ser cadastrados (0 = sem limite).\n\n" +
+        "Veja gráficos e estatísticas na aba Análise.\n\n" +
+        "Use o botão de backup na aba Configurações para baixar/restaurar uma cópia em JSON.",
+        {
+            title: "Ajuda · Mudae Tracker",
+            type: "info",
+            confirmText: "FECHAR"
+        }
+    );
 });
 
 /* ============================================================
