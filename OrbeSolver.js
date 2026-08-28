@@ -1,5 +1,5 @@
 /* ============================================================
-   ORBESOLVER V35 — Hub de solvers + solver local do $oc (Ourochest)
+   ORBESOLVER V36 — Hub de solvers + solver local do $oc (Ourochest)
    ------------------------------------------------------------
    Este módulo é autocontido: injeta seu próprio HTML e CSS,
    gera localmente os 16.800 tabuleiros válidos, calcula as
@@ -943,7 +943,7 @@
                 <div class="orbe-hub-inner">
                     <div class="orbe-hub-heading">
                         <span class="orbe-hub-kicker">MUDAE · ORBES</span>
-                        <h1 id="orbeHubTitle"><span class="page-icon">◉</span> ORBESOLVER <span class="orbe-version">V35</span></h1>
+                        <h1 id="orbeHubTitle"><span class="page-icon">◉</span> ORBESOLVER <span class="orbe-version">V36</span></h1>
                         <p class="subtitle">Selecione qual solver de orbes deseja utilizar.</p>
                     </div>
                     <div class="orbe-solver-picker" role="group" aria-label="Selecionar solver de orbes">
@@ -967,7 +967,7 @@
             <div id="orbeOcScreen" class="orbe-oc-screen" hidden>
             <div class="page-head split orbe-page-head">
                 <div>
-                    <h1 id="orbeTitle"><span class="page-icon">◉</span> $OC SOLVER <span class="orbe-version">V35</span></h1>
+                    <h1 id="orbeTitle"><span class="page-icon">◉</span> $OC SOLVER <span class="orbe-version">V36</span></h1>
                     <p class="subtitle">Solver probabilístico e simulador local do <code>$oc</code> — Ourochest.</p>
                 </div>
                 <div class="orbe-head-actions">
@@ -1093,7 +1093,7 @@ V(S,k) = max_c Σ_x P(Xc=x|S) × [valorSP(x) + V(S∪{c=x},k-1)]</pre>
        ======================================================== */
     const MODULE_CSS = `
         .orbe-view { --orbe-red:#ff4967; --orbe-orange:#ff8c32; --orbe-yellow:#ffd84a; --orbe-green:#45df87; --orbe-teal:#2ed7d0; --orbe-blue:#6687ff; }
-        .orbe-version { font-size:10px; color:var(--yellow); border:1px solid rgba(245,197,24,.4); padding:3px 6px; border-radius:999px; box-shadow:0 0 12px rgba(245,197,24,.12); }
+        .orbe-version { font-size:11px; color:var(--yellow); border:1px solid rgba(245,197,24,.4); padding:3px 6px; border-radius:999px; box-shadow:0 0 12px rgba(245,197,24,.12); }
         .orbe-hub[hidden],.orbe-oc-screen[hidden] { display:none!important; }
         .orbe-hub { min-height:calc(100vh - 155px); display:grid; place-items:center; padding:34px 12px 54px; }
         .orbe-hub-inner { width:min(900px,100%); text-align:center; }
@@ -1110,13 +1110,19 @@ V(S,k) = max_c Σ_x P(Xc=x|S) × [valorSP(x) + V(S∪{c=x},k-1)]</pre>
         .orbe-solver-status { color:var(--yellow); font-size:9px; letter-spacing:.5px; }
         .orbe-solver-enter { margin-top:6px; color:var(--cyan); font-size:8px; letter-spacing:1px; }
         .orbe-page-head { align-items:center; }
+        /* V36 — escala tipográfica do $OC para melhorar legibilidade sem alterar o layout lógico. */
+        .orbe-oc-screen { font-size:14px; }
+        .orbe-oc-screen .page-head h1 { font-size:26px; }
+        .orbe-oc-screen .page-head .subtitle { font-size:15px; line-height:1.55; }
+        .orbe-oc-screen .panel-title { font-size:15px; }
+        .orbe-oc-screen .pill { font-size:13px; }
         .orbe-head-actions { display:flex; align-items:center; justify-content:flex-end; gap:8px; flex-wrap:wrap; }
         .orbe-page-head code,.orbe-math-content code,.orbe-math-content pre { font-family:var(--mono); }
         .orbe-mode-switch { display:flex; padding:4px; border:1px solid var(--border); background:rgba(255,255,255,.02); border-radius:9px; gap:4px; }
-        .orbe-mode-btn { border:1px solid transparent; background:transparent; color:var(--muted); font:700 11px var(--mono); letter-spacing:.6px; padding:9px 14px; border-radius:6px; cursor:pointer; transition:.16s ease; }
+        .orbe-mode-btn { border:1px solid transparent; background:transparent; color:var(--muted); font:700 13px var(--mono); letter-spacing:.6px; padding:9px 14px; border-radius:6px; cursor:pointer; transition:.16s ease; }
         .orbe-mode-btn:hover,.orbe-mode-btn:focus-visible { color:var(--text); border-color:rgba(34,211,238,.28); outline:none; box-shadow:0 0 14px rgba(34,211,238,.10); }
         .orbe-mode-btn.active { color:var(--cyan); border-color:rgba(34,211,238,.45); background:var(--cyan-soft); box-shadow:inset 0 0 16px rgba(34,211,238,.07),0 0 13px rgba(34,211,238,.08); }
-        .orbe-diagnostic { display:flex; align-items:center; gap:8px; min-height:34px; margin:-8px 0 16px; padding:8px 12px; border:1px solid rgba(34,211,238,.18); border-radius:7px; background:rgba(34,211,238,.055); color:var(--muted); font-size:11px; }
+        .orbe-diagnostic { display:flex; align-items:center; gap:8px; min-height:34px; margin:-8px 0 16px; padding:8px 12px; border:1px solid rgba(34,211,238,.18); border-radius:7px; background:rgba(34,211,238,.055); color:var(--muted); font-size:13px; }
         .orbe-diagnostic.ok { color:var(--green); border-color:rgba(52,211,153,.25); background:rgba(52,211,153,.055); }
         .orbe-diagnostic.error { color:#ff6b87; border-color:rgba(255,73,103,.35); background:rgba(255,73,103,.08); }
         .orbe-loader { width:11px; height:11px; border-radius:50%; border:2px solid rgba(34,211,238,.22); border-top-color:var(--cyan); display:inline-block; animation:orbe-spin .7s linear infinite; flex:0 0 auto; }
@@ -1132,7 +1138,7 @@ V(S,k) = max_c Σ_x P(Xc=x|S) × [valorSP(x) + V(S∪{c=x},k-1)]</pre>
         .orbe-cell:disabled { cursor:default; }
         .orbe-cell.orbe-recommended { border-color:var(--yellow); box-shadow:0 0 0 1px rgba(245,197,24,.35),0 0 24px rgba(245,197,24,.23); animation:orbe-target 1.8s ease-in-out infinite; }
         @keyframes orbe-target { 0%,100%{box-shadow:0 0 0 1px rgba(245,197,24,.28),0 0 16px rgba(245,197,24,.14)} 50%{box-shadow:0 0 0 1px rgba(245,197,24,.5),0 0 29px rgba(245,197,24,.29)} }
-        .orbe-cell.orbe-center::before { content:"R=0"; position:absolute; right:5px; top:5px; font-size:8px; color:rgba(255,73,103,.7); letter-spacing:.2px; }
+        .orbe-cell.orbe-center::before { content:"R=0"; position:absolute; right:5px; top:5px; font-size:10px; color:rgba(255,73,103,.7); letter-spacing:.2px; }
         .orbe-cell.orbe-clicked { border-color:rgba(255,255,255,.28); }
         .orbe-cell.orbe-sim-clicked { box-shadow:inset 0 0 0 2px rgba(255,255,255,.35); }
         .orbe-cell.orbe-color-r { background:radial-gradient(circle at 50% 40%,rgba(255,73,103,.40),rgba(204,51,51,.12) 65%,rgba(8,10,18,.7)); border-color:rgba(255,73,103,.75); }
@@ -1143,47 +1149,47 @@ V(S,k) = max_c Σ_x P(Xc=x|S) × [valorSP(x) + V(S∪{c=x},k-1)]</pre>
         .orbe-cell.orbe-color-b { background:radial-gradient(circle at 50% 40%,rgba(102,135,255,.34),rgba(51,85,204,.11) 65%,rgba(8,10,18,.7)); border-color:rgba(102,135,255,.65); }
         .orbe-cell.orbe-color-x { background:repeating-linear-gradient(135deg,rgba(90,98,120,.18) 0 8px,rgba(90,98,120,.08) 8px 16px); border-color:rgba(148,163,184,.30); }
         .orbe-cell-main { position:absolute; inset:0; display:flex; align-items:center; justify-content:center; flex-direction:column; z-index:2; pointer-events:none; }
-        .orbe-cell-symbol { font-size:23px; font-weight:800; line-height:1; text-shadow:0 0 10px currentColor; }
-        .orbe-cell-target { font-size:20px; color:var(--yellow); font-weight:800; line-height:1; }
-        .orbe-cell-sp { font-size:8px; color:var(--muted); margin-top:5px; }
-        .orbe-cell-coord { position:absolute; left:6px; bottom:5px; font-size:8px; color:var(--muted); z-index:3; }
-        .orbe-cell-redprob { position:absolute; right:6px; bottom:5px; font-size:8px; color:#ff7790; z-index:3; }
-        .orbe-cell-tooltip { visibility:hidden; opacity:0; position:absolute; z-index:80; width:205px; left:50%; bottom:calc(100% + 8px); transform:translateX(-50%) translateY(3px); padding:10px; border:1px solid rgba(34,211,238,.35); background:rgba(8,10,18,.98); border-radius:8px; box-shadow:0 12px 34px rgba(0,0,0,.4),0 0 20px rgba(34,211,238,.08); pointer-events:none; text-align:left; transition:.12s ease; font-size:9px; color:var(--muted); }
+        .orbe-cell-symbol { font-size:27px; font-weight:800; line-height:1; text-shadow:0 0 10px currentColor; }
+        .orbe-cell-target { font-size:24px; color:var(--yellow); font-weight:800; line-height:1; }
+        .orbe-cell-sp { font-size:10px; color:var(--muted); margin-top:5px; }
+        .orbe-cell-coord { position:absolute; left:6px; bottom:5px; font-size:10px; color:var(--muted); z-index:3; }
+        .orbe-cell-redprob { position:absolute; right:6px; bottom:5px; font-size:10px; color:#ff7790; z-index:3; }
+        .orbe-cell-tooltip { visibility:hidden; opacity:0; position:absolute; z-index:80; width:205px; left:50%; bottom:calc(100% + 8px); transform:translateX(-50%) translateY(3px); padding:10px; border:1px solid rgba(34,211,238,.35); background:rgba(8,10,18,.98); border-radius:8px; box-shadow:0 12px 34px rgba(0,0,0,.4),0 0 20px rgba(34,211,238,.08); pointer-events:none; text-align:left; transition:.12s ease; font-size:11px; color:var(--muted); }
         .orbe-cell:hover .orbe-cell-tooltip,.orbe-cell:focus-visible .orbe-cell-tooltip { visibility:visible; opacity:1; transform:translateX(-50%) translateY(0); }
         .orbe-tooltip-row { display:flex; justify-content:space-between; gap:8px; padding:2px 0; }
         .orbe-tooltip-row strong { color:var(--text); }
         .orbe-tooltip-ev { border-top:1px solid var(--border-soft); margin-top:5px; padding-top:6px; color:var(--cyan); }
-        .orbe-hint,.orbe-small { color:var(--muted); font-size:10px; line-height:1.5; }
+        .orbe-hint,.orbe-small { color:var(--muted); font-size:12px; line-height:1.5; }
         .orbe-hint { text-align:center; margin:12px 0 0; }
-        .orbe-calc-status { min-height:20px; display:flex; align-items:center; gap:7px; color:var(--muted); font-size:9px; margin-bottom:8px; }
+        .orbe-calc-status { min-height:20px; display:flex; align-items:center; gap:7px; color:var(--muted); font-size:11px; margin-bottom:8px; }
         .orbe-calc-status.ready { color:var(--green); }
         .orbe-calc-status.fallback { color:var(--yellow); }
         .orbe-recommendation { min-height:104px; padding:14px; border:1px solid rgba(245,197,24,.25); border-radius:9px; background:linear-gradient(145deg,rgba(245,197,24,.075),rgba(245,197,24,.02)); }
-        .orbe-rec-empty { color:var(--muted); font-size:10px; line-height:1.5; }
-        .orbe-rec-coord { display:flex; align-items:center; gap:10px; color:var(--yellow); font-size:25px; font-weight:800; text-shadow:0 0 16px rgba(245,197,24,.24); }
-        .orbe-rec-target { width:34px; height:34px; display:grid; place-items:center; border:1px solid rgba(245,197,24,.5); border-radius:50%; font-size:17px; }
+        .orbe-rec-empty { color:var(--muted); font-size:12px; line-height:1.5; }
+        .orbe-rec-coord { display:flex; align-items:center; gap:10px; color:var(--yellow); font-size:28px; font-weight:800; text-shadow:0 0 16px rgba(245,197,24,.24); }
+        .orbe-rec-target { width:34px; height:34px; display:grid; place-items:center; border:1px solid rgba(245,197,24,.5); border-radius:50%; font-size:20px; }
         .orbe-rec-meta { display:grid; grid-template-columns:repeat(3,1fr); gap:6px; margin-top:11px; }
         .orbe-rec-metric { border-top:1px solid rgba(245,197,24,.14); padding-top:7px; }
-        .orbe-rec-metric span { display:block; font-size:7px; color:var(--muted); text-transform:uppercase; }
-        .orbe-rec-metric strong { display:block; margin-top:3px; font-size:10px; color:var(--text); }
-        .orbe-policy-badge { display:inline-flex; margin-top:9px; padding:4px 7px; border:1px solid rgba(34,211,238,.25); background:rgba(34,211,238,.06); color:var(--cyan); border-radius:999px; font-size:8px; }
+        .orbe-rec-metric span { display:block; font-size:9px; color:var(--muted); text-transform:uppercase; }
+        .orbe-rec-metric strong { display:block; margin-top:3px; font-size:12px; color:var(--text); }
+        .orbe-policy-badge { display:inline-flex; margin-top:9px; padding:4px 7px; border:1px solid rgba(34,211,238,.25); background:rgba(34,211,238,.06); color:var(--cyan); border-radius:999px; font-size:10px; }
         .orbe-policy-badge.fallback { border-color:rgba(245,197,24,.28); background:rgba(245,197,24,.06); color:var(--yellow); }
         .orbe-outcome-bars { margin-top:11px; display:grid; gap:5px; }
-        .orbe-outcome-row { display:grid; grid-template-columns:66px 1fr 52px; align-items:center; gap:7px; font-size:8px; }
+        .orbe-outcome-row { display:grid; grid-template-columns:82px 1fr 64px; align-items:center; gap:8px; font-size:10px; }
         .orbe-outcome-label { color:var(--muted); }
         .orbe-outcome-track { height:5px; border-radius:999px; background:rgba(255,255,255,.05); overflow:hidden; }
         .orbe-outcome-fill { height:100%; border-radius:inherit; box-shadow:0 0 8px currentColor; }
         .orbe-outcome-value { text-align:right; color:var(--text); }
         .orbe-stats-grid { display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:7px; }
         .orbe-stat { padding:8px; border:1px solid var(--border-soft); background:rgba(255,255,255,.016); border-radius:7px; min-width:0; }
-        .orbe-stat span { display:block; color:var(--muted); font-size:7px; text-transform:uppercase; letter-spacing:.35px; }
-        .orbe-stat strong { display:block; color:var(--text); font-size:11px; margin-top:4px; overflow-wrap:anywhere; }
+        .orbe-stat span { display:block; color:var(--muted); font-size:9px; text-transform:uppercase; letter-spacing:.35px; }
+        .orbe-stat strong { display:block; color:var(--text); font-size:13px; margin-top:4px; overflow-wrap:anywhere; }
         .orbe-stat.accent strong { color:var(--cyan); }
         .orbe-stat.warning strong { color:var(--yellow); }
         .orbe-history-panel { margin-top:16px; }
         .orbe-table-wrap { overflow:auto; }
-        .orbe-history-table { width:100%; border-collapse:collapse; font-size:9px; }
-        .orbe-history-table th { color:var(--muted); text-align:left; padding:8px; border-bottom:1px solid var(--border); font-size:8px; letter-spacing:.4px; }
+        .orbe-history-table { width:100%; border-collapse:collapse; font-size:11px; }
+        .orbe-history-table th { color:var(--muted); text-align:left; padding:8px; border-bottom:1px solid var(--border); font-size:10px; letter-spacing:.4px; }
         .orbe-history-table td { padding:9px 8px; border-bottom:1px solid var(--border-soft); color:var(--text); vertical-align:top; }
         .orbe-history-table tbody tr:last-child td { border-bottom:none; }
         .orbe-history-empty { color:var(--muted)!important; text-align:center; padding:18px!important; }
@@ -1192,28 +1198,28 @@ V(S,k) = max_c Σ_x P(Xc=x|S) × [valorSP(x) + V(S∪{c=x},k-1)]</pre>
         .orbe-history-details { min-width:240px; margin-top:6px; color:var(--muted); line-height:1.55; }
         .orbe-legend-panel { margin-top:16px; }
         .orbe-legend { display:grid; gap:6px; }
-        .orbe-legend-item { display:grid; grid-template-columns:26px 1fr auto; align-items:center; gap:8px; font-size:9px; color:var(--muted); }
+        .orbe-legend-item { display:grid; grid-template-columns:26px 1fr auto; align-items:center; gap:8px; font-size:11px; color:var(--muted); }
         .orbe-legend-item strong { color:var(--text); }
         .orbe-legend-dot { width:23px; height:23px; display:grid; place-items:center; border:1px solid currentColor; border-radius:6px; font-weight:800; }
         .orbe-color-r { color:var(--orbe-red); } .orbe-color-o { color:var(--orbe-orange); } .orbe-color-y { color:var(--orbe-yellow); }
         .orbe-color-g { color:var(--orbe-green); } .orbe-color-t { color:var(--orbe-teal); } .orbe-color-b { color:var(--orbe-blue); } .orbe-color-x { color:#8992a8; }
         .orbe-math-panel { margin-top:16px; }
-        .orbe-math-panel > summary { cursor:pointer; color:var(--cyan); font-size:11px; font-weight:800; letter-spacing:.5px; list-style:none; display:flex; align-items:center; gap:8px; }
+        .orbe-math-panel > summary { cursor:pointer; color:var(--cyan); font-size:13px; font-weight:800; letter-spacing:.5px; list-style:none; display:flex; align-items:center; gap:8px; }
         .orbe-math-panel > summary::-webkit-details-marker { display:none; }
-        .orbe-math-content { margin-top:16px; color:var(--muted); font-family:var(--sans); font-size:12px; line-height:1.65; }
-        .orbe-math-content h3 { color:var(--text); font:700 11px var(--mono); margin:18px 0 6px; }
-        .orbe-math-content pre { white-space:pre-wrap; padding:12px; border:1px solid var(--border); background:rgba(0,0,0,.22); border-radius:7px; color:#c9d5eb; font-size:10px; line-height:1.55; }
+        .orbe-math-content { margin-top:16px; color:var(--muted); font-family:var(--sans); font-size:14px; line-height:1.7; }
+        .orbe-math-content h3 { color:var(--text); font:700 13px var(--mono); margin:18px 0 6px; }
+        .orbe-math-content pre { white-space:pre-wrap; padding:12px; border:1px solid var(--border); background:rgba(0,0,0,.22); border-radius:7px; color:#c9d5eb; font-size:12px; line-height:1.6; }
         .orbe-formula-grid { display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:7px; }
-        .orbe-formula-grid code { padding:8px; background:rgba(34,211,238,.035); border:1px solid rgba(34,211,238,.12); border-radius:6px; color:#b8c8df; font-size:9px; }
+        .orbe-formula-grid code { padding:8px; background:rgba(34,211,238,.035); border:1px solid rgba(34,211,238,.12); border-radius:6px; color:#b8c8df; font-size:11px; }
         .orbe-dialog-backdrop { position:fixed; inset:0; z-index:150; display:grid; place-items:center; padding:18px; background:rgba(3,5,12,.78); backdrop-filter:blur(5px); }
         .orbe-dialog-backdrop[hidden] { display:none; }
         .orbe-dialog { width:min(560px,100%); padding:18px; border:1px solid rgba(34,211,238,.32); background:#0b1020; border-radius:12px; box-shadow:0 24px 70px rgba(0,0,0,.55),0 0 35px rgba(34,211,238,.08); }
         .orbe-dialog-head { display:flex; justify-content:space-between; align-items:flex-start; gap:14px; }
-        .orbe-dialog-kicker { color:var(--cyan); font-size:8px; letter-spacing:1.2px; }
-        .orbe-dialog h2 { margin:4px 0 0; color:var(--text); font-size:16px; }
+        .orbe-dialog-kicker { color:var(--cyan); font-size:10px; letter-spacing:1.2px; }
+        .orbe-dialog h2 { margin:4px 0 0; color:var(--text); font-size:19px; }
         .orbe-dialog-close { width:34px; height:34px; border:1px solid var(--border); background:rgba(255,255,255,.025); color:var(--muted); border-radius:7px; cursor:pointer; font-size:20px; }
         .orbe-dialog-close:hover,.orbe-dialog-close:focus-visible { color:var(--cyan); border-color:rgba(34,211,238,.4); outline:none; box-shadow:0 0 14px rgba(34,211,238,.1); }
-        .orbe-dialog-text { color:var(--muted); font-size:10px; line-height:1.55; }
+        .orbe-dialog-text { color:var(--muted); font-size:12px; line-height:1.55; }
         .orbe-color-choices { display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:8px; margin-top:12px; }
         .orbe-color-choice { --orbe-choice-glow:rgba(137,146,168,.16); display:grid; grid-template-columns:30px 1fr auto; align-items:center; gap:8px; padding:9px; border:1px solid currentColor; background:rgba(137,146,168,.06); color:#8992a8; border-radius:8px; cursor:pointer; text-align:left; font-family:var(--mono); transition:transform .14s ease,box-shadow .14s ease,background .14s ease; }
         .orbe-color-choice.orbe-color-r { color:var(--orbe-red); background:rgba(255,73,103,.075); --orbe-choice-glow:rgba(255,73,103,.22); }
@@ -1225,14 +1231,14 @@ V(S,k) = max_c Σ_x P(Xc=x|S) × [valorSP(x) + V(S∪{c=x},k-1)]</pre>
         .orbe-color-choice:hover:not(:disabled),.orbe-color-choice:focus-visible:not(:disabled) { outline:none; box-shadow:0 0 18px var(--orbe-choice-glow); transform:translateY(-1px); background-color:rgba(255,255,255,.035); }
         .orbe-color-choice:disabled { opacity:.28; cursor:not-allowed; }
         .orbe-choice-code { width:28px; height:28px; display:grid; place-items:center; border:1px solid currentColor; border-radius:6px; font-weight:800; text-shadow:0 0 9px currentColor; }
-        .orbe-choice-name { font-size:9px; color:currentColor; font-weight:700; }
-        .orbe-choice-prob { font-size:8px; color:currentColor; opacity:.78; }
+        .orbe-choice-name { font-size:11px; color:currentColor; font-weight:700; }
+        .orbe-choice-prob { font-size:10px; color:currentColor; opacity:.78; }
         .orbe-dialog-actions { display:flex; justify-content:flex-end; gap:8px; margin-top:14px; }
-        .orbe-impossible { color:#ff6b87; border:1px solid rgba(255,73,103,.32); background:rgba(255,73,103,.07); padding:10px; border-radius:7px; font-size:10px; line-height:1.5; }
+        .orbe-impossible { color:#ff6b87; border:1px solid rgba(255,73,103,.32); background:rgba(255,73,103,.07); padding:10px; border-radius:7px; font-size:12px; line-height:1.55; }
         @media (max-width:900px) { .orbe-layout { grid-template-columns:1fr; } .orbe-secondary-column { grid-template-columns:1fr 1fr; } }
         @media (max-width:760px) { .tabs { max-width:100%; overflow-x:auto; scrollbar-width:thin; } .tab-btn { flex:0 0 auto; white-space:nowrap; } }
         @media (max-width:720px) { .orbe-secondary-column { grid-template-columns:1fr; } .orbe-formula-grid { grid-template-columns:1fr; } .orbe-cell-tooltip { display:none; } .orbe-solver-picker { grid-template-columns:1fr; max-width:430px; margin:0 auto; } .orbe-solver-card { min-height:125px; } }
-        @media (max-width:520px) { .orbe-board { gap:5px; } .orbe-cell { border-radius:7px; } .orbe-cell-symbol { font-size:18px; } .orbe-cell-target { font-size:16px; } .orbe-cell-coord,.orbe-cell-redprob { font-size:7px; } .orbe-rec-meta { grid-template-columns:1fr; } .orbe-stats-grid { grid-template-columns:1fr 1fr; } .orbe-color-choices { grid-template-columns:1fr; } .orbe-mode-switch { width:100%; } .orbe-mode-btn { flex:1; } .orbe-head-actions { width:100%; justify-content:stretch; } .orbe-head-actions>.pill { width:100%; } }
+        @media (max-width:520px) { .orbe-board { gap:5px; } .orbe-cell { border-radius:7px; } .orbe-cell-symbol { font-size:22px; } .orbe-cell-target { font-size:20px; } .orbe-cell-coord,.orbe-cell-redprob { font-size:9px; } .orbe-rec-meta { grid-template-columns:1fr; } .orbe-stats-grid { grid-template-columns:1fr 1fr; } .orbe-color-choices { grid-template-columns:1fr; } .orbe-mode-switch { width:100%; } .orbe-mode-btn { flex:1; } .orbe-head-actions { width:100%; justify-content:stretch; } .orbe-head-actions>.pill { width:100%; } }
         @media (prefers-reduced-motion:reduce) { .orbe-cell,.orbe-loader,.orbe-cell.orbe-recommended { animation:none!important; transition:none!important; } }
     `;
 
