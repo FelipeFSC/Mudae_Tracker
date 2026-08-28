@@ -1,5 +1,5 @@
 /* ============================================================
-   ORBESOLVER V36 — Hub de solvers + solver local do $oc (Ourochest)
+   ORBESOLVER — Hub de solvers + solver local do $oc (Ourochest)
    ------------------------------------------------------------
    Este módulo é autocontido: injeta seu próprio HTML e CSS,
    gera localmente os 16.800 tabuleiros válidos, calcula as
@@ -943,22 +943,22 @@
                 <div class="orbe-hub-inner">
                     <div class="orbe-hub-heading">
                         <span class="orbe-hub-kicker">MUDAE · ORBES</span>
-                        <h1 id="orbeHubTitle"><span class="page-icon">◉</span> ORBESOLVER <span class="orbe-version">V36</span></h1>
+                        <h1 id="orbeHubTitle"><span class="page-icon">◉</span> ORBESOLVER</h1>
                         <p class="subtitle">Selecione qual solver de orbes deseja utilizar.</p>
                     </div>
                     <div class="orbe-solver-picker" role="group" aria-label="Selecionar solver de orbes">
                         <button type="button" class="orbe-solver-card is-disabled" disabled aria-disabled="true">
                             <span class="orbe-solver-command">$OH</span>
-                            <span class="orbe-solver-status">(em construção)</span>
                         </button>
                         <button type="button" id="orbeOpenOc" class="orbe-solver-card is-available">
                             <span class="orbe-solver-command">$OC</span>
                             <span class="orbe-solver-name">Ourochest</span>
                             <span class="orbe-solver-enter">ABRIR SOLVER →</span>
                         </button>
-                        <button type="button" class="orbe-solver-card is-disabled" disabled aria-disabled="true">
+                        <button type="button" id="orbeOpenOq" class="orbe-solver-card is-available">
                             <span class="orbe-solver-command">$OQ</span>
-                            <span class="orbe-solver-status">(em construção)</span>
+                            <span class="orbe-solver-name">Ouro Quest</span>
+                            <span class="orbe-solver-enter">ABRIR SOLVER →</span>
                         </button>
                     </div>
                 </div>
@@ -967,7 +967,7 @@
             <div id="orbeOcScreen" class="orbe-oc-screen" hidden>
             <div class="page-head split orbe-page-head">
                 <div>
-                    <h1 id="orbeTitle"><span class="page-icon">◉</span> $OC SOLVER <span class="orbe-version">V36</span></h1>
+                    <h1 id="orbeTitle"><span class="page-icon">◉</span> $OC SOLVER</h1>
                     <p class="subtitle">Solver probabilístico e simulador local do <code>$oc</code> — Ourochest.</p>
                 </div>
                 <div class="orbe-head-actions">
@@ -1093,7 +1093,6 @@ V(S,k) = max_c Σ_x P(Xc=x|S) × [valorSP(x) + V(S∪{c=x},k-1)]</pre>
        ======================================================== */
     const MODULE_CSS = `
         .orbe-view { --orbe-red:#ff4967; --orbe-orange:#ff8c32; --orbe-yellow:#ffd84a; --orbe-green:#45df87; --orbe-teal:#2ed7d0; --orbe-blue:#6687ff; }
-        .orbe-version { font-size:11px; color:var(--yellow); border:1px solid rgba(245,197,24,.4); padding:3px 6px; border-radius:999px; box-shadow:0 0 12px rgba(245,197,24,.12); }
         .orbe-hub[hidden],.orbe-oc-screen[hidden] { display:none!important; }
         .orbe-hub { min-height:calc(100vh - 155px); display:grid; place-items:center; padding:34px 12px 54px; }
         .orbe-hub-inner { width:min(900px,100%); text-align:center; }
@@ -1281,6 +1280,7 @@ V(S,k) = max_c Σ_x P(Xc=x|S) × [valorSP(x) + V(S∪{c=x},k-1)]</pre>
                 hub: byId("orbeHub"),
                 ocScreen: byId("orbeOcScreen"),
                 openOc: byId("orbeOpenOc"),
+                openOq: byId("orbeOpenOq"),
                 backToHub: byId("orbeBackToHub"),
                 diagnostic: byId("orbeDiagnostic"),
                 board: byId("orbeBoard"),
@@ -1305,6 +1305,7 @@ V(S,k) = max_c Σ_x P(Xc=x|S) × [valorSP(x) + V(S∪{c=x},k-1)]</pre>
 
         bindEvents() {
             this.el.openOc.addEventListener("click", () => this.openOcSolver());
+            this.el.openOq?.addEventListener("click", () => this.openOqSolver());
             this.el.backToHub.addEventListener("click", () => this.showHub());
 
             this.modeButtons.forEach(button => {
@@ -1379,16 +1380,31 @@ V(S,k) = max_c Σ_x P(Xc=x|S) × [valorSP(x) + V(S∪{c=x},k-1)]</pre>
             this.closeDialog(false);
             this.calculationToken += 1;
             this.solver?.cancel();
+            globalThis.OrbeSolverOQ?.deactivate?.();
             this.el.hub.hidden = false;
             this.el.ocScreen.hidden = true;
+            const oqScreen = document.getElementById("orbeOqScreen");
+            if (oqScreen) oqScreen.hidden = true;
             requestAnimationFrame(() => this.el.openOc?.focus());
         }
 
         async openOcSolver() {
+            globalThis.OrbeSolverOQ?.deactivate?.();
             this.el.hub.hidden = true;
             this.el.ocScreen.hidden = false;
+            const oqScreen = document.getElementById("orbeOqScreen");
+            if (oqScreen) oqScreen.hidden = true;
             await this.ensureInitialized();
             if (this.initialized) this.renderAll();
+        }
+
+        async openOqSolver() {
+            this.closeDialog(false);
+            this.calculationToken += 1;
+            this.solver?.cancel();
+            this.el.hub.hidden = true;
+            this.el.ocScreen.hidden = true;
+            await globalThis.OrbeSolverOQ?.activate?.();
         }
 
         switchMode(mode) {
@@ -1941,6 +1957,10 @@ V(S,k) = max_c Σ_x P(Xc=x|S) × [valorSP(x) + V(S∪{c=x},k-1)]</pre>
         activate() {
             injectModule();
             appInstance?.activate();
+        },
+        showHub() {
+            injectModule();
+            appInstance?.showHub();
         },
         runSelfTests,
         generateBoards,
