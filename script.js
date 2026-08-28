@@ -567,19 +567,27 @@ function chanceClass(v) {
    NAVEGAÇÃO ENTRE ABAS
    ============================================================ */
 const tabButtons = document.querySelectorAll(".tab-btn");
-const views = {
-    config: document.getElementById("view-config"),
-    chars: document.getElementById("view-chars"),
-    analysis: document.getElementById("view-analysis")
-};
+
+// Descoberta dinâmica das views: permite que módulos locais, como o
+// OrbeSolver, injetem uma nova seção antes da inicialização do script
+// principal sem acoplamento rígido ao restante do Tracker.
+const views = {};
+document.querySelectorAll(".view[id^='view-']").forEach(el => {
+    views[el.id.replace("view-", "")] = el;
+});
 
 function showView(name) {
+    // Descobre também views que tenham sido montadas depois da carga inicial.
+    const dynamicView = document.getElementById(`view-${name}`);
+    if (dynamicView && !views[name]) views[name] = dynamicView;
+
     Object.entries(views).forEach(([key, el]) => {
-        el.classList.toggle("active", key === name);
+        if (el) el.classList.toggle("active", key === name);
     });
     tabButtons.forEach(btn => btn.classList.toggle("active", btn.dataset.view === name));
     if (name === "analysis") renderAnalysis();
     if (name === "chars") renderCharacters();
+    if (name === "orbe" && window.OrbeSolver) window.OrbeSolver.activate();
 }
 
 tabButtons.forEach(btn => {
