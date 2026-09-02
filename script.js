@@ -967,6 +967,8 @@ const btnClearFilters = document.getElementById("btnClearFilters");
 const viewToggle = document.getElementById("viewToggle");
 const gridDetailsToggle = document.getElementById("gridDetailsToggle");
 const gridDetailsControl = document.getElementById("gridDetailsControl");
+const groupBySeriesToggle = document.getElementById("groupBySeriesToggle");
+const appEl = document.getElementById("app");
 const btnClearHarem = document.getElementById("btnClearHarem");
 
 const charFilters = {
@@ -976,7 +978,8 @@ const charFilters = {
     kakeraMax: null,
     sortKakera: "",
     sortKeys: "",
-    genders: new Set()
+    genders: new Set(),
+    groupBySeries: false
 };
 
 // Atualiza o <select> de séries com as séries realmente cadastradas no harem
@@ -999,6 +1002,110 @@ function populateSeriesFilter() {
     } else {
         charFilters.series = "";
     }
+}
+
+// Agrupa personagens já filtrados/ordenados por série, preservando a ordem
+// relativa dentro de cada série. "Sem série" cobre personagens sem série
+// definida (ou com o placeholder "—" usado na importação do Harém).
+function groupCharactersBySeries(items) {
+    const map = new Map();
+    items.forEach(c => {
+        const raw = (c.series || "").trim();
+        const key = raw && raw !== "—" ? raw : "Sem série";
+        if (!map.has(key)) map.set(key, []);
+        map.get(key).push(c);
+    });
+    return Array.from(map.entries()).sort((a, b) => a[0].localeCompare(b[0], "pt-BR"));
+}
+
+/* ============================================================
+   NEON DO GRUPO A PARTIR DA FOTO DO 1º PERSONAGEM
+   ------------------------------------------------------------
+   Experimental: em vez de só alternar cores fixas por posição, tenta
+   extrair a cor média da foto do primeiro personagem de cada série e
+   usa essa cor como o "--series-rgb" daquele grupo (ver style.css).
+   Se a imagem não puder ser lida (CORS de CDN externo, por exemplo),
+   ou não tiver foto, o grupo mantém a cor padrão do ciclo por posição.
+   ============================================================ */
+const seriesColorCache = new Map();
+
+// Converte RGB extraído da imagem para HSL e força saturação/luminância
+// dentro da faixa "neon" já usada pelas cores fixas do sistema (cyan,
+// roxo, rosa...), preservando só o matiz (hue) da imagem. Sem isso, a
+// média de uma foto costuma sair acinzentada/apagada.
+function vividizeRgb(r, g, b) {
+    r /= 255; g /= 255; b /= 255;
+    const max = Math.max(r, g, b), min = Math.min(r, g, b);
+    let h = 0, s = 0;
+    const l = (max + min) / 2;
+    const d = max - min;
+    if (d !== 0) {
+        s = l > 0.5 ? d / (2 - max - min) : d / (max + min);
+        switch (max) {
+            case r: h = (g - b) / d + (g < b ? 6 : 0); break;
+            case g: h = (b - r) / d + 2; break;
+            default: h = (r - g) / d + 4;
+        }
+        h /= 6;
+    }
+    const s2 = Math.max(s, 0.6);
+    const l2 = Math.min(Math.max(l, 0.48), 0.62);
+    const q = l2 < 0.5 ? l2 * (1 + s2) : l2 + s2 - l2 * s2;
+    const p = 2 * l2 - q;
+    const hue2rgb = (t) => {
+        if (t < 0) t += 1;
+        if (t > 1) t -= 1;
+        if (t < 1 / 6) return p + (q - p) * 6 * t;
+        if (t < 1 / 2) return q;
+        if (t < 2 / 3) return p + (q - p) * (2 / 3 - t) * 6;
+        return p;
+    };
+    return [
+        Math.round(hue2rgb(h + 1 / 3) * 255),
+        Math.round(hue2rgb(h) * 255),
+        Math.round(hue2rgb(h - 1 / 3) * 255)
+    ];
+}
+
+// Resolve para "r, g, b" (string pronta pro CSS custom property) ou null
+// quando a imagem não existe/não pôde ser lida.
+function extractDominantColor(url) {
+    if (!url) return Promise.resolve(null);
+    if (seriesColorCache.has(url)) return Promise.resolve(seriesColorCache.get(url));
+
+    return new Promise(resolve => {
+        const img = new Image();
+        img.crossOrigin = "anonymous";
+        img.onload = () => {
+            try {
+                const size = 24;
+                const canvas = document.createElement("canvas");
+                canvas.width = size;
+                canvas.height = size;
+                const ctx = canvas.getContext("2d");
+                ctx.drawImage(img, 0, 0, size, size);
+                const { data } = ctx.getImageData(0, 0, size, size);
+                let r = 0, g = 0, b = 0, count = 0;
+                for (let i = 0; i < data.length; i += 4) {
+                    if (data[i + 3] < 128) continue; // ignora pixels transparentes
+                    r += data[i]; g += data[i + 1]; b += data[i + 2];
+                    count++;
+                }
+                if (!count) { seriesColorCache.set(url, null); resolve(null); return; }
+                const [vr, vg, vb] = vividizeRgb(r / count, g / count, b / count);
+                const rgb = `${vr}, ${vg}, ${vb}`;
+                seriesColorCache.set(url, rgb);
+                resolve(rgb);
+            } catch (_) {
+                // Canvas "contaminado" por CORS (comum em CDNs externas sem
+                // cabeçalho Access-Control-Allow-Origin) — mantém o fallback.
+                seriesColorCache.set(url, null);
+                resolve(null);
+            }
+        };
+        img.onerror = () => { seriesColorCache.set(url, null); resolve(null); };
+        img.src = url;
+    });
 }
 
 function passesFilters(c) {
@@ -1081,6 +1188,12 @@ if (filterGenderRow) {
         });
     });
 }
+if (groupBySeriesToggle) {
+    groupBySeriesToggle.addEventListener("change", () => {
+        charFilters.groupBySeries = groupBySeriesToggle.checked;
+        renderCharacters();
+    });
+}
 // Extraído em função própria para poder ser reaproveitado ao trocar de
 // perfil (ver PROFILES): os filtros de um perfil não fazem sentido nos
 // personagens de outro, então são limpos automaticamente na troca.
@@ -1092,6 +1205,7 @@ function resetCharFilters() {
     charFilters.sortKakera = "";
     charFilters.sortKeys = "";
     charFilters.genders.clear();
+    charFilters.groupBySeries = false;
 
     if (filterCategoryRow) filterCategoryRow.querySelectorAll(".cat-toggle-btn").forEach(btn => btn.classList.remove("active"));
     if (filterSeriesEl) filterSeriesEl.value = "";
@@ -1100,6 +1214,7 @@ function resetCharFilters() {
     if (filterSortKakeraEl) filterSortKakeraEl.value = "";
     if (filterSortKeysEl) filterSortKeysEl.value = "";
     if (filterGenderRow) filterGenderRow.querySelectorAll(".gender-btn").forEach(btn => btn.classList.remove("active"));
+    if (groupBySeriesToggle) groupBySeriesToggle.checked = false;
 }
 
 if (btnClearFilters) {
@@ -1199,6 +1314,9 @@ function renderCharacters() {
 
     populateSeriesFilter();
     applyViewMode();
+    // Com muitas séries diferentes, o espaço extra evita que cada série
+    // fique espremida em colunas estreitas no modo grade.
+    if (appEl) appEl.classList.toggle("app-wide", !!charFilters.groupBySeries);
 
     const filteredCharacters = state.characters.filter(passesFilters);
     const anyFilterActive =
@@ -1258,6 +1376,33 @@ function renderCharacters() {
             empty.className = "group-empty";
             empty.textContent = "Nenhum personagem nesta categoria ainda. Use o botão \"ADICIONAR PERSONAGEM\" no topo da página.";
             body.appendChild(empty);
+        } else if (charFilters.groupBySeries) {
+            body.classList.add("grouped-by-series");
+            groupCharactersBySeries(items).forEach(([seriesName, seriesItems]) => {
+                const seriesGroup = document.createElement("div");
+                seriesGroup.className = "series-group";
+                seriesGroup.innerHTML = `
+          <div class="series-head">
+            <span class="series-title">${escapeXml(seriesName)}</span>
+            <span class="series-count">${seriesItems.length}</span>
+          </div>
+          <div class="series-body"></div>
+        `;
+                const seriesBody = seriesGroup.querySelector(".series-body");
+                seriesItems.forEach(c => seriesBody.appendChild(renderCharCard(c)));
+                body.appendChild(seriesGroup);
+
+                // Tenta "pintar" o neon do grupo com a cor da foto do primeiro
+                // personagem. Assíncrono e best-effort: se falhar (sem foto, CORS
+                // bloqueando a leitura etc.), o grupo simplesmente mantém a cor
+                // padrão do ciclo por posição já definida no CSS.
+                const firstPhoto = seriesItems.find(c => c.photo)?.photo;
+                if (firstPhoto) {
+                    extractDominantColor(firstPhoto).then(rgb => {
+                        if (rgb) seriesGroup.style.setProperty("--series-rgb", rgb);
+                    });
+                }
+            });
         } else {
             items.forEach(c => body.appendChild(renderCharCard(c)));
         }
