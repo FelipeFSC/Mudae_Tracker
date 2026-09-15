@@ -5,6 +5,7 @@
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>mudae</title>
+    <link rel="icon" type="image/webp" href="Mudae.webp" />
     <link rel="stylesheet" href="style.css?v=50" />
     <meta name="referrer" content="no-referrer">
 </head>
@@ -282,9 +283,12 @@
                     </div>
                     <div class="field toolbar-field">
                         <label>SÉRIE</label>
-                        <select id="filterSeries">
-                            <option value="">Todas</option>
-                        </select>
+                        <div class="series-filter-row">
+                            <select id="filterSeries">
+                                <option value="">Todas</option>
+                            </select>
+                            <button type="button" class="pill yellow" id="btnOpenSeriesOrder" title="Gerar o comando pra organizar a ordem das séries no seu harém do Mudae">⇅ ORGANIZAR</button>
+                        </div>
                     </div>
                     <div class="view-controls">
                         <label class="grid-details-control" id="groupBySeriesControl" title="Agrupar personagens por série dentro de cada categoria">
@@ -338,15 +342,6 @@
                         </div>
                     </div>
                     <button id="btnClearFilters" class="btn-clear-filters">LIMPAR FILTROS</button>
-                </div>
-                <div class="filter-command-box" id="filterCommandBox" hidden>
-                    <div class="filter-command-label">💡 Comando equivalente no Mudae</div>
-                    <div class="clear-harem-command-wrap" id="filterCommandWrap">
-                        <code class="clear-harem-command" id="filterCommandText"></code>
-                        <button type="button" class="pill cyan" id="filterCommandCopyBtn">COPIAR</button>
-                    </div>
-                    <p class="filter-command-note" id="filterCommandNote" hidden></p>
-                    <p class="clear-harem-copy-status" id="filterCommandCopyStatus"></p>
                 </div>
             </div>
 
@@ -663,6 +658,53 @@
             <div class="op-modal-footer">
                 <span class="op-save-status" id="wishlistOrderStatus"></span>
                 <button id="wishlistOrderCloseBtn" class="btn-minimal op-close-btn">FECHAR</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- ============ MODAL: ORGANIZAR SÉRIES DO HARÉM ============ -->
+    <div id="seriesOrderModalOverlay" class="modal-overlay">
+        <div class="modal series-order-modal">
+            <div class="modal-head">
+                <div>
+                    <h2>ORGANIZAR SÉRIES</h2>
+                    <p class="tower-modal-sub">Escolha quais séries do seu harém você quer trazer pra frente e em
+                        que ordem. As séries que você não escolher aqui não entram no comando e continuam onde
+                        já estão.</p>
+                </div>
+                <button id="seriesOrderModalClose" class="modal-x">✕</button>
+            </div>
+
+            <div class="series-order-section">
+                <label class="series-order-label">SÉRIES DISPONÍVEIS <span class="series-order-hint">— clique pra
+                        adicionar à ordem</span></label>
+                <div class="series-order-pool" id="seriesOrderPool"></div>
+            </div>
+
+            <div class="series-order-section">
+                <label class="series-order-label">ORDEM ESCOLHIDA</label>
+                <div class="series-order-list" id="seriesOrderList"></div>
+            </div>
+
+            <div class="series-order-unconfirmed" id="seriesOrderUnconfirmed" hidden>
+                <p class="series-order-unconfirmed-title">⚠ Sem série confirmada pelo Mudae</p>
+                <p class="series-order-unconfirmed-text" id="seriesOrderUnconfirmedText"></p>
+            </div>
+
+            <div class="series-order-command-box" id="seriesOrderCommandBox" hidden>
+                <div class="series-order-command-label">💡 Comando pra rodar no Mudae</div>
+                <div class="clear-harem-command-wrap">
+                    <code class="clear-harem-command" id="seriesOrderCommandText"></code>
+                    <button type="button" class="pill cyan" id="seriesOrderCopyBtn">COPIAR</button>
+                </div>
+                <p class="clear-harem-hint">Depois de ordenar o harém por série, o Mudae não deixa mais voltar pra
+                    ordem cronológica original. Rode o comando só quando tiver certeza da ordem.</p>
+                <p class="clear-harem-copy-status" id="seriesOrderCopyStatus"></p>
+            </div>
+
+            <div class="op-modal-footer">
+                <span class="op-save-status" id="seriesOrderEmptyHint">Selecione ao menos uma série pra gerar o comando.</span>
+                <button id="seriesOrderCloseBtn" class="btn-minimal op-close-btn">FECHAR</button>
             </div>
         </div>
     </div>

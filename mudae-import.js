@@ -1010,9 +1010,11 @@ function initializeMudaeImportFlow() {
                 continue;
             }
 
+            const importedSeriesIsReal = item.series && item.series !== "Wishlist" && item.series !== "—";
             const novoPersonagem = {
                 name: item.name,
                 series: item.series || "—",
+                seriesKey: importedSeriesIsReal ? item.series : null,
                 category: "comuns",
                 claimed: true,
                 nickname: item.nickname || null,
@@ -1108,9 +1110,11 @@ function initializeMudaeImportFlow() {
                 continue;
             }
 
+            const importedSeriesIsReal = item.series && item.series !== "Wishlist" && item.series !== "—";
             const novoPersonagem = {
                 name: item.name,
                 series: item.series || "—",
+                seriesKey: importedSeriesIsReal ? item.series : null,
                 category,
                 claimed: false,
                 nickname: item.nickname || null,

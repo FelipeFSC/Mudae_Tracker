@@ -1546,122 +1546,6 @@ function renderCharacters() {
 
         charGroupsEl.appendChild(group);
     });
-
-    updateFilterCommandPreview();
-}
-
-/* ============================================================
-   COMANDO EQUIVALENTE DO MUDAE PARA OS FILTROS ATIVOS
-   ------------------------------------------------------------
-   Traduz os filtros da lista (gênero, ordenação por kakera/chaves,
-   série, agrupar por série) para as "flags" reais do comando $mm do
-   Mudae, somando várias de uma vez quando possível. Baseado no que a
-   Flags Wiki do Mudae documenta publicamente; a direção exata de
-   ordenação (menor→maior vs. maior→menor) não é 100% confirmada, por
-   isso aparece um aviso nesse caso — o resto (gênero, série, agrupar
-   por série) é o comportamento documentado das flags.
-   ============================================================ */
-const filterCommandBox = document.getElementById("filterCommandBox");
-const filterCommandWrapEl = document.getElementById("filterCommandWrap");
-const filterCommandTextEl = document.getElementById("filterCommandText");
-const filterCommandNoteEl = document.getElementById("filterCommandNote");
-const filterCommandCopyBtn = document.getElementById("filterCommandCopyBtn");
-const filterCommandCopyStatusEl = document.getElementById("filterCommandCopyStatus");
-
-function buildMudaeFilterCommand() {
-    const f = charFilters;
-    const has = (g) => f.genders.has(g);
-    let flags = "";
-    const notes = [];
-
-    if (f.genders.size > 0 && f.genders.size < 4) {
-        if (has("wa") && has("wg") && !has("ha") && !has("hg")) {
-            flags += "w";
-        } else if (has("ha") && has("hg") && !has("wa") && !has("wg")) {
-            flags += "h";
-        } else if (has("wa") && has("ha") && !has("wg") && !has("hg")) {
-            flags += "g-=";
-        } else if (has("wg") && has("hg") && !has("wa") && !has("ha")) {
-            flags += "g=";
-        } else if (f.genders.size === 1) {
-            if (has("wa")) flags += "wg-=";
-            else if (has("wg")) flags += "wg=";
-            else if (has("ha")) flags += "hg-=";
-            else if (has("hg")) flags += "hg=";
-        } else {
-            notes.push("Essa combinação específica de gêneros não tem uma flag única equivalente — o comando abaixo não inclui esse filtro.");
-        }
-    }
-
-    if (f.sortKakera) {
-        flags += "k=";
-        if (f.sortKakera === "asc") {
-            notes.push("Não confirmei se o Mudae ordena kakera do menor pro maior com essa flag (a wiki só documenta que k= ordena por kakera) — confira o resultado no jogo.");
-        }
-    }
-
-    if (f.sortKeys) {
-        flags += "y=";
-        if (f.sortKeys === "asc") {
-            notes.push("O mesmo vale pra chaves: a direção exata (menos → mais) não é garantida por essa flag.");
-        }
-    }
-
-    if (f.groupBySeries) flags += "a";
-    if (f.series) flags += "p";
-
-    if (f.kakeraMin !== null || f.kakeraMax !== null) {
-        notes.push("Kakera mínimo/máximo é só um filtro visual daqui do site — o Mudae não tem uma flag pra faixa de valores.");
-    }
-
-    const hasCommand = flags.length > 0 || !!f.series;
-    if (!hasCommand && notes.length === 0) return null;
-
-    const command = hasCommand ? "$mm" + flags + (f.series ? " " + f.series : "") : null;
-    return { command, notes };
-}
-
-function updateFilterCommandPreview() {
-    if (!filterCommandBox) return;
-    const result = buildMudaeFilterCommand();
-
-    if (!result) {
-        filterCommandBox.hidden = true;
-        return;
-    }
-
-    filterCommandBox.hidden = false;
-    if (filterCommandWrapEl) filterCommandWrapEl.hidden = !result.command;
-    if (result.command) {
-        if (filterCommandTextEl) filterCommandTextEl.textContent = result.command;
-        if (filterCommandCopyStatusEl) filterCommandCopyStatusEl.textContent = "";
-    }
-    if (filterCommandNoteEl) {
-        if (result.notes.length > 0) {
-            filterCommandNoteEl.hidden = false;
-            filterCommandNoteEl.textContent = "⚠ " + result.notes.join(" ");
-        } else {
-            filterCommandNoteEl.hidden = true;
-            filterCommandNoteEl.textContent = "";
-        }
-    }
-}
-
-if (filterCommandCopyBtn) {
-    filterCommandCopyBtn.addEventListener("click", async () => {
-        const text = filterCommandTextEl ? filterCommandTextEl.textContent : "";
-        if (!text) return;
-        try {
-            if (!navigator.clipboard || !navigator.clipboard.writeText) {
-                throw new Error("Clipboard API indisponível");
-            }
-            await navigator.clipboard.writeText(text);
-            if (filterCommandCopyStatusEl) filterCommandCopyStatusEl.textContent = "✓ Comando copiado.";
-        } catch (err) {
-            console.error("Erro ao copiar o comando de filtro do Mudae:", err);
-            if (filterCommandCopyStatusEl) filterCommandCopyStatusEl.textContent = "Não foi possível copiar automaticamente. Selecione o texto manualmente.";
-        }
-    });
 }
 
 function normalizeCharacterGenders(value) {
@@ -2156,6 +2040,184 @@ wishlistOrderModalOverlay?.addEventListener("click", (e) => {
     if (e.target === wishlistOrderModalOverlay) closeWishlistOrderModal();
 });
 
+/* ============================================================
+   ORGANIZAR SÉRIES DO HARÉM -> comando $smser
+   ------------------------------------------------------------
+   O usuário escolhe quais séries do harém reivindicado quer trazer
+   pra frente e em que ordem; o resto do harém fica como está. Usa
+   c.seriesKey (nome exato vindo da importação do Mudae) em vez do
+   campo "série" editável, porque é o que o comando precisa bater
+   com o que o Mudae reconhece — ver mergeImportedCharacter().
+   ============================================================ */
+const seriesOrderModalOverlay = document.getElementById("seriesOrderModalOverlay");
+const seriesOrderPoolEl = document.getElementById("seriesOrderPool");
+const seriesOrderListEl = document.getElementById("seriesOrderList");
+const seriesOrderUnconfirmedEl = document.getElementById("seriesOrderUnconfirmed");
+const seriesOrderUnconfirmedTextEl = document.getElementById("seriesOrderUnconfirmedText");
+const seriesOrderCommandBoxEl = document.getElementById("seriesOrderCommandBox");
+const seriesOrderCommandTextEl = document.getElementById("seriesOrderCommandText");
+const seriesOrderCopyBtn = document.getElementById("seriesOrderCopyBtn");
+const seriesOrderCopyStatusEl = document.getElementById("seriesOrderCopyStatus");
+const seriesOrderEmptyHintEl = document.getElementById("seriesOrderEmptyHint");
+const btnOpenSeriesOrder = document.getElementById("btnOpenSeriesOrder");
+
+let seriesOrderSelected = []; // seriesKey na ordem escolhida pelo usuário
+
+// Só personagens reivindicados existem de fato no $mm do Mudae, então só
+// eles entram no agrupamento por série.
+function getClaimedSeriesGroups() {
+    const confirmed = new Map();
+    let unconfirmedCount = 0;
+    const unconfirmedLabels = new Set();
+
+    state.characters.forEach(c => {
+        if (!c.claimed) return;
+        if (c.seriesKey) {
+            confirmed.set(c.seriesKey, (confirmed.get(c.seriesKey) || 0) + 1);
+        } else {
+            unconfirmedCount++;
+            const label = (c.series || "").trim();
+            unconfirmedLabels.add(label && label !== "—" ? label : "Sem série");
+        }
+    });
+
+    const confirmedList = Array.from(confirmed.entries())
+        .map(([seriesKey, count]) => ({ seriesKey, count }))
+        .sort((a, b) => a.seriesKey.localeCompare(b.seriesKey, "pt-BR"));
+
+    return {
+        confirmedList,
+        unconfirmedCount,
+        unconfirmedLabels: Array.from(unconfirmedLabels).sort((a, b) => a.localeCompare(b, "pt-BR"))
+    };
+}
+
+// Primeira série sem "$", as seguintes com "$" grudado na frente — mesma
+// convenção que o comando $divorce já usa em buildDivorceCommand().
+function buildSeriesSortCommand(seriesKeys) {
+    const [first, ...rest] = seriesKeys;
+    return `$smser ${[first, ...rest.map(s => `$${s}`)].join("")}`;
+}
+
+function renderSeriesOrderModal() {
+    if (!seriesOrderPoolEl || !seriesOrderListEl) return;
+    const { confirmedList, unconfirmedCount, unconfirmedLabels } = getClaimedSeriesGroups();
+    const countBySeriesKey = new Map(confirmedList.map(s => [s.seriesKey, s.count]));
+
+    const available = confirmedList.filter(s => !seriesOrderSelected.includes(s.seriesKey));
+    if (confirmedList.length === 0) {
+        seriesOrderPoolEl.innerHTML = `<p class="series-order-empty">Nenhuma série com nome confirmado pelo Mudae encontrada no harém. Importe o harém pelo botão "IMPORTAR MUDAE" pra preencher isso automaticamente.</p>`;
+    } else if (available.length === 0) {
+        seriesOrderPoolEl.innerHTML = `<p class="series-order-empty">Todas as séries disponíveis já estão na ordem escolhida.</p>`;
+    } else {
+        seriesOrderPoolEl.innerHTML = available.map(s => `
+            <button type="button" class="series-order-chip" data-series-key="${escapeXml(s.seriesKey)}">
+                ${escapeXml(s.seriesKey)} <span class="series-order-chip-count">(${s.count})</span>
+            </button>
+        `).join("");
+        seriesOrderPoolEl.querySelectorAll(".series-order-chip").forEach(btn => {
+            btn.addEventListener("click", () => {
+                seriesOrderSelected.push(btn.dataset.seriesKey);
+                renderSeriesOrderModal();
+            });
+        });
+    }
+
+    if (seriesOrderSelected.length === 0) {
+        seriesOrderListEl.innerHTML = `<p class="series-order-empty">Nenhuma série escolhida ainda.</p>`;
+    } else {
+        seriesOrderListEl.innerHTML = seriesOrderSelected.map((seriesKey, idx) => `
+            <div class="series-order-row" data-series-key="${escapeXml(seriesKey)}">
+                <span class="wishlist-order-pos">${idx + 1}</span>
+                <span class="series-order-name" title="${escapeXml(seriesKey)}">${escapeXml(seriesKey)}</span>
+                <span class="series-order-chip-count">${countBySeriesKey.get(seriesKey) || 0} pers.</span>
+                <div class="series-order-controls">
+                    <button type="button" class="op-level-btn" data-dir="-1" ${idx === 0 ? "disabled" : ""} title="Mover para cima">▲</button>
+                    <button type="button" class="op-level-btn" data-dir="1" ${idx === seriesOrderSelected.length - 1 ? "disabled" : ""} title="Mover para baixo">▼</button>
+                    <button type="button" class="op-level-btn series-order-remove-btn" data-dir="0" title="Remover da ordem">✕</button>
+                </div>
+            </div>
+        `).join("");
+
+        seriesOrderListEl.querySelectorAll(".series-order-row").forEach(row => {
+            const seriesKey = row.dataset.seriesKey;
+            row.querySelectorAll("button[data-dir]").forEach(btn => {
+                btn.addEventListener("click", () => {
+                    const dir = parseInt(btn.dataset.dir, 10);
+                    const idx = seriesOrderSelected.indexOf(seriesKey);
+                    if (idx === -1) return;
+                    if (dir === 0) {
+                        seriesOrderSelected.splice(idx, 1);
+                    } else {
+                        const targetIdx = idx + dir;
+                        if (targetIdx < 0 || targetIdx >= seriesOrderSelected.length) return;
+                        seriesOrderSelected.splice(idx, 1);
+                        seriesOrderSelected.splice(targetIdx, 0, seriesKey);
+                    }
+                    renderSeriesOrderModal();
+                });
+            });
+        });
+    }
+
+    if (seriesOrderUnconfirmedEl) {
+        if (unconfirmedCount > 0) {
+            seriesOrderUnconfirmedEl.hidden = false;
+            if (seriesOrderUnconfirmedTextEl) {
+                seriesOrderUnconfirmedTextEl.textContent = `${unconfirmedCount} personagem(ns) reivindicado(s) sem nome de série confirmado pelo Mudae (${unconfirmedLabels.join(", ")}). Eles não entram nesse comando — pra corrigir, reimporte o harém ou edite o personagem.`;
+            }
+        } else {
+            seriesOrderUnconfirmedEl.hidden = true;
+        }
+    }
+
+    if (seriesOrderSelected.length > 0) {
+        if (seriesOrderCommandBoxEl) seriesOrderCommandBoxEl.hidden = false;
+        if (seriesOrderCommandTextEl) seriesOrderCommandTextEl.textContent = buildSeriesSortCommand(seriesOrderSelected);
+        if (seriesOrderEmptyHintEl) seriesOrderEmptyHintEl.textContent = "";
+    } else {
+        if (seriesOrderCommandBoxEl) seriesOrderCommandBoxEl.hidden = true;
+        if (seriesOrderEmptyHintEl) seriesOrderEmptyHintEl.textContent = "Selecione ao menos uma série pra gerar o comando.";
+    }
+}
+
+function openSeriesOrderModal() {
+    if (!seriesOrderModalOverlay) return;
+    seriesOrderSelected = [];
+    if (seriesOrderCopyStatusEl) seriesOrderCopyStatusEl.textContent = "";
+    renderSeriesOrderModal();
+    seriesOrderModalOverlay.classList.add("active");
+}
+
+function closeSeriesOrderModal() {
+    if (!seriesOrderModalOverlay) return;
+    seriesOrderModalOverlay.classList.remove("active");
+}
+
+if (btnOpenSeriesOrder) btnOpenSeriesOrder.addEventListener("click", openSeriesOrderModal);
+document.getElementById("seriesOrderModalClose")?.addEventListener("click", closeSeriesOrderModal);
+document.getElementById("seriesOrderCloseBtn")?.addEventListener("click", closeSeriesOrderModal);
+seriesOrderModalOverlay?.addEventListener("click", (e) => {
+    if (e.target === seriesOrderModalOverlay) closeSeriesOrderModal();
+});
+
+if (seriesOrderCopyBtn) {
+    seriesOrderCopyBtn.addEventListener("click", async () => {
+        const text = seriesOrderCommandTextEl ? seriesOrderCommandTextEl.textContent : "";
+        if (!text) return;
+        try {
+            if (!navigator.clipboard || !navigator.clipboard.writeText) {
+                throw new Error("Clipboard API indisponível");
+            }
+            await navigator.clipboard.writeText(text);
+            if (seriesOrderCopyStatusEl) seriesOrderCopyStatusEl.textContent = "✓ Comando copiado.";
+        } catch (err) {
+            console.error("Erro ao copiar o comando de organizar séries:", err);
+            if (seriesOrderCopyStatusEl) seriesOrderCopyStatusEl.textContent = "Não foi possível copiar automaticamente. Selecione o texto manualmente.";
+        }
+    });
+}
+
 document.querySelectorAll(".pill[data-jump]").forEach(pill => {
     pill.addEventListener("click", () => {
         const target = document.getElementById("group-" + pill.dataset.jump);
@@ -2499,10 +2561,16 @@ function findExistingCharacterByName(name) {
 function mergeImportedCharacter(existing, item, { allowCategoryChange = false, category = existing.category } = {}) {
     const importedGenders = normalizeCharacterGenders(item.genders);
     const hasOwner = Boolean(item.nickname);
+    const importedSeriesIsReal = item.series && item.series !== "Wishlist" && item.series !== "—";
     return {
         ...existing,
         category: allowCategoryChange ? category : existing.category,
-        series: item.series && item.series !== "Wishlist" && item.series !== "—" ? item.series : existing.series,
+        series: importedSeriesIsReal ? item.series : existing.series,
+        // Nome de série exato do texto exportado pelo Mudae — não editável pelo
+        // usuário, usado só pra gerar comandos que o jogo realmente reconhece
+        // (ex: $smser). Diferente de "series" (acima), que o usuário pode
+        // renomear livremente pra organização própria dentro do site.
+        seriesKey: importedSeriesIsReal ? item.series : existing.seriesKey,
         kakera: Number.isFinite(Number(item.kakera)) ? Number(item.kakera) : existing.kakera,
         keys: Number.isFinite(Number(item.keys)) ? Number(item.keys) : existing.keys,
         photo: item.photo || existing.photo,
@@ -2706,9 +2774,11 @@ if (importConfirmBtn) {
                     continue;
                 }
 
+                const importedSeriesIsReal = item.series && item.series !== "Wishlist" && item.series !== "—";
                 const novoPersonagem = {
                     name: item.name,
                     series: item.series || "—",
+                    seriesKey: importedSeriesIsReal ? item.series : null,
                     category,
                     claimed: item.importType === "harem" || Boolean(item.nickname),
                     nickname: item.nickname || null,

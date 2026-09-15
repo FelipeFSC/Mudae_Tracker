@@ -1198,6 +1198,22 @@ select#mCategory {
     min-width: 240px;
 }
 
+.series-filter-row {
+    display: flex;
+    gap: 8px;
+    align-items: stretch;
+}
+
+.series-filter-row select {
+    flex: 1;
+    min-width: 0;
+}
+
+.series-filter-row .pill {
+    flex: none;
+    white-space: nowrap;
+}
+
 .toolbar-categories {
     flex: 2;
     min-width: 260px;
@@ -2435,6 +2451,145 @@ select#mCategory {
     padding: 10px 2px 20px;
 }
 
+/* ---- Modal: Organizar Séries do Harém ---- */
+.series-order-modal {
+    width: 640px;
+}
+
+.series-order-section {
+    margin: 16px 0;
+}
+
+.series-order-label {
+    display: block;
+    font-size: 11.5px;
+    font-weight: 700;
+    letter-spacing: .4px;
+    color: var(--muted);
+    margin: 0 0 8px;
+}
+
+.series-order-hint {
+    color: var(--muted-2);
+    font-weight: 500;
+    text-transform: none;
+    letter-spacing: 0;
+}
+
+.series-order-pool {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+}
+
+.series-order-chip {
+    border-radius: 8px;
+    border: 1px solid rgba(34, 211, 238, 0.35);
+    background: transparent;
+    color: var(--cyan);
+    padding: 8px 12px;
+    font-family: var(--mono);
+    font-size: 11.5px;
+    font-weight: 700;
+    cursor: pointer;
+}
+
+.series-order-chip:hover,
+.series-order-chip:focus-visible {
+    background: rgba(34, 211, 238, 0.08);
+}
+
+.series-order-chip-count {
+    color: var(--muted-2);
+    font-weight: 500;
+}
+
+.series-order-empty {
+    color: var(--muted);
+    font-size: 12px;
+    padding: 4px 0;
+}
+
+.series-order-list {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+    max-height: 260px;
+    overflow-y: auto;
+    padding-right: 4px;
+}
+
+.series-order-row {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    border: 1px solid var(--border);
+    background: var(--bg-panel-2);
+    border-radius: 10px;
+    padding: 9px 10px;
+}
+
+.series-order-name {
+    flex: 1;
+    min-width: 0;
+    font-size: 12.5px;
+    font-weight: 700;
+    color: var(--text);
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+.series-order-controls {
+    display: flex;
+    gap: 6px;
+}
+
+.series-order-remove-btn {
+    color: #ff5c7a !important;
+}
+
+.series-order-unconfirmed {
+    margin: 16px 0;
+    padding: 10px 12px;
+    border: 1px dashed var(--border);
+    border-radius: 10px;
+}
+
+.series-order-unconfirmed-title {
+    color: var(--yellow);
+    font-size: 12px;
+    font-weight: 700;
+    margin: 0 0 4px;
+}
+
+.series-order-unconfirmed-text {
+    font-size: 11.5px;
+    color: var(--muted);
+    line-height: 1.5;
+    margin: 0;
+}
+
+.series-order-command-box {
+    margin-top: 16px;
+    padding-top: 16px;
+    border-top: 1px dashed var(--border);
+}
+
+.series-order-command-label {
+    font-size: 11.5px;
+    font-weight: 700;
+    letter-spacing: .4px;
+    color: var(--muted);
+    margin: 0 0 8px;
+}
+
+@media (max-width: 720px) {
+    .series-order-modal {
+        width: calc(100vw - 32px);
+    }
+}
+
 /* ---- Modo de seleção da listagem de Personagens ("LIMPAR HAREM") ---- */
 .clear-harem-selection-bar {
     display: flex;
@@ -2601,28 +2756,6 @@ select#mCategory {
     .clear-harem-command-wrap {
         flex-direction: column;
     }
-}
-
-/* ---- Comando equivalente do Mudae (filtros da lista) ---- */
-.filter-command-box {
-    margin-top: 14px;
-    padding-top: 14px;
-    border-top: 1px dashed var(--border);
-}
-
-.filter-command-label {
-    font-size: 11.5px;
-    font-weight: 700;
-    letter-spacing: .4px;
-    color: var(--muted);
-    margin: 0 0 8px;
-}
-
-.filter-command-note {
-    font-size: 11.5px;
-    color: var(--yellow);
-    line-height: 1.5;
-    margin: 8px 0 0;
 }
 
 @media (max-width: 720px) {
