@@ -5,7 +5,7 @@
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>mudae</title>
-    <link rel="stylesheet" href="style.css?v=47" />
+    <link rel="stylesheet" href="style.css?v=50" />
     <meta name="referrer" content="no-referrer">
 </head>
 
@@ -250,12 +250,23 @@
                     <p class="subtitle"><span id="charsSubCount">0</span> personagens · <span
                             id="charsSubServer">Servidor Anime</span></p>
                 </div>
-                <div class="pill-row">
+                <div class="pill-row" id="charsPrimaryActions">
                     <button class="pill cyan" id="btnAddCharacter">➕ ADICIONAR PERSONAGEM</button>
                     <button class="pill green" id="btnOpenImport">📥 IMPORTAR MUDAE</button>
                     <button class="pill yellow" id="btnOpenOpImport">⚡ IMPORTAR BUFFS OP</button>
                     <button class="pill purple" id="btnOpenWishlistOrder">⇅ REORDENAR WISHLIST</button>
                     <button class="pill red" id="btnClearHarem">🗑 LIMPAR HAREM</button>
+                </div>
+                <div class="clear-harem-selection-bar" id="clearHaremSelectionBar" hidden>
+                    <div class="clear-harem-selection-info">
+                        <strong id="clearHaremSelectionCount">0</strong> selecionado(s) · use os filtros abaixo para encontrar quem remover
+                    </div>
+                    <div class="clear-harem-selection-actions">
+                        <button type="button" class="pill cyan" id="clearHaremSelectVisibleBtn">☑ SELECIONAR VISÍVEIS</button>
+                        <button type="button" class="pill purple" id="clearHaremClearSelectionBtn">◻ LIMPAR SELEÇÃO</button>
+                        <button type="button" class="pill" id="clearHaremExitSelectionBtn">✕ CANCELAR</button>
+                        <button type="button" class="pill red" id="clearHaremProceedBtn" disabled>🗑 REMOVER SELECIONADOS</button>
+                    </div>
                 </div>
             </div>
 
@@ -647,6 +658,37 @@
         </div>
     </div>
 
+    <!-- ============ MODAL: CONFIRMAR REMOÇÃO (LIMPAR HAREM) ============ -->
+    <div id="clearHaremModalOverlay" class="modal-overlay">
+        <div class="modal clear-harem-modal">
+            <div class="modal-head">
+                <div>
+                    <h2>REMOVER PERSONAGENS</h2>
+                    <p class="tower-modal-sub">Confirme a remoção do Tracker.</p>
+                </div>
+                <button id="clearHaremModalClose" class="modal-x">✕</button>
+            </div>
+
+            <p class="clear-harem-warning">Isso vai remover <strong id="clearHaremConfirmCount">0</strong> personagem(ns) daqui do Tracker. Essa ação não pode ser desfeita.</p>
+            <p class="clear-harem-hint">
+                Remover aqui NÃO divorcia de verdade no servidor do Mudae — são dois sistemas separados.
+                Para isso, rode o comando abaixo no Discord: o primeiro nome vem sem prefixo e, a partir do
+                segundo, cada nome recebe um "$" na frente — é assim que o Mudae reconhece onde termina um
+                personagem e começa o próximo.
+            </p>
+            <div class="clear-harem-command-wrap">
+                <code id="clearHaremCommandText" class="clear-harem-command"></code>
+                <button type="button" id="clearHaremCopyBtn" class="pill cyan">⧉ COPIAR</button>
+            </div>
+            <p class="clear-harem-copy-status" id="clearHaremCopyStatus"></p>
+            <div class="op-modal-footer">
+                <span class="op-save-status" id="clearHaremConfirmStatus"></span>
+                <button id="clearHaremBackBtn" class="btn-minimal op-close-btn">VOLTAR</button>
+                <button id="clearHaremConfirmBtn" class="btn-cancel op-save-btn danger">CONFIRMAR REMOÇÃO</button>
+            </div>
+        </div>
+    </div>
+
 
     <!-- ============ MODAL: MENSAGENS DO SISTEMA ============ -->
     <div id="systemDialogOverlay" class="modal-overlay system-dialog-overlay" aria-hidden="true">
@@ -675,12 +717,12 @@
 
     <button id="helpBtn" class="help-btn">?</button>
 
-    <script src="database.js?v=47"></script>
-    <script src="formulas.js?v=47"></script>
-    <script src="mudae-import.js?v=47"></script>
-    <script src="OrbeSolver.js?v=47"></script>
-    <script src="OrbeSolverOQ.js?v=47"></script>
-    <script src="script.js?v=47"></script>
+    <script src="database.js?v=50"></script>
+    <script src="formulas.js?v=50"></script>
+    <script src="mudae-import.js?v=50"></script>
+    <script src="OrbeSolver.js?v=50"></script>
+    <script src="OrbeSolverOQ.js?v=50"></script>
+    <script src="script.js?v=50"></script>
 </body>
 
 </html>

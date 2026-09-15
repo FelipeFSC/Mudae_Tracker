@@ -1273,36 +1273,169 @@ if (gridDetailsToggle) {
 }
 
 /* ============================================================
-   LIMPAR HAREM (remove todos os personagens)
+   LIMPAR HAREM (modo de seleção na própria listagem + $divorce)
+   ------------------------------------------------------------
+   Em vez de um modal com uma lista separada, "LIMPAR HAREM" ativa
+   um modo de seleção diretamente na tela de Personagens: os mesmos
+   filtros, agrupamento e visualização (lista/grade) continuam
+   valendo — só os botões de ação de cada card viram um checkbox
+   (ver renderCharCard). Ao confirmar, mostramos o comando $divorce
+   equivalente para o usuário rodar no Discord também, se quiser,
+   já que a remoção daqui não afeta o servidor do Mudae de verdade.
    ============================================================ */
+const charsPrimaryActions = document.getElementById("charsPrimaryActions");
+const clearHaremSelectionBar = document.getElementById("clearHaremSelectionBar");
+const clearHaremSelectionCount = document.getElementById("clearHaremSelectionCount");
+const clearHaremSelectVisibleBtn = document.getElementById("clearHaremSelectVisibleBtn");
+const clearHaremClearSelectionBtn = document.getElementById("clearHaremClearSelectionBtn");
+const clearHaremExitSelectionBtn = document.getElementById("clearHaremExitSelectionBtn");
+const clearHaremProceedBtn = document.getElementById("clearHaremProceedBtn");
+
+const clearHaremModalOverlay = document.getElementById("clearHaremModalOverlay");
+const clearHaremConfirmCount = document.getElementById("clearHaremConfirmCount");
+const clearHaremCommandText = document.getElementById("clearHaremCommandText");
+const clearHaremCopyBtn = document.getElementById("clearHaremCopyBtn");
+const clearHaremCopyStatus = document.getElementById("clearHaremCopyStatus");
+const clearHaremBackBtn = document.getElementById("clearHaremBackBtn");
+const clearHaremConfirmBtn = document.getElementById("clearHaremConfirmBtn");
+const clearHaremConfirmStatus = document.getElementById("clearHaremConfirmStatus");
+
+let clearHaremSelectionMode = false;
+let clearHaremSelectedIds = new Set();
+
+function updateClearHaremSelectionBar() {
+    if (clearHaremSelectionCount) clearHaremSelectionCount.textContent = String(clearHaremSelectedIds.size);
+    if (clearHaremProceedBtn) clearHaremProceedBtn.disabled = clearHaremSelectedIds.size === 0;
+}
+
+function enterClearHaremSelectionMode() {
+    clearHaremSelectionMode = true;
+    clearHaremSelectedIds = new Set();
+    if (charsPrimaryActions) charsPrimaryActions.hidden = true;
+    if (clearHaremSelectionBar) clearHaremSelectionBar.hidden = false;
+    updateClearHaremSelectionBar();
+    renderCharacters();
+}
+
+function exitClearHaremSelectionMode() {
+    clearHaremSelectionMode = false;
+    clearHaremSelectedIds = new Set();
+    if (charsPrimaryActions) charsPrimaryActions.hidden = false;
+    if (clearHaremSelectionBar) clearHaremSelectionBar.hidden = true;
+    renderCharacters();
+}
+
+// Personagens atualmente visíveis na listagem, respeitando os mesmos filtros
+// usados por renderCharacters() (categoria, série, kakera, gêneros).
+function visibleClearHaremCharacters() {
+    return state.characters.filter(passesFilters);
+}
+
+// Formato do $divorce: o primeiro nome vem sem prefixo; a partir do segundo,
+// cada nome recebe "$" na frente — é assim que o Mudae reconhece onde um
+// nome termina e o próximo começa (sem isso, nomes com espaço colariam nos
+// vizinhos).
+function buildDivorceCommand(names) {
+    const [first, ...rest] = names;
+    const parts = [first, ...rest.map(name => `$${name}`)];
+    return `$divorce ${parts.join(" ")}`;
+}
+
+function openClearHaremConfirmModal() {
+    if (!clearHaremModalOverlay || clearHaremSelectedIds.size === 0) return;
+    const selectedCharacters = state.characters.filter(c => clearHaremSelectedIds.has(String(c.id)));
+    if (clearHaremConfirmCount) clearHaremConfirmCount.textContent = String(selectedCharacters.length);
+    if (clearHaremCommandText) clearHaremCommandText.textContent = buildDivorceCommand(selectedCharacters.map(c => c.name));
+    if (clearHaremConfirmStatus) clearHaremConfirmStatus.textContent = "";
+    if (clearHaremCopyStatus) clearHaremCopyStatus.textContent = "";
+    clearHaremModalOverlay.classList.add("active");
+}
+
+function closeClearHaremConfirmModal() {
+    if (!clearHaremModalOverlay) return;
+    clearHaremModalOverlay.classList.remove("active");
+}
+
 if (btnClearHarem) {
-    btnClearHarem.addEventListener("click", async () => {
+    btnClearHarem.addEventListener("click", () => {
         if (state.characters.length === 0) {
             setBackupStatus("O harem já está vazio.");
             return;
         }
-        const confirmado = await showSystemConfirm(
-            `Isso vai remover TODOS os ${state.characters.length} personagens cadastrados. Essa ação não pode ser desfeita. Deseja continuar?`,
-            {
-                title: "Limpar Harém",
-                type: "danger",
-                confirmText: "REMOVER TODOS",
-                cancelText: "CANCELAR"
-            }
-        );
-        if (!confirmado) return;
+        enterClearHaremSelectionMode();
+    });
+}
 
-        btnClearHarem.disabled = true;
+if (clearHaremSelectVisibleBtn) {
+    clearHaremSelectVisibleBtn.addEventListener("click", () => {
+        visibleClearHaremCharacters().forEach(c => clearHaremSelectedIds.add(String(c.id)));
+        updateClearHaremSelectionBar();
+        renderCharacters();
+    });
+}
+if (clearHaremClearSelectionBtn) {
+    clearHaremClearSelectionBtn.addEventListener("click", () => {
+        clearHaremSelectedIds = new Set();
+        updateClearHaremSelectionBar();
+        renderCharacters();
+    });
+}
+if (clearHaremExitSelectionBtn) {
+    clearHaremExitSelectionBtn.addEventListener("click", exitClearHaremSelectionMode);
+}
+if (clearHaremProceedBtn) {
+    clearHaremProceedBtn.addEventListener("click", openClearHaremConfirmModal);
+}
+
+if (document.getElementById("clearHaremModalClose")) {
+    document.getElementById("clearHaremModalClose").addEventListener("click", closeClearHaremConfirmModal);
+}
+if (clearHaremBackBtn) clearHaremBackBtn.addEventListener("click", closeClearHaremConfirmModal);
+if (clearHaremModalOverlay) {
+    clearHaremModalOverlay.addEventListener("click", (e) => {
+        if (e.target === clearHaremModalOverlay) closeClearHaremConfirmModal();
+    });
+}
+
+if (clearHaremCopyBtn) {
+    clearHaremCopyBtn.addEventListener("click", async () => {
+        const text = clearHaremCommandText ? clearHaremCommandText.textContent : "";
+        if (!text) return;
         try {
-            await Database.clearCharacters();
-            state.characters = [];
-            renderCharacters();
-            setBackupStatus("✓ Harem limpo com sucesso!");
+            if (!navigator.clipboard || !navigator.clipboard.writeText) {
+                throw new Error("Clipboard API indisponível");
+            }
+            await navigator.clipboard.writeText(text);
+            if (clearHaremCopyStatus) clearHaremCopyStatus.textContent = "✓ Comando copiado.";
         } catch (err) {
-            console.error("Erro ao limpar o harem:", err);
-            setBackupStatus("Erro ao limpar o harem. Tente novamente.", true);
+            console.error("Erro ao copiar o comando $divorce:", err);
+            if (clearHaremCopyStatus) clearHaremCopyStatus.textContent = "Não foi possível copiar automaticamente. Selecione o texto manualmente.";
+        }
+    });
+}
+
+if (clearHaremConfirmBtn) {
+    clearHaremConfirmBtn.addEventListener("click", async () => {
+        const toDelete = state.characters.filter(c => clearHaremSelectedIds.has(String(c.id)));
+        if (toDelete.length === 0) return;
+
+        clearHaremConfirmBtn.disabled = true;
+        if (clearHaremConfirmStatus) clearHaremConfirmStatus.textContent = "Removendo...";
+
+        try {
+            for (const character of toDelete) {
+                await Database.deleteCharacter(character.id);
+            }
+            const removedIds = new Set(toDelete.map(c => String(c.id)));
+            state.characters = state.characters.filter(c => !removedIds.has(String(c.id)));
+            closeClearHaremConfirmModal();
+            exitClearHaremSelectionMode(); // já chama renderCharacters()
+            setBackupStatus(`✓ ${toDelete.length} personagem(ns) removido(s) do Tracker.`);
+        } catch (err) {
+            console.error("Erro ao remover personagens selecionados:", err);
+            if (clearHaremConfirmStatus) clearHaremConfirmStatus.textContent = "Erro ao remover. Tente novamente.";
         } finally {
-            btnClearHarem.disabled = false;
+            clearHaremConfirmBtn.disabled = false;
         }
     });
 }
@@ -1479,12 +1612,29 @@ function renderCharCard(c) {
 
     const card = document.createElement("div");
     const opStatus = getOpStatus(c);
-    card.className = "char-card cat-" + c.category + (c.claimed === false ? " char-unclaimed" : "") + (opStatus.any ? " op-has-buff" : "") + (opStatus.maxed ? " op-maxed" : "");
+    const inSelectionMode = clearHaremSelectionMode;
+    const isSelected = inSelectionMode && clearHaremSelectedIds.has(String(c.id));
+    card.className = "char-card cat-" + c.category + (c.claimed === false ? " char-unclaimed" : "") + (opStatus.any ? " op-has-buff" : "") + (opStatus.maxed ? " op-maxed" : "") + (inSelectionMode ? " selection-mode" : "") + (isSelected ? " selection-selected" : "");
     card.dataset.charId = c.id;
 
     const photoBlock = c.photo
         ? `<div class="char-photo has-image"><img src="${c.photo}" alt="${escapeXml(c.name)}" /></div>`
         : `<div class="char-photo">⬆<span>FOTO</span></div>`;
+
+    // No modo de seleção (ver "LIMPAR HAREM"), os botões de ação viram um
+    // único checkbox — a listagem, filtros e agrupamento continuam os mesmos.
+    const actionsHtml = inSelectionMode
+        ? `<div class="char-actions">
+      <label class="char-select-check" title="Selecionar para remoção">
+        <input type="checkbox" class="char-select-checkbox" ${isSelected ? "checked" : ""} />
+      </label>
+    </div>`
+        : `<div class="char-actions">
+      ${WISHLIST_CATEGORIES.includes(c.category) ? `<button class="icon-btn move-btn" title="Reordenar na Wishlist">⇅</button>` : ""}
+      <button class="icon-btn op-btn" title="Buffs (OP)">OP</button>
+      <button class="icon-btn edit-btn" title="Editar personagem">✎</button>
+      <button class="icon-btn delete-btn" title="Remover personagem">✕</button>
+    </div>`;
 
     card.innerHTML = `
     ${photoBlock}
@@ -1530,13 +1680,28 @@ function renderCharCard(c) {
         </div>
       </div>
     </div>
-    <div class="char-actions">
-      ${WISHLIST_CATEGORIES.includes(c.category) ? `<button class="icon-btn move-btn" title="Reordenar na Wishlist">⇅</button>` : ""}
-      <button class="icon-btn op-btn" title="Buffs (OP)">OP</button>
-      <button class="icon-btn edit-btn" title="Editar personagem">✎</button>
-      <button class="icon-btn delete-btn" title="Remover personagem">✕</button>
-    </div>
+    ${actionsHtml}
   `;
+
+    if (inSelectionMode) {
+        const checkbox = card.querySelector(".char-select-checkbox");
+        checkbox.addEventListener("change", () => {
+            const id = String(c.id);
+            if (checkbox.checked) clearHaremSelectedIds.add(id);
+            else clearHaremSelectedIds.delete(id);
+            card.classList.toggle("selection-selected", checkbox.checked);
+            updateClearHaremSelectionBar();
+        });
+        // Qualquer clique no card (fora do próprio checkbox) também alterna a seleção,
+        // facilitando marcar vários personagens sem precisar acertar o alvo pequeno.
+        card.addEventListener("click", event => {
+            if (event.target.closest(".char-select-check")) return;
+            checkbox.checked = !checkbox.checked;
+            checkbox.dispatchEvent(new Event("change"));
+        });
+        return card;
+    }
+
     const moveBtn = card.querySelector(".move-btn");
     if (moveBtn) {
         moveBtn.addEventListener("click", () => openWishlistOrderModal(c.id));

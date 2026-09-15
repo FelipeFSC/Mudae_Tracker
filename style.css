@@ -2425,6 +2425,174 @@ select#mCategory {
     padding: 10px 2px 20px;
 }
 
+/* ---- Modo de seleção da listagem de Personagens ("LIMPAR HAREM") ---- */
+.clear-harem-selection-bar {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+    flex-wrap: wrap;
+    flex: 1 1 auto;
+    padding: 10px 14px;
+    border: 1px solid rgba(255, 92, 122, 0.35);
+    background: rgba(255, 92, 122, 0.06);
+    border-radius: 10px;
+}
+
+.clear-harem-selection-bar[hidden] {
+    display: none;
+}
+
+.clear-harem-selection-info {
+    font-size: 12px;
+    color: var(--text);
+}
+
+.clear-harem-selection-info strong {
+    color: #ff5c7a;
+    font-size: 14px;
+}
+
+.clear-harem-selection-actions {
+    display: flex;
+    gap: 8px;
+    flex-wrap: wrap;
+}
+
+/* Card da listagem em modo de seleção: os botões de ação viram um checkbox único. */
+.char-card.selection-mode {
+    cursor: pointer;
+    user-select: none;
+    transition: border-color .15s ease, background .15s ease, box-shadow .15s ease;
+}
+
+.char-card.selection-mode:hover {
+    border-color: rgba(255, 92, 122, 0.4);
+}
+
+.char-card.selection-selected {
+    border-color: #ff5c7a;
+    box-shadow: 0 0 0 1px rgba(255, 92, 122, 0.4), 0 0 22px -12px rgba(255, 92, 122, 0.7);
+    background: rgba(255, 92, 122, 0.05);
+}
+
+.char-select-check {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 26px;
+    height: 26px;
+    cursor: pointer;
+}
+
+.char-select-check input {
+    width: 19px;
+    height: 19px;
+    accent-color: #ff5c7a;
+    cursor: pointer;
+}
+
+/* Na grade compacta, os botões de ação só aparecem no hover — durante a
+   seleção o checkbox precisa ficar sempre visível. */
+#charGroups.view-grid.grid-compact .char-card.selection-mode .char-actions {
+    opacity: 1;
+    visibility: visible;
+    pointer-events: auto;
+    transform: none;
+}
+
+@media (max-width: 720px) {
+    .clear-harem-selection-bar {
+        flex-direction: column;
+        align-items: stretch;
+    }
+
+    .clear-harem-selection-actions {
+        justify-content: stretch;
+    }
+
+    .clear-harem-selection-actions .pill {
+        flex: 1 1 auto;
+    }
+}
+
+/* ---- Modal: Confirmar remoção (Limpar Harem) ---- */
+.clear-harem-modal {
+    width: 560px;
+}
+
+.clear-harem-warning {
+    font-size: 13px;
+    color: var(--text);
+    line-height: 1.55;
+    margin: 0 0 10px;
+}
+
+.clear-harem-warning strong {
+    color: #ff5c7a;
+}
+
+.clear-harem-hint {
+    font-size: 12px;
+    color: var(--muted);
+    line-height: 1.55;
+    margin: 0 0 12px;
+}
+
+.clear-harem-command-wrap {
+    display: flex;
+    gap: 8px;
+    align-items: stretch;
+    margin-bottom: 8px;
+}
+
+.clear-harem-command {
+    flex: 1;
+    display: block;
+    padding: 12px;
+    border: 1px solid rgba(34, 211, 238, 0.3);
+    background: rgba(34, 211, 238, 0.06);
+    border-radius: 8px;
+    color: var(--cyan);
+    font-family: var(--mono);
+    font-size: 12.5px;
+    line-height: 1.6;
+    word-break: break-word;
+    max-height: 120px;
+    overflow-y: auto;
+}
+
+.clear-harem-copy-status {
+    min-height: 16px;
+    font-size: 11px;
+    color: var(--green);
+    margin: 0 0 14px;
+}
+
+.op-save-btn.danger {
+    border-color: rgba(255, 92, 122, 0.5);
+    color: #ff5c7a;
+    background: rgba(255, 92, 122, 0.08);
+}
+
+.op-save-btn.danger:hover,
+.op-save-btn.danger:focus-visible {
+    border-color: #ff5c7a;
+    color: #fff;
+    background: rgba(255, 92, 122, 0.18);
+    box-shadow: 0 0 15px -4px #ff5c7a;
+}
+
+@media (max-width: 720px) {
+    .clear-harem-modal {
+        width: calc(100vw - 32px);
+    }
+
+    .clear-harem-command-wrap {
+        flex-direction: column;
+    }
+}
+
 @media (max-width: 720px) {
     .wishlist-order-modal {
         width: calc(100vw - 32px);
