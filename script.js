@@ -1546,6 +1546,122 @@ function renderCharacters() {
 
         charGroupsEl.appendChild(group);
     });
+
+    updateFilterCommandPreview();
+}
+
+/* ============================================================
+   COMANDO EQUIVALENTE DO MUDAE PARA OS FILTROS ATIVOS
+   ------------------------------------------------------------
+   Traduz os filtros da lista (gênero, ordenação por kakera/chaves,
+   série, agrupar por série) para as "flags" reais do comando $mm do
+   Mudae, somando várias de uma vez quando possível. Baseado no que a
+   Flags Wiki do Mudae documenta publicamente; a direção exata de
+   ordenação (menor→maior vs. maior→menor) não é 100% confirmada, por
+   isso aparece um aviso nesse caso — o resto (gênero, série, agrupar
+   por série) é o comportamento documentado das flags.
+   ============================================================ */
+const filterCommandBox = document.getElementById("filterCommandBox");
+const filterCommandWrapEl = document.getElementById("filterCommandWrap");
+const filterCommandTextEl = document.getElementById("filterCommandText");
+const filterCommandNoteEl = document.getElementById("filterCommandNote");
+const filterCommandCopyBtn = document.getElementById("filterCommandCopyBtn");
+const filterCommandCopyStatusEl = document.getElementById("filterCommandCopyStatus");
+
+function buildMudaeFilterCommand() {
+    const f = charFilters;
+    const has = (g) => f.genders.has(g);
+    let flags = "";
+    const notes = [];
+
+    if (f.genders.size > 0 && f.genders.size < 4) {
+        if (has("wa") && has("wg") && !has("ha") && !has("hg")) {
+            flags += "w";
+        } else if (has("ha") && has("hg") && !has("wa") && !has("wg")) {
+            flags += "h";
+        } else if (has("wa") && has("ha") && !has("wg") && !has("hg")) {
+            flags += "g-=";
+        } else if (has("wg") && has("hg") && !has("wa") && !has("ha")) {
+            flags += "g=";
+        } else if (f.genders.size === 1) {
+            if (has("wa")) flags += "wg-=";
+            else if (has("wg")) flags += "wg=";
+            else if (has("ha")) flags += "hg-=";
+            else if (has("hg")) flags += "hg=";
+        } else {
+            notes.push("Essa combinação específica de gêneros não tem uma flag única equivalente — o comando abaixo não inclui esse filtro.");
+        }
+    }
+
+    if (f.sortKakera) {
+        flags += "k=";
+        if (f.sortKakera === "asc") {
+            notes.push("Não confirmei se o Mudae ordena kakera do menor pro maior com essa flag (a wiki só documenta que k= ordena por kakera) — confira o resultado no jogo.");
+        }
+    }
+
+    if (f.sortKeys) {
+        flags += "y=";
+        if (f.sortKeys === "asc") {
+            notes.push("O mesmo vale pra chaves: a direção exata (menos → mais) não é garantida por essa flag.");
+        }
+    }
+
+    if (f.groupBySeries) flags += "a";
+    if (f.series) flags += "p";
+
+    if (f.kakeraMin !== null || f.kakeraMax !== null) {
+        notes.push("Kakera mínimo/máximo é só um filtro visual daqui do site — o Mudae não tem uma flag pra faixa de valores.");
+    }
+
+    const hasCommand = flags.length > 0 || !!f.series;
+    if (!hasCommand && notes.length === 0) return null;
+
+    const command = hasCommand ? "$mm" + flags + (f.series ? " " + f.series : "") : null;
+    return { command, notes };
+}
+
+function updateFilterCommandPreview() {
+    if (!filterCommandBox) return;
+    const result = buildMudaeFilterCommand();
+
+    if (!result) {
+        filterCommandBox.hidden = true;
+        return;
+    }
+
+    filterCommandBox.hidden = false;
+    if (filterCommandWrapEl) filterCommandWrapEl.hidden = !result.command;
+    if (result.command) {
+        if (filterCommandTextEl) filterCommandTextEl.textContent = result.command;
+        if (filterCommandCopyStatusEl) filterCommandCopyStatusEl.textContent = "";
+    }
+    if (filterCommandNoteEl) {
+        if (result.notes.length > 0) {
+            filterCommandNoteEl.hidden = false;
+            filterCommandNoteEl.textContent = "⚠ " + result.notes.join(" ");
+        } else {
+            filterCommandNoteEl.hidden = true;
+            filterCommandNoteEl.textContent = "";
+        }
+    }
+}
+
+if (filterCommandCopyBtn) {
+    filterCommandCopyBtn.addEventListener("click", async () => {
+        const text = filterCommandTextEl ? filterCommandTextEl.textContent : "";
+        if (!text) return;
+        try {
+            if (!navigator.clipboard || !navigator.clipboard.writeText) {
+                throw new Error("Clipboard API indisponível");
+            }
+            await navigator.clipboard.writeText(text);
+            if (filterCommandCopyStatusEl) filterCommandCopyStatusEl.textContent = "✓ Comando copiado.";
+        } catch (err) {
+            console.error("Erro ao copiar o comando de filtro do Mudae:", err);
+            if (filterCommandCopyStatusEl) filterCommandCopyStatusEl.textContent = "Não foi possível copiar automaticamente. Selecione o texto manualmente.";
+        }
+    });
 }
 
 function normalizeCharacterGenders(value) {

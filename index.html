@@ -262,9 +262,9 @@
                         <strong id="clearHaremSelectionCount">0</strong> selecionado(s) · use os filtros abaixo para encontrar quem remover
                     </div>
                     <div class="clear-harem-selection-actions">
-                        <button type="button" class="pill cyan" id="clearHaremSelectVisibleBtn">☑ SELECIONAR VISÍVEIS</button>
+                        <button type="button" class="pill yellow" id="clearHaremSelectVisibleBtn">☑ SELECIONAR VISÍVEIS</button>
                         <button type="button" class="pill purple" id="clearHaremClearSelectionBtn">◻ LIMPAR SELEÇÃO</button>
-                        <button type="button" class="pill" id="clearHaremExitSelectionBtn">✕ CANCELAR</button>
+                        <button type="button" class="pill blue" id="clearHaremExitSelectionBtn">✕ CANCELAR</button>
                         <button type="button" class="pill red" id="clearHaremProceedBtn" disabled>🗑 REMOVER SELECIONADOS</button>
                     </div>
                 </div>
@@ -338,6 +338,15 @@
                         </div>
                     </div>
                     <button id="btnClearFilters" class="btn-clear-filters">LIMPAR FILTROS</button>
+                </div>
+                <div class="filter-command-box" id="filterCommandBox" hidden>
+                    <div class="filter-command-label">💡 Comando equivalente no Mudae</div>
+                    <div class="clear-harem-command-wrap" id="filterCommandWrap">
+                        <code class="clear-harem-command" id="filterCommandText"></code>
+                        <button type="button" class="pill cyan" id="filterCommandCopyBtn">COPIAR</button>
+                    </div>
+                    <p class="filter-command-note" id="filterCommandNote" hidden></p>
+                    <p class="clear-harem-copy-status" id="filterCommandCopyStatus"></p>
                 </div>
             </div>
 
