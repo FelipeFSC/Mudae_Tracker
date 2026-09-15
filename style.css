@@ -27,6 +27,34 @@
     box-sizing: border-box;
 }
 
+/* ============ SCROLLBAR (padrão neon da página) ============ */
+* {
+    scrollbar-width: thin;
+    scrollbar-color: rgba(34, 211, 238, 0.35) rgba(255, 255, 255, 0.03);
+}
+
+*::-webkit-scrollbar {
+    width: 10px;
+    height: 10px;
+}
+
+*::-webkit-scrollbar-track {
+    background: rgba(255, 255, 255, 0.03);
+}
+
+*::-webkit-scrollbar-thumb {
+    background: rgba(34, 211, 238, 0.3);
+    border: 2px solid transparent;
+    background-clip: padding-box;
+    border-radius: 20px;
+}
+
+*::-webkit-scrollbar-thumb:hover {
+    background: rgba(34, 211, 238, 0.55);
+    border: 2px solid transparent;
+    background-clip: padding-box;
+}
+
 html,
 body {
     margin: 0;
@@ -1102,6 +1130,8 @@ select#mCategory {
     backdrop-filter: blur(3px);
     align-items: center;
     justify-content: center;
+    padding: 32px 16px;
+    overflow-y: auto;
     z-index: 100;
 }
 
@@ -1112,11 +1142,14 @@ select#mCategory {
 .modal {
     width: 420px;
     max-width: calc(100vw - 32px);
+    max-height: 100%;
+    overflow-y: auto;
     background: var(--bg-panel);
     border: 1px solid rgba(236, 47, 156, 0.4);
     box-shadow: 0 0 40px rgba(236, 47, 156, 0.15);
     border-radius: 14px;
     padding: 24px;
+    margin: auto;
 }
 
 .modal-head {
