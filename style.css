@@ -524,7 +524,7 @@ select#mCategory {
 #charGroups.view-grid .group-body.grouped-by-series {
     display: grid;
     grid-template-columns: repeat(2, minmax(0, 1fr));
-    align-items: start;
+    align-items: stretch;
     gap: 18px;
 }
 
@@ -537,6 +537,8 @@ select#mCategory {
 .series-group {
     --series-rgb: 148, 163, 184;
     position: relative;
+    display: flex;
+    flex-direction: column;
     border: 1px solid var(--border-soft);
     border-radius: 10px;
     background:
@@ -627,8 +629,10 @@ select#mCategory {
    os mesmos da linha de cima. */
 #charGroups.view-grid .group-body.grouped-by-series .series-body {
     display: flex;
+    flex: 1;
     flex-flow: row wrap;
     justify-content: center;
+    align-content: center;
     gap: 14px;
 }
 
