@@ -747,12 +747,20 @@ CONFIG_TEXT_FIELDS.forEach(({ id, key }) => {
    ============================================================ */
 const charGroupsEl = document.getElementById("charGroups");
 
+// Só personagens reivindicados ocupam vaga no harem do Mudae; os não
+// reivindicados são só itens acompanhados no sistema e não devem contar
+// pro total nem pro limite.
+function claimedCharacterCount() {
+    return state.characters.filter(c => c.claimed !== false).length;
+}
+
 function updateHaremCountDisplay() {
     const limit = state.config.haremLimit;
+    const count = claimedCharacterCount();
     const countText = limit > 0
-        ? `${state.characters.length} / ${limit}`
-        : `${state.characters.length}`;
-    document.getElementById("charCountBadge").textContent = state.characters.length;
+        ? `${count} / ${limit}`
+        : `${count}`;
+    document.getElementById("charCountBadge").textContent = count;
     document.getElementById("charsSubCount").textContent = countText;
 }
 
@@ -2362,13 +2370,13 @@ let editingCharacterId = null;
 // Verifica se o limite do harem já foi atingido
 function haremLimitReached() {
     const limit = state.config.haremLimit;
-    return limit > 0 && state.characters.length >= limit;
+    return limit > 0 && claimedCharacterCount() >= limit;
 }
 
 function openModal(defaultCat) {
     if (haremLimitReached()) {
         showSystemAlert(
-            `Limite do harem atingido (${state.characters.length}/${state.config.haremLimit}).\n` +
+            `Limite do harem atingido (${claimedCharacterCount()}/${state.config.haremLimit}).\n` +
             `Aumente o valor em "TOTAL DE PERSONAGENS NO HAREM" nas Configurações, ou remova algum personagem antes de adicionar um novo.`,
             {
                 title: "Limite do Harém",
@@ -2438,7 +2446,7 @@ document.getElementById("modalAdd").addEventListener("click", async () => {
     // O limite do harem só se aplica ao criar um personagem novo, não ao editar
     if (!isEditing && haremLimitReached()) {
         showSystemAlert(
-            `Limite do harem atingido (${state.characters.length}/${state.config.haremLimit}). Não é possível adicionar mais personagens.`,
+            `Limite do harem atingido (${claimedCharacterCount()}/${state.config.haremLimit}). Não é possível adicionar mais personagens.`,
             {
                 title: "Limite do Harém",
                 type: "warning",
@@ -2718,7 +2726,7 @@ if (importConfirmBtn) {
         );
 
         const limit = state.config.haremLimit;
-        const projectedCount = state.characters.length - removableClaimed.length + newItemsCount;
+        const projectedCount = claimedCharacterCount() - removableClaimed.length + newItemsCount;
         if (limit > 0 && projectedCount > limit) {
             showSystemAlert(
                 `Limite do harem atingido: após sincronizar, a importação deixaria ${projectedCount}/${limit} personagens. ` +
