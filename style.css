@@ -1215,6 +1215,21 @@ select#mCategory {
     color: var(--pink);
 }
 
+.ec-export-group-label {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    margin-top: 14px;
+}
+
+.ec-export-swatch {
+    width: 14px;
+    height: 14px;
+    border-radius: 4px;
+    border: 1px solid var(--border);
+    flex-shrink: 0;
+}
+
 .embed-color-row.is-locked {
     opacity: 0.4;
 }

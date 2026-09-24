@@ -2233,8 +2233,10 @@ if (seriesOrderCopyBtn) {
 /* ============================================================
    EXPORTAR EC -> comando $ec em lote
    ------------------------------------------------------------
-   Formato do Mudae: "$ec Nome $cor $Nome $cor ..." — o primeiro nome
-   vai sem "$", os seguintes com "$" grudado, e cada cor é "$rrggbb".
+   Formato do Mudae: "$ec Nome $Nome $Nome $rrggbb" — o primeiro nome
+   vai sem "$", os seguintes com "$" grudado, e a cor vem no final.
+   Um $ec aplica UMA cor a todos os nomes listados, então é gerado um
+   comando por cor, agrupando os personagens que compartilham a mesma.
    Só entram reivindicados com pelo menos 1 chave: o $ec só vale para
    personagens do próprio harém que já tenham chave.
    ============================================================ */
@@ -2250,46 +2252,59 @@ function getEmbedColorEntries() {
         .filter(entry => entry.name && entry.color);
 }
 
-// Mesma convenção do $smser: primeiro nome sem "$", os seguintes com "$".
-function buildEmbedColorCommand(entries) {
-    if (!entries.length) return "";
-    const pairs = entries.map(({ name, color }, idx) => `${idx === 0 ? "" : "$"}${name} $${color.slice(1)}`);
-    return `$ec ${pairs.join(" ")}`;
+// Um comando por cor, na ordem em que cada cor aparece pela primeira vez.
+function buildEmbedColorCommands(entries) {
+    const namesByColor = new Map();
+    entries.forEach(({ name, color }) => {
+        if (!namesByColor.has(color)) namesByColor.set(color, []);
+        namesByColor.get(color).push(name);
+    });
+    return Array.from(namesByColor, ([color, names]) => ({
+        color,
+        count: names.length,
+        command: `$ec ${names.map((name, idx) => `${idx === 0 ? "" : "$"}${name}`).join(" ")} $${color.slice(1)}`
+    }));
 }
 
 function renderEcExportModal() {
     const entries = getEmbedColorEntries();
-    const command = buildEmbedColorCommand(entries);
+    const groups = buildEmbedColorCommands(entries);
     ecExportCopyStatusEl.textContent = "";
 
-    if (!command) {
+    if (!groups.length) {
         ecExportCommandsEl.innerHTML = `<p class="series-order-empty">Nenhum personagem reivindicado com chave e embed color salva. Importe o harém com a flag c+ ou defina a cor editando o personagem.</p>`;
         ecExportSummaryEl.textContent = "";
         return;
     }
 
-    ecExportCommandsEl.innerHTML = `
-        <div class="series-order-command-label">💡 Comando pra rodar no Mudae</div>
-        <div class="clear-harem-command-wrap">
-            <code class="clear-harem-command">${escapeXml(command)}</code>
-            <button type="button" class="pill cyan ec-export-copy-btn">COPIAR</button>
+    ecExportCommandsEl.innerHTML = groups.map((group, idx) => `
+        <div class="series-order-command-label ec-export-group-label">
+            <span class="ec-export-swatch" style="background:${group.color}"></span>
+            ${group.color} · ${group.count} personagem(ns)
         </div>
-    `;
+        <div class="clear-harem-command-wrap">
+            <code class="clear-harem-command">${escapeXml(group.command)}</code>
+            <button type="button" class="pill cyan ec-export-copy-btn" data-idx="${idx}">COPIAR</button>
+        </div>
+    `).join("");
 
-    ecExportCommandsEl.querySelector(".ec-export-copy-btn").addEventListener("click", async () => {
-        try {
-            if (!navigator.clipboard || !navigator.clipboard.writeText) {
-                throw new Error("Clipboard API indisponível");
+    ecExportCommandsEl.querySelectorAll(".ec-export-copy-btn").forEach(btn => {
+        btn.addEventListener("click", async () => {
+            const group = groups[Number(btn.dataset.idx)];
+            try {
+                if (!navigator.clipboard || !navigator.clipboard.writeText) {
+                    throw new Error("Clipboard API indisponível");
+                }
+                await navigator.clipboard.writeText(group.command);
+                ecExportCopyStatusEl.textContent = `✓ Comando da cor ${group.color} copiado.`;
+            } catch (err) {
+                console.error("Erro ao copiar o comando $ec:", err);
+                ecExportCopyStatusEl.textContent = "Não foi possível copiar automaticamente. Selecione o texto manualmente.";
             }
-            await navigator.clipboard.writeText(command);
-            ecExportCopyStatusEl.textContent = "✓ Comando copiado.";
-        } catch (err) {
-            console.error("Erro ao copiar o comando $ec:", err);
-            ecExportCopyStatusEl.textContent = "Não foi possível copiar automaticamente. Selecione o texto manualmente.";
-        }
+        });
     });
 
-    ecExportSummaryEl.textContent = `${entries.length} personagem(ns) no comando.`;
+    ecExportSummaryEl.textContent = `${entries.length} personagem(ns) em ${groups.length} comando(s) — um por cor.`;
 }
 
 function openEcExportModal() {
