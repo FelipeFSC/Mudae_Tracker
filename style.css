@@ -1215,6 +1215,21 @@ select#mCategory {
     color: var(--pink);
 }
 
+.embed-color-row.is-locked {
+    opacity: 0.4;
+}
+
+.embed-color-row.is-locked input,
+.embed-color-row.is-locked .embed-color-clear {
+    cursor: not-allowed;
+}
+
+.embed-color-hint {
+    margin: 6px 0 0;
+    font-size: 11px;
+    color: var(--muted);
+}
+
 .btn-add {
     width: 100%;
     background: linear-gradient(135deg, var(--pink), #b0209e);

@@ -2235,8 +2235,8 @@ if (seriesOrderCopyBtn) {
    ------------------------------------------------------------
    Formato do Mudae: "$ec Nome $cor $Nome $cor ..." — o primeiro nome
    vai sem "$", os seguintes com "$" grudado, e cada cor é "$rrggbb".
-   Só entram reivindicados: o $ec só vale para personagens do próprio
-   harém.
+   Só entram reivindicados com pelo menos 1 chave: o $ec só vale para
+   personagens do próprio harém que já tenham chave.
    ============================================================ */
 const ecExportModalOverlay = document.getElementById("ecExportModalOverlay");
 const ecExportCommandsEl = document.getElementById("ecExportCommands");
@@ -2245,7 +2245,7 @@ const ecExportSummaryEl = document.getElementById("ecExportSummary");
 
 function getEmbedColorEntries() {
     return state.characters
-        .filter(c => c.claimed !== false)
+        .filter(c => c.claimed !== false && characterCanHaveEmbedColor(c.keys))
         .map(c => ({ name: String(c.name || "").trim(), color: normalizeEmbedColor(c.embedColor) }))
         .filter(entry => entry.name && entry.color);
 }
@@ -2263,7 +2263,7 @@ function renderEcExportModal() {
     ecExportCopyStatusEl.textContent = "";
 
     if (!command) {
-        ecExportCommandsEl.innerHTML = `<p class="series-order-empty">Nenhum personagem reivindicado com embed color salva. Importe o harém com a flag c+ ou defina a cor editando o personagem.</p>`;
+        ecExportCommandsEl.innerHTML = `<p class="series-order-empty">Nenhum personagem reivindicado com chave e embed color salva. Importe o harém com a flag c+ ou defina a cor editando o personagem.</p>`;
         ecExportSummaryEl.textContent = "";
         return;
     }
@@ -2348,6 +2348,25 @@ function setEmbedColorField(color) {
     mEmbedColorPicker.value = normalized || "#ffffff";
     mEmbedColorPicker.classList.toggle("is-empty", !normalized);
 }
+
+// Regra do Mudae: $ec só funciona em personagens com pelo menos 1 chave.
+function characterCanHaveEmbedColor(keys) {
+    return (Number(keys) || 0) > 0;
+}
+
+const mEmbedColorHint = document.getElementById("mEmbedColorHint");
+
+// Trava/destrava o campo conforme o valor atual de CHAVES no modal.
+function updateEmbedColorAvailability() {
+    const allowed = characterCanHaveEmbedColor(mKeys && mKeys.value);
+    mEmbedColor.disabled = !allowed;
+    mEmbedColorPicker.disabled = !allowed;
+    mEmbedColorClear.disabled = !allowed;
+    mEmbedColor.closest(".embed-color-row").classList.toggle("is-locked", !allowed);
+    mEmbedColorHint.hidden = allowed;
+}
+
+if (mKeys) mKeys.addEventListener("input", updateEmbedColorAvailability);
 
 mEmbedColorPicker.addEventListener("input", () => setEmbedColorField(mEmbedColorPicker.value));
 mEmbedColorClear.addEventListener("click", () => setEmbedColorField(null));
@@ -2512,6 +2531,7 @@ function openModal(defaultCat) {
     mKakera.value = "500";
     if (mKeys) mKeys.value = "0";
     setEmbedColorField(null);
+    updateEmbedColorAvailability();
     mCategory.value = defaultCat || "comuns";
     if (mClaimed) mClaimed.value = "true";
     clearPhotoPreview();
@@ -2530,6 +2550,7 @@ function openEditModal(character) {
     mKakera.value = character.kakera;
     if (mKeys) mKeys.value = Number(character.keys) || 0;
     setEmbedColorField(character.embedColor);
+    updateEmbedColorAvailability();
     mCategory.value = character.category;
     if (mClaimed) mClaimed.value = String(character.claimed !== false);
 
@@ -2583,7 +2604,12 @@ document.getElementById("modalAdd").addEventListener("click", async () => {
     const kakeraVal = parseInt(mKakera.value) || 0;
     const keysVal = parseInt(mKeys && mKeys.value) || 0;
 
-    const embedColorVal = normalizeEmbedColor(mEmbedColor.value);
+    // Sem chave o campo fica travado: a cor não muda (mantém a já salva).
+    const canEditEmbedColor = characterCanHaveEmbedColor(keysVal);
+    const previousEmbedColor = isEditing
+        ? (state.characters.find(c => c.id === editingCharacterId)?.embedColor || null)
+        : null;
+    const embedColorVal = canEditEmbedColor ? normalizeEmbedColor(mEmbedColor.value) : previousEmbedColor;
     if (embedColorVal === undefined) {
         mEmbedColor.classList.add("invalid");
         mEmbedColor.focus();
