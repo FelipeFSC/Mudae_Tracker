@@ -471,12 +471,21 @@
             </div>
             <div class="character-modal-body">
             <div class="character-modal-media field">
-                <label>FOTO DO PERSONAGEM</label>
-                <div class="photo-upload" id="photoUploadArea">
-                    <img id="photoPreviewImg" style="display:none;" />
-                    <div id="photoPlaceholder">
-                        <span>⬆</span>
-                        <span>Clique ou arraste uma imagem</span>
+                <label>PRÉVIA NO MUDAE</label>
+                <!-- Imita o embed do $im no Discord; atualiza conforme os campos ao lado. -->
+                <div class="mudae-embed" id="mudaePreview">
+                    <div class="mudae-embed-name" id="mudaePreviewName"></div>
+                    <div class="mudae-embed-line">
+                        <span id="mudaePreviewSeries"></span>
+                        <span id="mudaePreviewGender"></span>
+                    </div>
+                    <div class="mudae-embed-line" id="mudaePreviewStats"></div>
+                    <div class="photo-upload mudae-embed-image" id="photoUploadArea">
+                        <img id="photoPreviewImg" style="display:none;" />
+                        <div id="photoPlaceholder">
+                            <span>⬆</span>
+                            <span>Clique ou arraste uma imagem</span>
+                        </div>
                     </div>
                 </div>
                 <input type="file" id="mPhotoInput" accept="image/*" style="display:none;" />

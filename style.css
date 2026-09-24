@@ -1750,6 +1750,75 @@ select#mCategory {
     max-width: 100%;
 }
 
+/* ---- Prévia do embed do Mudae (cores e tipografia do Discord escuro) ---- */
+.mudae-embed {
+    --mudae-embed-color: #1e1f22; /* sem $ec: barra neutra, como embed sem cor */
+    /* Vidro fosco no estilo Discord: cinza médio translúcido + blur do que
+       estiver atrás. Ajuste a opacidade (0.35) e o blur (16px) para testar. */
+    background: rgba(88, 91, 102, 0.35);
+    -webkit-backdrop-filter: blur(16px) saturate(140%);
+    backdrop-filter: blur(16px) saturate(140%);
+    border-left: 4px solid var(--mudae-embed-color);
+    border-radius: 4px;
+    padding: 10px 14px 14px 12px;
+    font-family: "gg sans", "Noto Sans", "Helvetica Neue", Helvetica, Arial, sans-serif;
+    font-size: 14px;
+    line-height: 1.375;
+    color: #dbdee1;
+    overflow-wrap: anywhere;
+}
+
+.mudae-embed-name {
+    font-weight: 700;
+    color: #f2f3f5;
+    margin-bottom: 8px;
+}
+
+.mudae-embed-name.is-placeholder,
+.mudae-embed-line .is-placeholder {
+    color: #80848e;
+}
+
+.mudae-embed-line em {
+    font-style: italic;
+}
+
+.mudae-embed-line strong {
+    font-weight: 700;
+    color: #f2f3f5;
+}
+
+.mudae-embed-gender {
+    font-weight: 700;
+    font-size: 16px;
+    line-height: 1;
+}
+
+.mudae-embed-gender.female {
+    color: #e91e8c;
+}
+
+.mudae-embed-gender.male {
+    color: #3b9cff;
+}
+
+.mudae-embed-icon {
+    width: 13px;
+    height: 13px;
+    vertical-align: -2px;
+}
+
+.mudae-embed-sep {
+    color: #b5bac1;
+    margin: 0 4px;
+}
+
+.character-modal-media .mudae-embed-image {
+    margin-top: 12px;
+    border-radius: 4px;
+    background: #1e1f22;
+}
+
 @media (max-width: 720px) {
     .character-modal-body {
         grid-template-columns: minmax(0, 1fr);

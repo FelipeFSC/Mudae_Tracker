@@ -2362,6 +2362,7 @@ function setEmbedColorField(color) {
     mEmbedColor.classList.remove("invalid");
     mEmbedColorPicker.value = normalized || "#ffffff";
     mEmbedColorPicker.classList.toggle("is-empty", !normalized);
+    renderMudaePreview();
 }
 
 // Regra do Mudae: $ec só funciona em personagens com pelo menos 1 chave.
@@ -2493,7 +2494,61 @@ function renderGenderButtons() {
     mGenderRow.querySelectorAll(".gender-btn").forEach(btn => {
         btn.classList.toggle("active", mGenders.has(btn.dataset.gender));
     });
+    renderMudaePreview();
 }
+
+/* ---- Prévia do embed do Mudae no modal ----
+   Gênero: 1ª letra W (waifu ♀) / H (husbando ♂); 2ª letra G (Game) /
+   A (Animanga). Rank de claim/like e descrição ainda não são conhecidos
+   pelo sistema, por isso ficam fora da prévia. */
+const mudaePreviewEl = document.getElementById("mudaePreview");
+const mudaePreviewNameEl = document.getElementById("mudaePreviewName");
+const mudaePreviewSeriesEl = document.getElementById("mudaePreviewSeries");
+const mudaePreviewGenderEl = document.getElementById("mudaePreviewGender");
+const mudaePreviewStatsEl = document.getElementById("mudaePreviewStats");
+
+const MUDAE_KAKERA_ICON = `<svg class="mudae-embed-icon" viewBox="0 0 16 16" aria-hidden="true"><path d="M8 1 13 6 8 15 3 6Z" fill="#7cc4ff"/><path d="M8 1 10.5 6 8 15 5.5 6Z" fill="#b8e0ff"/><path d="M3 6h10" stroke="#4a8fd4" stroke-width=".8"/></svg>`;
+const MUDAE_KEY_ICON = `<svg class="mudae-embed-icon" viewBox="0 0 16 16" aria-hidden="true"><circle cx="5" cy="11" r="3.2" fill="none" stroke="#b58cff" stroke-width="1.8"/><path d="M7.3 8.7 14 2M11.2 4.8l1.8 1.8M12.8 3.2l1.4 1.4" stroke="#b58cff" stroke-width="1.8" stroke-linecap="round"/></svg>`;
+
+function renderMudaePreview() {
+    if (!mudaePreviewEl) return;
+
+    const name = mName.value.trim();
+    mudaePreviewNameEl.textContent = name || "Nome do personagem";
+    mudaePreviewNameEl.classList.toggle("is-placeholder", !name);
+
+    const series = mSeries.value.trim();
+    mudaePreviewSeriesEl.textContent = series || "Série / Anime";
+    mudaePreviewSeriesEl.classList.toggle("is-placeholder", !series);
+
+    const genders = Array.from(mGenders);
+    const hasFemale = genders.some(g => g[0] === "w");
+    const hasMale = genders.some(g => g[0] === "h");
+    mudaePreviewGenderEl.innerHTML =
+        (hasFemale ? `<span class="mudae-embed-gender female">♀</span>` : "") +
+        (hasMale ? `<span class="mudae-embed-gender male">♂</span>` : "");
+
+    const hasGame = genders.some(g => g[1] === "g");
+    const hasAnimanga = genders.some(g => g[1] === "a");
+    const typeLabel = hasGame && hasAnimanga ? "Game &amp; Animanga" : hasGame ? "Game" : hasAnimanga ? "Animanga" : "";
+
+    const kakera = parseInt(mKakera.value, 10) || 0;
+    const keys = parseInt(mKeys && mKeys.value, 10) || 0;
+    const parts = [];
+    if (typeLabel) parts.push(`<em>${typeLabel}</em>`);
+    parts.push(`<strong>${kakera.toLocaleString("pt-BR")}</strong> ${MUDAE_KAKERA_ICON}`);
+    if (keys > 0) parts.push(`${MUDAE_KEY_ICON} (${keys})`);
+    mudaePreviewStatsEl.innerHTML = parts.join(`<span class="mudae-embed-sep">·</span>`);
+
+    // Barra lateral: $ec digitado (se válido); senão, a barra neutra do CSS.
+    const embedColor = normalizeEmbedColor(mEmbedColor.value);
+    if (embedColor) mudaePreviewEl.style.setProperty("--mudae-embed-color", embedColor);
+    else mudaePreviewEl.style.removeProperty("--mudae-embed-color");
+}
+
+[mName, mSeries, mKakera, mKeys, mEmbedColor].forEach(input => {
+    if (input) input.addEventListener("input", renderMudaePreview);
+});
 
 function setGenders(genders) {
     mGenders = new Set((genders || []).filter(g => GENDER_OPTIONS.includes(g)));
