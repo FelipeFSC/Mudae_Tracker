@@ -446,3 +446,63 @@ function getProbabilityBreakdown(config, person, characters) {
         multiplier: getCharacterBuffMultiplier(config, person, characters)
     };
 }
+
+// ---- Bônus de kakera por chaves (fonte: $infokeys do Mudae) ----
+// Percentual: +10% nos níveis 2, 4, 5, 7, 8 e 9 (+60% com 9 chaves) e +5%
+// por chave a partir da 11ª. É somado e aplicado sobre o valor padrão.
+// Fixo: alguns níveis somam pontos ao valor padrão "antes de qualquer outro
+// boost" (níveis 10 e 15: +15; 20, 25, 30: +10; 35..60 de 5 em 5: +5;
+// 70..300 de 10 em 10: +5).
+// OP 2 ("Valor base de kakera aumentado") também soma ao valor base, então
+// é multiplicado pelo bônus % das chaves: 100 base, +100% de chaves e OP 2
+// nível 1 (+20) => (100 + 20) × 2 = 240, e não 200 + 20.
+// valor total = (valor bruto + fixo das chaves + OP 2) × (1 + bônus %)
+// Obs.: pelo teste real (704 base -> 1262 com 13 chaves) o bônus fixo
+// parece passar também pelo multiplicador de claims do servidor, que o
+// sistema ainda não conhece — por isso pode sobrar uma diferença pequena.
+const KEY_LEVELS_WITH_10PCT = [2, 4, 5, 7, 8, 9];
+
+function keyKakeraBonus(keys) {
+    const k = Math.max(0, Math.floor(Number(keys) || 0));
+    const tenPctLevels = KEY_LEVELS_WITH_10PCT.filter(level => k >= level).length;
+    return tenPctLevels * 0.10 + Math.max(0, k - 10) * 0.05;
+}
+
+function keyFlatKakeraBonus(keys) {
+    const k = Math.max(0, Math.floor(Number(keys) || 0));
+    let flat = 0;
+    [10, 15].forEach(level => { if (k >= level) flat += 15; });
+    [20, 25, 30].forEach(level => { if (k >= level) flat += 10; });
+    for (let level = 35; level <= 60; level += 5) if (k >= level) flat += 5;
+    for (let level = 70; level <= 300; level += 10) if (k >= level) flat += 5;
+    return flat;
+}
+
+// OP 2 por nível (0..6 compráveis; 7 = personagem totalmente otimizado).
+const opBaseKakeraBonus = [0, 20, 40, 60, 80, 100, 130, 150];
+
+function opKakeraBaseBonus(person) {
+    return opLevelValue(person, "p2", opBaseKakeraBonus);
+}
+
+// Para trás: valor total -> valor bruto (sem chaves e sem OP 2).
+function baseKakeraFromTotal(total, keys, opFlat = 0) {
+    const base = (Number(total) || 0) / (1 + keyKakeraBonus(keys)) - keyFlatKakeraBonus(keys) - (Number(opFlat) || 0);
+    return Math.max(0, Math.round(base));
+}
+
+// Para frente: valor bruto -> valor total com as chaves e o OP 2 informados.
+function totalKakeraFromBase(base, keys, opFlat = 0) {
+    const flat = (Number(base) || 0) + keyFlatKakeraBonus(keys) + (Number(opFlat) || 0);
+    return Math.round(flat * (1 + keyKakeraBonus(keys)));
+}
+
+// Recalcula o total salvo quando o OP 2 do personagem muda. Se o bônus do
+// OP 2 não mudou, devolve o total atual intacto (evita erro de arredondamento).
+function kakeraAfterOpChange(character, newOpLevels) {
+    const oldFlat = opKakeraBaseBonus(character);
+    const newFlat = opKakeraBaseBonus({ ...character, opLevels: newOpLevels });
+    if (oldFlat === newFlat) return Number(character.kakera) || 0;
+    const raw = baseKakeraFromTotal(character.kakera, character.keys, oldFlat);
+    return totalKakeraFromBase(raw, character.keys, newFlat);
+}

@@ -1239,6 +1239,16 @@ select#mCategory {
     cursor: not-allowed;
 }
 
+.kakera-base-hint {
+    margin: 6px 0 0;
+    font-size: 11px;
+    color: var(--muted);
+}
+
+.kakera-base-hint strong {
+    color: var(--yellow);
+}
+
 .embed-color-hint {
     margin: 6px 0 0;
     font-size: 11px;

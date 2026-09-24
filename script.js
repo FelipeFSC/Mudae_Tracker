@@ -1880,7 +1880,12 @@ async function saveOpLevels() {
     if (idx === -1) return;
 
     const levelsSnapshot = normalizeOpLevels(editingOpLevels);
-    state.characters[idx] = { ...state.characters[idx], opLevels: levelsSnapshot };
+    state.characters[idx] = {
+        ...state.characters[idx],
+        // OP 2 soma ao valor base, que é multiplicado pelo bônus das chaves.
+        kakera: kakeraAfterOpChange(state.characters[idx], levelsSnapshot),
+        opLevels: levelsSnapshot
+    };
     showOpStatus("Salvando...", false);
 
     try {
@@ -2384,6 +2389,41 @@ function updateEmbedColorAvailability() {
 
 if (mKeys) mKeys.addEventListener("input", updateEmbedColorAvailability);
 
+// ---- Kakera base x total (bônus das chaves) ----
+// O campo KAKERA guarda o TOTAL (como o Mudae exibe, já com as chaves).
+// O valor base (sem chaves) é derivado dele e fica fixo enquanto se mexe
+// nas chaves: mudar CHAVES recalcula o total; mudar KAKERA recalcula a base.
+const mKakeraBaseHint = document.getElementById("mKakeraBaseHint");
+let mKakeraBase = 0;  // valor bruto: sem chaves e sem OP 2
+let mOpKakeraFlat = 0; // +kakera do OP 2 do personagem em edição (0 para novo)
+
+function renderKakeraBaseHint() {
+    const keys = parseInt(mKeys && mKeys.value, 10) || 0;
+    const bonusPct = Math.round(keyKakeraBonus(keys) * 100);
+    const flat = keyFlatKakeraBonus(keys);
+    const keyText = [flat > 0 ? `+${flat} fixo` : "", bonusPct > 0 ? `+${bonusPct}%` : ""].filter(Boolean).join(" e ");
+    const parts = [`Base: <strong>${mKakeraBase.toLocaleString("pt-BR")}</strong>`];
+    if (mOpKakeraFlat > 0) parts.push(`OP 2: +${mOpKakeraFlat}`);
+    parts.push(keyText ? `chaves: ${keyText} (${keys})` : "sem bônus de chaves");
+    mKakeraBaseHint.innerHTML = parts.join(" · ");
+}
+
+// Chamado ao abrir o modal, depois de preencher KAKERA e CHAVES e de
+// definir mOpKakeraFlat.
+function syncKakeraBaseFromFields() {
+    mKakeraBase = baseKakeraFromTotal(mKakera.value, mKeys && mKeys.value, mOpKakeraFlat);
+    renderKakeraBaseHint();
+}
+
+mKakera.addEventListener("input", syncKakeraBaseFromFields);
+if (mKeys) {
+    mKeys.addEventListener("input", () => {
+        mKakera.value = totalKakeraFromBase(mKakeraBase, mKeys.value, mOpKakeraFlat);
+        renderKakeraBaseHint();
+        renderMudaePreview();
+    });
+}
+
 mEmbedColorPicker.addEventListener("input", () => setEmbedColorField(mEmbedColorPicker.value));
 mEmbedColorClear.addEventListener("click", () => setEmbedColorField(null));
 mEmbedColor.addEventListener("input", () => {
@@ -2600,6 +2640,8 @@ function openModal(defaultCat) {
     mSeries.value = "";
     mKakera.value = "500";
     if (mKeys) mKeys.value = "0";
+    mOpKakeraFlat = 0;
+    syncKakeraBaseFromFields();
     setEmbedColorField(null);
     updateEmbedColorAvailability();
     mCategory.value = defaultCat || "comuns";
@@ -2619,6 +2661,8 @@ function openEditModal(character) {
     mSeries.value = character.series === "—" ? "" : character.series;
     mKakera.value = character.kakera;
     if (mKeys) mKeys.value = Number(character.keys) || 0;
+    mOpKakeraFlat = opKakeraBaseBonus(character);
+    syncKakeraBaseFromFields();
     setEmbedColorField(character.embedColor);
     updateEmbedColorAvailability();
     mCategory.value = character.category;
@@ -3262,7 +3306,11 @@ if (opImportConfirmBtn) {
             for (const item of toImport) {
                 const existing = item.existing;
                 const importedLevels = normalizeOpLevels(item.opLevels);
-                const updatedCharacter = { ...existing, opLevels: importedLevels };
+                const updatedCharacter = {
+                    ...existing,
+                    kakera: kakeraAfterOpChange(existing, importedLevels),
+                    opLevels: importedLevels
+                };
 
                 await Database.updateCharacter(updatedCharacter);
                 const stateIndex = state.characters.findIndex(character => String(character.id) === String(existing.id));
