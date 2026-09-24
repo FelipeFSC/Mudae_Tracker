@@ -256,6 +256,7 @@
                     <button class="pill green" id="btnOpenImport">📥 IMPORTAR MUDAE</button>
                     <button class="pill yellow" id="btnOpenOpImport">⚡ IMPORTAR BUFFS OP</button>
                     <button class="pill purple" id="btnOpenWishlistOrder">⇅ REORDENAR WISHLIST</button>
+                    <button class="pill pink" id="btnOpenEcExport" title="Gerar o comando $ec com as embed colors salvas">🎨 EXPORTAR EC</button>
                     <button class="pill red" id="btnClearHarem">🗑 LIMPAR HAREM</button>
                 </div>
                 <div class="clear-harem-selection-bar" id="clearHaremSelectionBar" hidden>
@@ -463,12 +464,13 @@
 
     <!-- ============ MODAL: NOVO PERSONAGEM ============ -->
     <div id="modalOverlay" class="modal-overlay">
-        <div class="modal">
+        <div class="modal character-modal">
             <div class="modal-head">
                 <h2 id="modalTitle">Novo Personagem</h2>
                 <button id="modalClose" class="modal-x">✕</button>
             </div>
-            <div class="field">
+            <div class="character-modal-body">
+            <div class="character-modal-media field">
                 <label>FOTO DO PERSONAGEM</label>
                 <div class="photo-upload" id="photoUploadArea">
                     <img id="photoPreviewImg" style="display:none;" />
@@ -483,6 +485,7 @@
                     <input type="text" id="mPhotoUrl" placeholder="https://mudae.net/uploads/..." />
                 </div>
             </div>
+            <div class="character-modal-data">
             <div class="field">
                 <label>NOME DO PERSONAGEM</label>
                 <input type="text" id="mName" placeholder="Ex: Rem" />
@@ -498,6 +501,14 @@
             <div class="field">
                 <label>CHAVES</label>
                 <input type="number" id="mKeys" min="0" value="0" />
+            </div>
+            <div class="field">
+                <label>EMBED COLOR ($ec)</label>
+                <div class="embed-color-row">
+                    <input type="color" id="mEmbedColorPicker" value="#ffffff" title="Escolher cor" />
+                    <input type="text" id="mEmbedColor" placeholder="Sem cor (ex: #fff2b9)" maxlength="7" spellcheck="false" />
+                    <button type="button" id="mEmbedColorClear" class="embed-color-clear" title="Remover cor">✕</button>
+                </div>
             </div>
             <div class="field">
                 <label>STATUS DO PERSONAGEM</label>
@@ -522,6 +533,8 @@
                     <button type="button" class="gender-btn" data-gender="ha">$ha</button>
                     <button type="button" class="gender-btn" data-gender="hg">$hg</button>
                 </div>
+            </div>
+            </div>
             </div>
             <button id="modalAdd" class="btn-add">ADICIONAR</button>
         </div>
@@ -705,6 +718,28 @@
             <div class="op-modal-footer">
                 <span class="op-save-status" id="seriesOrderEmptyHint">Selecione ao menos uma série pra gerar o comando.</span>
                 <button id="seriesOrderCloseBtn" class="btn-minimal op-close-btn">FECHAR</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- ============ MODAL: EXPORTAR EMBED COLORS ($ec) ============ -->
+    <div id="ecExportModalOverlay" class="modal-overlay">
+        <div class="modal series-order-modal">
+            <div class="modal-head">
+                <div>
+                    <h2>Exportar EC</h2>
+                    <p class="tower-modal-sub">Comando $ec com todos os personagens reivindicados que têm embed color
+                        salva. Copie e cole no Discord pra aplicar as cores no Mudae.</p>
+                </div>
+                <button id="ecExportModalClose" class="modal-x">✕</button>
+            </div>
+
+            <div class="series-order-command-box" id="ecExportCommands"></div>
+            <p class="clear-harem-copy-status" id="ecExportCopyStatus"></p>
+
+            <div class="op-modal-footer">
+                <span class="op-save-status" id="ecExportSummary"></span>
+                <button id="ecExportCloseBtn" class="btn-minimal op-close-btn">FECHAR</button>
             </div>
         </div>
     </div>

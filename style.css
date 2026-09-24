@@ -670,43 +670,33 @@ select#mCategory {
 }
 
 .char-card {
-    border-radius: 12px;
+    border-radius: 12px 12px 12px 0px;
     padding: 18px;
     background: var(--bg-panel);
-    border: 1px solid var(--border);
-    border-left: 3px solid var(--muted-2);
+    border: 1.5px solid #94a3b824;
+    border-left: 5px solid #94a3b824;
     display: flex;
     gap: 16px;
     align-items: center;
     position: relative;
 }
 
-.char-card.cat-favoritos {
-    border-left-color: var(--pink);
-    box-shadow: -2px 0 18px -8px var(--pink-soft) inset;
+/* Borda lateral: cinza por padrão; o embed color ($ec) do personagem,
+   quando existe, é aplicado via --embed-color no próprio card. */
+.char-card.has-embed-color {
+    border-color: var(--embed-color);
 }
 
-.char-card.cat-estrelas {
-    border-left-color: var(--yellow);
+/* ---- Indicador de OP investido: só um ícone ao lado das chaves ----
+   Sempre presente no HTML e exibido pela classe op-has-buff do card,
+   que o modal OP alterna ao salvar sem precisar redesenhar a lista. */
+.tag.op-spent,
+.compact-op {
+    display: none;
 }
 
-.char-card.cat-comuns {
-    border-left-color: var(--cyan);
-}
-
-/* ---- Indicador visual de buffs (OP) — mesmo esquema de cor das linhas do modal OP ---- */
-.char-card.op-has-buff {
-    border-top-color: var(--purple);
-    border-right-color: var(--purple);
-    border-bottom-color: var(--purple);
-    box-shadow: 0 0 22px -12px var(--purple);
-}
-
-.char-card.op-maxed {
-    border-top-color: var(--yellow);
-    border-right-color: var(--yellow);
-    border-bottom-color: var(--yellow);
-    box-shadow: 0 0 22px -12px var(--yellow);
+.char-card.op-has-buff .tag.op-spent {
+    display: inline;
 }
 
 .char-photo {
@@ -790,6 +780,11 @@ select#mCategory {
 .tag.keys {
     background: var(--cyan-soft);
     color: var(--cyan);
+}
+
+.tag.op-spent {
+    background: var(--purple-soft);
+    color: var(--purple);
 }
 
 .chance-row {
@@ -1175,6 +1170,49 @@ select#mCategory {
 
 .modal .field {
     margin-bottom: 14px;
+}
+
+.embed-color-row {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+}
+
+.field .embed-color-row input[type="color"] {
+    flex: 0 0 42px;
+    width: 42px;
+    height: 40px;
+    padding: 3px;
+    cursor: pointer;
+}
+
+.field .embed-color-row input[type="color"].is-empty {
+    opacity: 0.35;
+}
+
+.field .embed-color-row input[type="text"] {
+    flex: 1 1 auto;
+    min-width: 0;
+}
+
+.field .embed-color-row input[type="text"].invalid {
+    border-color: var(--pink);
+}
+
+.embed-color-clear {
+    flex: 0 0 40px;
+    height: 40px;
+    background: var(--bg-panel-2);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    color: var(--muted);
+    cursor: pointer;
+    transition: border-color .15s ease, color .15s ease;
+}
+
+.embed-color-clear:hover {
+    border-color: var(--pink);
+    color: var(--pink);
 }
 
 .btn-add {
@@ -1618,6 +1656,13 @@ select#mCategory {
     transition: border-color .15s ease, background .15s ease;
 }
 
+/* Com foto, a moldura tracejada dá lugar ao filete sobreposto
+   (ver .photo-upload.has-image::after). */
+.photo-upload.has-image {
+    border: none;
+    background: transparent;
+}
+
 .photo-upload:hover {
     border-color: var(--pink);
 }
@@ -1653,6 +1698,38 @@ select#mCategory {
 .photo-url-field {
     margin-top: 10px;
     margin-bottom: 0;
+}
+
+/* ---- Modal de cadastro/edição: foto à esquerda, dados à direita ---- */
+.modal.character-modal {
+    width: 760px;
+}
+
+.character-modal-body {
+    display: grid;
+    grid-template-columns: 260px minmax(0, 1fr);
+    gap: 24px;
+    align-items: start;
+    margin-bottom: 6px;
+}
+
+/* Proporção retrato das imagens do Mudae (225×350). */
+.character-modal-media .photo-upload {
+    height: auto;
+    aspect-ratio: 225 / 350;
+    max-width: 100%;
+}
+
+@media (max-width: 720px) {
+    .character-modal-body {
+        grid-template-columns: minmax(0, 1fr);
+        gap: 4px;
+    }
+
+    .character-modal-media .photo-upload {
+        width: min(220px, 100%);
+        margin: 0 auto;
+    }
 }
 
 .photo-url-field label {
@@ -1930,8 +2007,29 @@ select#mCategory {
 /* foto já enviada dentro do card */
 .char-photo.has-image {
     padding: 0;
-    border-style: solid;
+    border: none;
     overflow: hidden;
+    position: relative;
+}
+
+/* Filete cinza-escuro desenhado POR CIMA da imagem: cobre o 1px claro
+   que algumas imagens têm nas bordas e deixa a moldura discreta. */
+.char-photo.has-image::after,
+.photo-upload.has-image::after {
+    content: "";
+    position: absolute;
+    inset: 0;
+    border: 1px solid #1c2130;
+    border-radius: inherit;
+    pointer-events: none;
+}
+
+.photo-upload.has-image:hover::after {
+    border-color: var(--pink);
+}
+
+.photo-upload.has-image.drag-over::after {
+    border-color: var(--cyan);
 }
 
 .char-photo.has-image img {
@@ -3448,6 +3546,17 @@ select#mCategory {
     margin-left: 8px;
     background: var(--cyan-soft);
     color: var(--cyan);
+}
+
+#charGroups.view-grid.grid-compact .char-card.op-has-buff .compact-op {
+    display: inline-flex;
+    align-items: center;
+    margin-left: 8px;
+    padding: 4px 8px;
+    border-radius: 6px;
+    font-size: 11px;
+    background: var(--purple-soft);
+    color: var(--purple);
 }
 
 #charGroups.view-grid.grid-compact .compact-genders {

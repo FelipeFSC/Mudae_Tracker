@@ -42,6 +42,13 @@
 
     const GENDER_OPTIONS = ["wa", "ha", "wg", "hg"];
 
+    // Embed color do $ec, exibido pela flag c/c+ logo após as chaves:
+    // ":bronzekey: (2) (#fff2b9)". Devolve "#rrggbb" em minúsculas ou null.
+    function extractEmbedColor(text) {
+        const match = /\(#([0-9a-f]{6})\)/i.exec(String(text || ""));
+        return match ? `#${match[1].toLowerCase()}` : null;
+    }
+
     // Acha o primeiro título de série no texto e devolve tudo a partir dali
     // (ou seja: ignora cabeçalho, "Total value: ...:kakera:", etc.)
     // Um título de série tem o formato "Nome da Série - N/N" e vem
@@ -66,7 +73,7 @@
     // Grupo 5: gêneros, crus, dentro do parênteses
     // Grupo 6: quantidade de chaves (opcional — o "(N)" antes do valor de ka,
     //          ex. o "1" de ":bronzekey: (1)"; não confundir com código de
-    //          cor tipo "(#d9d7e1)", que não é capturado aqui)
+    //          cor tipo "(#d9d7e1)", que é lido à parte por extractEmbedColor)
     // Grupo 7: valor de kakera
     // Grupo 8: link da imagem
     const ENTRY_REGEX =
@@ -118,6 +125,7 @@
             const keyMatch = details.match(/:(?:bronze|silver|gold|chaos)key:\s*[\u00a0\u202f\s]*\((\d+)\)/i)
                 || details.match(/(?:^|·)\s*[^·]*?\((\d+)\)(?:\s*\(#[0-9a-f]{6}\))?/i);
             if (keyMatch) keys = parseInt(keyMatch[1], 10) || 0;
+            const embedColor = extractEmbedColor(details);
 
             // Remove dados que não fazem parte do nome.
             const ownerMatch = details.match(/=>\s*([^·]+?)(?=\s*·|$)/);
@@ -139,6 +147,7 @@
                 nickname,
                 genders: [],
                 keys,
+                embedColor,
                 kakera,
                 photo,
                 importType: "wishlist",
@@ -392,6 +401,7 @@
                 nickname: match[4] || null,
                 genders,
                 keys: parseInt(match[6], 10) || 0,
+                embedColor: extractEmbedColor(match[0]),
                 kakera: parseInt((match[7] || "0").replace(/[.,]/g, ""), 10) || 0,
                 photo: match[8] || null
             });
@@ -400,7 +410,7 @@
         return results;
     }
 
-    return { parse: parseMudaeExport, parseOPBuffs: parseOPBuffsExport, resolveOPEntryName };
+    return { parse: parseMudaeExport, parseOPBuffs: parseOPBuffsExport, resolveOPEntryName, extractEmbedColor };
 });
 
 /* ============================================================
@@ -490,6 +500,7 @@
             const keyMatch = detailPart.match(/:(?:bronze|silver|gold|chaos)key:\s*\((\d+)\)/i)
                 || detailPart.match(/(?:^|·)\s*[^·]*?\((\d+)\)\s*(?:\(#[0-9a-f]{6}\))?/i);
             if (keyMatch) keys = parseInt(keyMatch[1], 10) || 0;
+            const embedColor = targetImport.extractEmbedColor(detailPart);
 
             let genders = [];
             const genderMatch = detailPart.match(/\(\s*(\$?(?:wa|wg|ha|hg)(?:\s*,\s*\$?(?:wa|wg|ha|hg))*)\s*\)/i);
@@ -517,6 +528,7 @@
                 nickname,
                 genders,
                 keys,
+                embedColor,
                 kakera,
                 photo,
                 importType: "wishlist",
@@ -1021,6 +1033,7 @@ function initializeMudaeImportFlow() {
                 buff: 1.0,
                 kakera: Number(item.kakera) || 0,
                 keys: Number(item.keys) || 0,
+                embedColor: item.embedColor || null,
                 daysAgo: 0,
                 photo: item.photo || null,
                 genders: normalizeCharacterGenders(item.genders),
@@ -1047,6 +1060,7 @@ function initializeMudaeImportFlow() {
             category,
             kakera: Number.isFinite(Number(item.kakera)) ? Number(item.kakera) : existing.kakera,
             keys: Number.isFinite(Number(item.keys)) ? Number(item.keys) : existing.keys,
+            embedColor: item.embedColor || existing.embedColor || null,
             genders: importedGenders.length ? importedGenders : (existing.genders || []),
             wishlistPosition
         };
@@ -1121,6 +1135,7 @@ function initializeMudaeImportFlow() {
                 buff: 1.0,
                 kakera: Number(item.kakera) || 0,
                 keys: Number(item.keys) || 0,
+                embedColor: item.embedColor || null,
                 daysAgo: 0,
                 photo: item.photo || null,
                 genders: normalizeCharacterGenders(item.genders),

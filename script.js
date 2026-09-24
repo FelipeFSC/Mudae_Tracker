@@ -1622,7 +1622,9 @@ function renderCharCard(c) {
     const opStatus = getOpStatus(c);
     const inSelectionMode = clearHaremSelectionMode;
     const isSelected = inSelectionMode && clearHaremSelectedIds.has(String(c.id));
-    card.className = "char-card cat-" + c.category + (c.claimed === false ? " char-unclaimed" : "") + (opStatus.any ? " op-has-buff" : "") + (opStatus.maxed ? " op-maxed" : "") + (inSelectionMode ? " selection-mode" : "") + (isSelected ? " selection-selected" : "");
+    const embedColor = normalizeEmbedColor(c.embedColor);
+    card.className = "char-card cat-" + c.category + (embedColor ? " has-embed-color" : "") + (c.claimed === false ? " char-unclaimed" : "") + (opStatus.any ? " op-has-buff" : "") + (opStatus.maxed ? " op-maxed" : "") + (inSelectionMode ? " selection-mode" : "") + (isSelected ? " selection-selected" : "");
+    if (embedColor) card.style.setProperty("--embed-color", embedColor);
     card.dataset.charId = c.id;
 
     const photoBlock = c.photo
@@ -1652,6 +1654,7 @@ function renderCharCard(c) {
         <div class="compact-values">
           <span class="compact-kakera">${formatKakera(c.kakera)}</span>
           <span class="compact-keys" title="Chaves">🔑 ${Number(c.keys) || 0}</span>
+          <span class="compact-op">◈</span>
         </div>
         <div class="compact-genders">
           ${characterGenders.length
@@ -1663,6 +1666,7 @@ function renderCharCard(c) {
       <div class="char-tags">
         <span class="tag kakera">${formatKakera(c.kakera)}</span>  
         <span class="tag keys" title="Chaves">🔑 ${Number(c.keys) || 0}</span>
+        <span class="tag op-spent">◈</span>
         ${showSpawnBuffLabels && adjacentOpPct > 0 ? `<span class="tag buff op-adjacent-buff" title="Bônus recebido dos personagens imediatamente adjacentes na wishlist circular">OP adj. +${fmtBuff(adjacentOpPct)}%</span>` : ""}
         ${showSpawnBuffLabels && ownShopPct > 0 ? `<span class="tag buff shop-self-buff" title="SHOP 1 nível ${Number(state.config?.shopLevels?.s1 || 0)} compartilha ${fmtBuff(shop1SharePct)}% do próprio Perk 1 (+${fmtBuff(ownPerk1Pct)}%), resultando em +${fmtBuff(ownShopPct)}%">SHOP próprio +${fmtBuff(ownShopPct)}%</span>` : ""}
         ${showSpawnBuffLabels && totalBuffPct > 0 ? `<span class="tag buff total-spawn-buff" title="${escapeXml(breakdownText)}">Total +${totalBuffPct}%</span>` : ""}
@@ -2226,6 +2230,84 @@ if (seriesOrderCopyBtn) {
     });
 }
 
+/* ============================================================
+   EXPORTAR EC -> comando $ec em lote
+   ------------------------------------------------------------
+   Formato do Mudae: "$ec Nome $cor $Nome $cor ..." — o primeiro nome
+   vai sem "$", os seguintes com "$" grudado, e cada cor é "$rrggbb".
+   Só entram reivindicados: o $ec só vale para personagens do próprio
+   harém.
+   ============================================================ */
+const ecExportModalOverlay = document.getElementById("ecExportModalOverlay");
+const ecExportCommandsEl = document.getElementById("ecExportCommands");
+const ecExportCopyStatusEl = document.getElementById("ecExportCopyStatus");
+const ecExportSummaryEl = document.getElementById("ecExportSummary");
+
+function getEmbedColorEntries() {
+    return state.characters
+        .filter(c => c.claimed !== false)
+        .map(c => ({ name: String(c.name || "").trim(), color: normalizeEmbedColor(c.embedColor) }))
+        .filter(entry => entry.name && entry.color);
+}
+
+// Mesma convenção do $smser: primeiro nome sem "$", os seguintes com "$".
+function buildEmbedColorCommand(entries) {
+    if (!entries.length) return "";
+    const pairs = entries.map(({ name, color }, idx) => `${idx === 0 ? "" : "$"}${name} $${color.slice(1)}`);
+    return `$ec ${pairs.join(" ")}`;
+}
+
+function renderEcExportModal() {
+    const entries = getEmbedColorEntries();
+    const command = buildEmbedColorCommand(entries);
+    ecExportCopyStatusEl.textContent = "";
+
+    if (!command) {
+        ecExportCommandsEl.innerHTML = `<p class="series-order-empty">Nenhum personagem reivindicado com embed color salva. Importe o harém com a flag c+ ou defina a cor editando o personagem.</p>`;
+        ecExportSummaryEl.textContent = "";
+        return;
+    }
+
+    ecExportCommandsEl.innerHTML = `
+        <div class="series-order-command-label">💡 Comando pra rodar no Mudae</div>
+        <div class="clear-harem-command-wrap">
+            <code class="clear-harem-command">${escapeXml(command)}</code>
+            <button type="button" class="pill cyan ec-export-copy-btn">COPIAR</button>
+        </div>
+    `;
+
+    ecExportCommandsEl.querySelector(".ec-export-copy-btn").addEventListener("click", async () => {
+        try {
+            if (!navigator.clipboard || !navigator.clipboard.writeText) {
+                throw new Error("Clipboard API indisponível");
+            }
+            await navigator.clipboard.writeText(command);
+            ecExportCopyStatusEl.textContent = "✓ Comando copiado.";
+        } catch (err) {
+            console.error("Erro ao copiar o comando $ec:", err);
+            ecExportCopyStatusEl.textContent = "Não foi possível copiar automaticamente. Selecione o texto manualmente.";
+        }
+    });
+
+    ecExportSummaryEl.textContent = `${entries.length} personagem(ns) no comando.`;
+}
+
+function openEcExportModal() {
+    renderEcExportModal();
+    ecExportModalOverlay.classList.add("active");
+}
+
+function closeEcExportModal() {
+    ecExportModalOverlay.classList.remove("active");
+}
+
+document.getElementById("btnOpenEcExport")?.addEventListener("click", openEcExportModal);
+document.getElementById("ecExportModalClose")?.addEventListener("click", closeEcExportModal);
+document.getElementById("ecExportCloseBtn")?.addEventListener("click", closeEcExportModal);
+ecExportModalOverlay?.addEventListener("click", (e) => {
+    if (e.target === ecExportModalOverlay) closeEcExportModal();
+});
+
 document.querySelectorAll(".pill[data-jump]").forEach(pill => {
     pill.addEventListener("click", () => {
         const target = document.getElementById("group-" + pill.dataset.jump);
@@ -2244,6 +2326,38 @@ const mKeys = document.getElementById("mKeys");
 const mCategory = document.getElementById("mCategory");
 const mClaimed = document.getElementById("mClaimed");
 
+// ---- Embed color ($ec) ----
+// O campo de texto é a fonte de verdade (pode ficar vazio = sem cor);
+// o seletor nativo só serve de atalho visual, já que não aceita vazio.
+const mEmbedColor = document.getElementById("mEmbedColor");
+const mEmbedColorPicker = document.getElementById("mEmbedColorPicker");
+const mEmbedColorClear = document.getElementById("mEmbedColorClear");
+
+// Normaliza "fff2b9" / "#FFF2B9" para "#fff2b9". Vazio -> null; inválido -> undefined.
+function normalizeEmbedColor(value) {
+    const raw = String(value || "").trim();
+    if (!raw) return null;
+    const match = /^#?([0-9a-f]{6})$/i.exec(raw);
+    return match ? `#${match[1].toLowerCase()}` : undefined;
+}
+
+function setEmbedColorField(color) {
+    const normalized = normalizeEmbedColor(color) || null;
+    mEmbedColor.value = normalized || "";
+    mEmbedColor.classList.remove("invalid");
+    mEmbedColorPicker.value = normalized || "#ffffff";
+    mEmbedColorPicker.classList.toggle("is-empty", !normalized);
+}
+
+mEmbedColorPicker.addEventListener("input", () => setEmbedColorField(mEmbedColorPicker.value));
+mEmbedColorClear.addEventListener("click", () => setEmbedColorField(null));
+mEmbedColor.addEventListener("input", () => {
+    const normalized = normalizeEmbedColor(mEmbedColor.value);
+    mEmbedColor.classList.toggle("invalid", normalized === undefined);
+    if (normalized) mEmbedColorPicker.value = normalized;
+    mEmbedColorPicker.classList.toggle("is-empty", !normalized);
+});
+
 // ---- Upload de foto ----
 const photoUploadArea = document.getElementById("photoUploadArea");
 const mPhotoInput = document.getElementById("mPhotoInput");
@@ -2256,6 +2370,7 @@ function showPhotoPreview(dataUrl) {
     photoPreviewImg.src = dataUrl;
     photoPreviewImg.style.display = "block";
     photoPlaceholder.style.display = "none";
+    photoUploadArea.classList.add("has-image");
 }
 
 function clearPhotoPreview() {
@@ -2265,6 +2380,7 @@ function clearPhotoPreview() {
     photoPreviewImg.src = "";
     photoPreviewImg.style.display = "none";
     photoPlaceholder.style.display = "flex";
+    photoUploadArea.classList.remove("has-image");
 }
 
 // Permite usar um link de imagem em vez de enviar um arquivo
@@ -2395,6 +2511,7 @@ function openModal(defaultCat) {
     mSeries.value = "";
     mKakera.value = "500";
     if (mKeys) mKeys.value = "0";
+    setEmbedColorField(null);
     mCategory.value = defaultCat || "comuns";
     if (mClaimed) mClaimed.value = "true";
     clearPhotoPreview();
@@ -2412,6 +2529,7 @@ function openEditModal(character) {
     mSeries.value = character.series === "—" ? "" : character.series;
     mKakera.value = character.kakera;
     if (mKeys) mKeys.value = Number(character.keys) || 0;
+    setEmbedColorField(character.embedColor);
     mCategory.value = character.category;
     if (mClaimed) mClaimed.value = String(character.claimed !== false);
 
@@ -2465,6 +2583,13 @@ document.getElementById("modalAdd").addEventListener("click", async () => {
     const kakeraVal = parseInt(mKakera.value) || 0;
     const keysVal = parseInt(mKeys && mKeys.value) || 0;
 
+    const embedColorVal = normalizeEmbedColor(mEmbedColor.value);
+    if (embedColorVal === undefined) {
+        mEmbedColor.classList.add("invalid");
+        mEmbedColor.focus();
+        return;
+    }
+
     const addBtn = document.getElementById("modalAdd");
     addBtn.disabled = true;
 
@@ -2491,6 +2616,7 @@ document.getElementById("modalAdd").addEventListener("click", async () => {
                 claimed: !mClaimed || mClaimed.value === "true",
                 kakera: kakeraVal,
                 keys: keysVal,
+                embedColor: embedColorVal,
                 photo: mPhotoData,
                 genders: Array.from(mGenders),
                 opLevels: existing.opLevels || defaultOpLevels(),
@@ -2510,6 +2636,7 @@ document.getElementById("modalAdd").addEventListener("click", async () => {
                 buff: 1,
                 kakera: kakeraVal,
                 keys: keysVal,
+                embedColor: embedColorVal,
                 daysAgo: 0,
                 photo: mPhotoData,
                 genders: Array.from(mGenders),
@@ -2581,6 +2708,8 @@ function mergeImportedCharacter(existing, item, { allowCategoryChange = false, c
         seriesKey: importedSeriesIsReal ? item.series : existing.seriesKey,
         kakera: Number.isFinite(Number(item.kakera)) ? Number(item.kakera) : existing.kakera,
         keys: Number.isFinite(Number(item.keys)) ? Number(item.keys) : existing.keys,
+        // Texto colado sem a flag c+ não traz a cor; nesse caso mantém a salva.
+        embedColor: item.embedColor || existing.embedColor || null,
         photo: item.photo || existing.photo,
         genders: importedGenders.length ? importedGenders : (existing.genders || []),
         claimed: item.importType === "harem" ? true : (hasOwner ? true : existing.claimed),
@@ -2596,6 +2725,7 @@ function parseMudaeImportText(rawText) {
         series: item.series || "—",
         kakera: item.kakera,
         keys: item.keys || 0,
+        embedColor: item.embedColor || null,
         photo: item.photo,
         genders: normalizeCharacterGenders(item.genders),
         importType: item.importType || "harem",
@@ -2793,6 +2923,7 @@ if (importConfirmBtn) {
                     buff: 1.0,
                     kakera: Number(item.kakera) || 0,
                     keys: Number(item.keys) || 0,
+                    embedColor: item.embedColor || null,
                     daysAgo: 0,
                     photo: item.photo || null,
                     genders: normalizeCharacterGenders(item.genders),
