@@ -2367,6 +2367,7 @@ function setEmbedColorField(color) {
     mEmbedColor.classList.remove("invalid");
     mEmbedColorPicker.value = normalized || "#ffffff";
     mEmbedColorPicker.classList.toggle("is-empty", !normalized);
+    markActiveEcSuggestion();
     renderMudaePreview();
 }
 
@@ -2384,6 +2385,7 @@ function updateEmbedColorAvailability() {
     mEmbedColorPicker.disabled = !allowed;
     mEmbedColorClear.disabled = !allowed;
     mEmbedColor.closest(".embed-color-row").classList.toggle("is-locked", !allowed);
+    mEcSuggestionsEl.classList.toggle("is-locked", !allowed);
     mEmbedColorHint.hidden = allowed;
 }
 
@@ -2431,6 +2433,181 @@ mEmbedColor.addEventListener("input", () => {
     mEmbedColor.classList.toggle("invalid", normalized === undefined);
     if (normalized) mEmbedColorPicker.value = normalized;
     mEmbedColorPicker.classList.toggle("is-empty", !normalized);
+    markActiveEcSuggestion();
+});
+
+/* ---- Sugestões de $ec a partir da foto ----
+   1) Cores da imagem: a foto é reduzida, os pixels são agrupados por
+      quantização RGB e cada grupo recebe nota = área × (0.25 + saturação),
+      penalizando quase-preto/quase-branco (fundo e sombra pesam pouco).
+      Ficam as mais bem notadas que sejam visualmente distintas entre si.
+   2) Combinações: partindo da cor de destaque (a mais saturada entre as
+      dominantes), aplica-se teoria das cores no círculo HSL —
+      complementar (+180°), análogas (±30°) e triádica (+120°).
+   Todas passam por um ajuste de luminosidade para aparecer bem na barra
+   do embed sobre o fundo escuro do Discord. */
+const mEcSuggestionsEl = document.getElementById("mEcSuggestions");
+let ecSuggestionToken = 0;
+let ecSuggestionTimer = null;
+
+function rgbToHsl(r, g, b) {
+    r /= 255; g /= 255; b /= 255;
+    const max = Math.max(r, g, b), min = Math.min(r, g, b);
+    const l = (max + min) / 2;
+    if (max === min) return { h: 0, s: 0, l };
+    const d = max - min;
+    const s = l > 0.5 ? d / (2 - max - min) : d / (max + min);
+    let h;
+    if (max === r) h = (g - b) / d + (g < b ? 6 : 0);
+    else if (max === g) h = (b - r) / d + 2;
+    else h = (r - g) / d + 4;
+    return { h: h * 60, s, l };
+}
+
+function hslToHex(h, s, l) {
+    h = ((h % 360) + 360) % 360;
+    const k = n => (n + h / 30) % 12;
+    const a = s * Math.min(l, 1 - l);
+    const f = n => l - a * Math.max(-1, Math.min(k(n) - 3, 9 - k(n), 1));
+    return "#" + [f(0), f(8), f(4)].map(v => Math.round(v * 255).toString(16).padStart(2, "0")).join("");
+}
+
+// Mantém o tom, mas garante que a cor apareça na barra do embed (fundo escuro).
+function tuneForDiscord({ h, s, l }, minSat = 0) {
+    return hslToHex(h, Math.max(s, minSat), Math.min(0.82, Math.max(0.42, l)));
+}
+
+function extractImagePalette(img, maxColors = 4) {
+    const size = 64;
+    const scale = Math.min(1, size / Math.max(img.naturalWidth, img.naturalHeight));
+    const w = Math.max(1, Math.round(img.naturalWidth * scale));
+    const h = Math.max(1, Math.round(img.naturalHeight * scale));
+    const canvas = document.createElement("canvas");
+    canvas.width = w;
+    canvas.height = h;
+    const ctx = canvas.getContext("2d", { willReadFrequently: true });
+    ctx.drawImage(img, 0, 0, w, h);
+    const data = ctx.getImageData(0, 0, w, h).data; // lança erro se a imagem não liberar CORS
+
+    // Agrupa em 16 níveis por canal e guarda a média real de cada grupo.
+    const buckets = new Map();
+    let total = 0;
+    for (let i = 0; i < data.length; i += 4) {
+        if (data[i + 3] < 128) continue;
+        const r = data[i], g = data[i + 1], b = data[i + 2];
+        const key = (r >> 4) << 8 | (g >> 4) << 4 | (b >> 4);
+        const bucket = buckets.get(key) || { r: 0, g: 0, b: 0, count: 0 };
+        bucket.r += r; bucket.g += g; bucket.b += b; bucket.count++;
+        buckets.set(key, bucket);
+        total++;
+    }
+    if (!total) return [];
+
+    const candidates = Array.from(buckets.values()).map(bk => {
+        const r = bk.r / bk.count, g = bk.g / bk.count, b = bk.b / bk.count;
+        const hsl = rgbToHsl(r, g, b);
+        const extremePenalty = hsl.l < 0.12 || hsl.l > 0.93 ? 0.15 : 1;
+        return { r, g, b, hsl, share: bk.count / total, score: bk.count * (0.25 + hsl.s) * extremePenalty };
+    }).sort((a, b) => b.score - a.score);
+
+    // Descarta tons muito próximos dos já escolhidos (distância RGB ponderada).
+    const picked = [];
+    for (const c of candidates) {
+        const distinct = picked.every(p => {
+            const dr = c.r - p.r, dg = c.g - p.g, db = c.b - p.b;
+            return Math.sqrt(2 * dr * dr + 4 * dg * dg + 3 * db * db) > 110;
+        });
+        if (distinct) picked.push(c);
+        if (picked.length >= maxColors) break;
+    }
+    return picked;
+}
+
+function buildEcSuggestions(palette) {
+    const fromImage = palette.map(c => ({
+        hex: tuneForDiscord(c.hsl),
+        title: `Da imagem (~${Math.max(1, Math.round(c.share * 100))}% dos pixels)`
+    }));
+
+    // Cor de destaque: a mais saturada entre as dominantes (cai na 1ª se tudo for cinza).
+    const accent = palette.reduce((best, c) => (c.hsl.s > best.hsl.s ? c : best), palette[0]).hsl;
+    const base = { h: accent.h, s: Math.max(accent.s, 0.55), l: 0.62 };
+    const accentHex = tuneForDiscord(accent);
+    const harmonies = accent.s < 0.08 ? [] : [
+        { shift: 180, name: "Complementar" },
+        { shift: -30, name: "Análoga" },
+        { shift: 30, name: "Análoga" },
+        { shift: 120, name: "Triádica" }
+    ].map(({ shift, name }) => ({
+        hex: hslToHex(base.h + shift, base.s, base.l),
+        title: `${name} de ${accentHex} (${shift > 0 ? "+" : ""}${shift}°)`
+    }));
+
+    // Evita repetir a mesma cor nos dois grupos.
+    const seen = new Set(fromImage.map(s => s.hex));
+    return { fromImage, harmonies: harmonies.filter(s => !seen.has(s.hex)) };
+}
+
+function renderEcSuggestionGroup(label, items) {
+    if (!items.length) return "";
+    const chips = items.map(s =>
+        `<button type="button" class="ec-suggestion-chip" data-color="${s.hex}" style="background:${s.hex}" title="${s.title} · ${s.hex}"></button>`
+    ).join("");
+    return `<div class="ec-suggestion-group"><span class="ec-suggestion-label">${label}</span>${chips}</div>`;
+}
+
+function setEcSuggestionsStatus(text) {
+    mEcSuggestionsEl.innerHTML = `<span class="ec-suggestion-status">${text}</span>`;
+    mEcSuggestionsEl.hidden = false;
+}
+
+function markActiveEcSuggestion() {
+    const current = normalizeEmbedColor(mEmbedColor.value);
+    mEcSuggestionsEl.querySelectorAll(".ec-suggestion-chip").forEach(chip => {
+        chip.classList.toggle("active", chip.dataset.color === current);
+    });
+}
+
+function clearEcSuggestions() {
+    ecSuggestionToken++;
+    clearTimeout(ecSuggestionTimer);
+    mEcSuggestionsEl.innerHTML = "";
+    mEcSuggestionsEl.hidden = true;
+}
+
+// Debounce porque o campo de link dispara a cada tecla.
+function updateEcSuggestions(src) {
+    clearEcSuggestions();
+    if (!src) return;
+    const token = ecSuggestionToken;
+    ecSuggestionTimer = setTimeout(() => {
+        setEcSuggestionsStatus("Analisando cores da imagem…");
+        const img = new Image();
+        if (!src.startsWith("data:")) img.crossOrigin = "anonymous";
+        img.onload = () => {
+            if (token !== ecSuggestionToken) return;
+            try {
+                const palette = extractImagePalette(img);
+                if (!palette.length) return clearEcSuggestions();
+                const { fromImage, harmonies } = buildEcSuggestions(palette);
+                mEcSuggestionsEl.innerHTML =
+                    renderEcSuggestionGroup("DA IMAGEM", fromImage) +
+                    renderEcSuggestionGroup("COMBINAÇÕES", harmonies);
+                markActiveEcSuggestion();
+            } catch (err) {
+                setEcSuggestionsStatus("Não foi possível ler as cores desta imagem (o site não permite).");
+            }
+        };
+        img.onerror = () => {
+            if (token === ecSuggestionToken) setEcSuggestionsStatus("Não foi possível carregar a imagem para sugerir cores.");
+        };
+        img.src = src;
+    }, 300);
+}
+
+mEcSuggestionsEl.addEventListener("click", (e) => {
+    const chip = e.target.closest(".ec-suggestion-chip");
+    if (chip && !mEmbedColor.disabled) setEmbedColorField(chip.dataset.color);
 });
 
 // ---- Upload de foto ----
@@ -2446,6 +2623,7 @@ function showPhotoPreview(dataUrl) {
     photoPreviewImg.style.display = "block";
     photoPlaceholder.style.display = "none";
     photoUploadArea.classList.add("has-image");
+    updateEcSuggestions(dataUrl);
 }
 
 function clearPhotoPreview() {
@@ -2456,6 +2634,7 @@ function clearPhotoPreview() {
     photoPreviewImg.style.display = "none";
     photoPlaceholder.style.display = "flex";
     photoUploadArea.classList.remove("has-image");
+    clearEcSuggestions();
 }
 
 // Permite usar um link de imagem em vez de enviar um arquivo
@@ -2472,6 +2651,7 @@ if (mPhotoUrl) {
             photoPreviewImg.src = "";
             photoPreviewImg.style.display = "none";
             photoPlaceholder.style.display = "flex";
+            clearEcSuggestions();
         }
     });
 }

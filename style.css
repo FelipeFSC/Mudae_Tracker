@@ -1239,6 +1239,58 @@ select#mCategory {
     cursor: not-allowed;
 }
 
+/* Sugestões de $ec calculadas a partir da foto */
+.ec-suggestions {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+    margin-top: 8px;
+}
+
+.ec-suggestions.is-locked {
+    opacity: 0.4;
+    pointer-events: none;
+}
+
+.ec-suggestion-group {
+    display: flex;
+    align-items: center;
+    flex-wrap: wrap;
+    gap: 6px;
+}
+
+.ec-suggestion-label {
+    flex: 0 0 88px;
+    font-size: 10px;
+    letter-spacing: .06em;
+    color: var(--muted);
+}
+
+.ec-suggestion-chip {
+    width: 26px;
+    height: 26px;
+    padding: 0;
+    border-radius: 6px;
+    border: 2px solid rgba(255, 255, 255, 0.12);
+    cursor: pointer;
+    transition: transform .12s ease, border-color .12s ease, box-shadow .12s ease;
+}
+
+.ec-suggestion-chip:hover {
+    transform: translateY(-1px);
+    border-color: rgba(255, 255, 255, 0.5);
+}
+
+.ec-suggestion-chip.active {
+    border-color: #fff;
+    box-shadow: 0 0 0 2px var(--pink);
+}
+
+.ec-suggestion-status {
+    font-size: 11px;
+    color: var(--muted);
+}
+
 .kakera-base-hint {
     margin: 6px 0 0;
     font-size: 11px;
