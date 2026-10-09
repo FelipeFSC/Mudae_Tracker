@@ -682,9 +682,10 @@ select#mCategory {
 }
 
 /* Borda lateral: cinza por padrão; o embed color ($ec) do personagem,
-   quando existe, é aplicado via --embed-color no próprio card. */
+   quando existe, pinta só a faixa da esquerda (via --embed-color no card).
+   O contorno do resto da carta continua neutro. */
 .char-card.has-embed-color {
-    border-color: var(--embed-color);
+    border-left-color: var(--embed-color);
 }
 
 /* ---- Indicador de OP investido: só um ícone ao lado das chaves ----
@@ -4466,47 +4467,8 @@ select#mCategory {
 }
 
 
-/* ============ Estrelas (starwish): fundo dourado com brilho discreto ============
-   Gradiente quente sobre o painel, leve brilho interno e um reflexo
-   diagonal lento que atravessa o card de tempos em tempos (efeito "foil").
-   Não se aplica a personagens não reivindicados nem ao card selecionado. */
-.char-card.cat-estrelas:not(.char-unclaimed):not(.selection-selected) {
-    background:
-        radial-gradient(120% 80% at 0% 0%, rgba(245, 197, 24, 0.14), transparent 60%),
-        radial-gradient(90% 70% at 100% 100%, rgba(251, 191, 36, 0.08), transparent 65%),
-        linear-gradient(160deg, #15130d 0%, var(--bg-panel) 55%, #13110a 100%);
-    box-shadow:
-        inset 0 1px 0 rgba(255, 223, 128, 0.10),
-        inset 0 0 24px -10px rgba(245, 197, 24, 0.35),
-        0 6px 26px -18px rgba(245, 197, 24, 0.55);
-}
-
-.char-card.cat-estrelas:not(.has-embed-color):not(.char-unclaimed):not(.selection-selected) {
-    border-color: rgba(245, 197, 24, 0.28);
-}
-
-.char-card.cat-estrelas:not(.char-unclaimed)::after {
-    content: "";
-    position: absolute;
-    inset: 0;
-    border-radius: inherit;
-    pointer-events: none;
-    z-index: 3;
-    background: linear-gradient(115deg,
-        transparent 0%,
-        transparent 40%,
-        rgba(255, 236, 170, 0.10) 47%,
-        rgba(255, 248, 220, 0.18) 50%,
-        rgba(255, 236, 170, 0.10) 53%,
-        transparent 60%,
-        transparent 100%);
-    background-size: 250% 100%;
-    background-repeat: no-repeat;
-    background-position: 150% 0;
-    mix-blend-mode: screen;
-    animation: star-card-shine 7s ease-in-out infinite;
-}
-
+/* ============ Estrelas (starwish): nome dourado ============
+   Só o nome ganha o degradê dourado; o card segue o visual padrão. */
 .char-card.cat-estrelas:not(.char-unclaimed) .char-name {
     background: linear-gradient(90deg, #f5c518, #fde68a 45%, #f5c518 70%, #d4a017);
     -webkit-background-clip: text;
@@ -4521,21 +4483,16 @@ select#mCategory {
     text-shadow: 0 0 8px rgba(245, 197, 24, 0.55);
 }
 
+/* Reflexo diagonal que atravessa o card de tempos em tempos
+   (usado pelo destaque de 10+ chaves e pelas raridades). */
 @keyframes star-card-shine {
     0%, 55% { background-position: 150% 0; }
     85%, 100% { background-position: -50% 0; }
 }
 
-@media (prefers-reduced-motion: reduce) {
-    .char-card.cat-estrelas::after {
-        animation: none;
-        opacity: 0;
-    }
-}
-
-
-/* ============ 10+ chaves: mesmo acabamento das estrelas, em azul ============
-   A classe keys-highlight só é aplicada fora da categoria estrelas,
+/* ============ 10+ chaves: fundo azul com brilho discreto ============
+   A classe keys-highlight só é aplicada fora da categoria estrelas
+   (as estrelas vão ganhar um design próprio). */
    então o dourado sempre tem prioridade. */
 .char-card.keys-highlight:not(.char-unclaimed):not(.selection-selected) {
     background:
@@ -4621,8 +4578,8 @@ select#mCategory {
 
 .card-inspect-holder {
     position: fixed;
-    transform-origin: center;
-    perspective: 900px;
+    transform-origin: 0 0;
+    perspective: 1400px;
     transition: transform .45s cubic-bezier(.2, .9, .25, 1);
 }
 
@@ -4633,7 +4590,6 @@ select#mCategory {
     border-radius: 12px 12px 12px 0;
     box-shadow: 0 30px 60px -24px rgba(0, 0, 0, 0.8);
     transition: transform .18s ease-out;
-    will-change: transform;
 }
 
 .card-inspect-overlay:not(.active) .card-inspect-tilt {
@@ -4641,8 +4597,6 @@ select#mCategory {
 }
 
 .card-inspect-tilt > .char-card.card-inspect-card {
-    width: 100%;
-    height: 100%;
     margin: 0;
     flex: none;
     cursor: default;
@@ -4942,4 +4896,355 @@ select#mCategory {
     display: flex;
     flex-direction: column;
     justify-content: flex-end;
+}
+
+
+/* ============ Borda $ec: brilho passando ============
+   Um reflexo sutil desce pela faixa colorida da esquerda (a borda de
+   5px na cor do $ec), com pausa entre as passadas — como o reflexo
+   das estrelas, só que na borda. */
+.char-card.has-embed-color:not(.char-unclaimed):not(.selection-selected)::before {
+    content: "";
+    position: absolute;
+    top: -1.5px;
+    bottom: -1.5px;
+    left: -5px;
+    width: 5px;
+    z-index: 2;
+    border-radius: 12px 0 0 0;
+    pointer-events: none;
+    background: linear-gradient(180deg,
+        transparent 0%,
+        transparent 36%,
+        color-mix(in srgb, var(--embed-color) 70%, white) 44%,
+        color-mix(in srgb, var(--embed-color) 30%, white) 50%,
+        color-mix(in srgb, var(--embed-color) 70%, white) 56%,
+        transparent 64%,
+        transparent 100%);
+    background-size: 100% 300%;
+    background-repeat: no-repeat;
+    background-position: 0 100%;
+    animation: ec-border-shine 5s ease-in-out infinite;
+}
+
+/* A grade compacta corta o que passa do padding (overflow: hidden);
+   aqui o corte vai até a borda para o reflexo continuar visível. */
+#charGroups.grid-compact .char-card.has-embed-color {
+    overflow: clip;
+    overflow-clip-margin: 5px;
+    overflow-clip-margin: border-box;
+}
+
+@keyframes ec-border-shine {
+    0% { background-position: 0 100%; }
+    45%, 100% { background-position: 0 0%; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+    .char-card.has-embed-color::before {
+        animation: none;
+        opacity: 0;
+    }
+}
+
+
+/* ============ Raridade: lâminas de "carta especial" ============
+   A raridade vem do kakera (ver RARITY_TIERS no script). A lâmina
+   holográfica (.card-holo) cobre a carta inteira, por baixo do conteúdo
+   (z-index -1 dentro do card isolado), então texto e foto continuam
+   nítidos. Na foto fica só a moldura do tier, discreta.
+     Comum           —
+     Incomum         verniz brilhante
+     Raro            verniz + reflexo passando
+     Super Raro      foil arco-íris + reflexo
+     Lendário        foil dourado
+     Extraordinário  arco-íris branco + moldura holográfica na foto
+   Tudo fica sob #charGroups:not(.effects-off) — o botão EFEITOS desliga. */
+@property --holo-angle {
+    syntax: "<angle>";
+    inherits: false;
+    initial-value: 0deg;
+}
+
+.char-card {
+    isolation: isolate;
+}
+
+.card-holo {
+    position: absolute;
+    inset: 0;
+    z-index: -1;
+    display: none;
+    border-radius: inherit;
+    overflow: hidden;
+    pointer-events: none;
+}
+
+.card-holo::before,
+.card-holo::after {
+    content: "";
+    position: absolute;
+    inset: 0;
+    border-radius: inherit;
+}
+
+#charGroups:not(.effects-off) .char-card:not(.char-unclaimed):not(.rarity-comum) .card-holo {
+    display: block;
+}
+
+.char-card.rarity-incomum { --rar: #34d399; }
+.char-card.rarity-raro { --rar: #38bdf8; }
+.char-card.rarity-super-raro { --rar: #a855f7; }
+.char-card.rarity-lendario { --rar: #f59e0b; }
+.char-card.rarity-extraordinario { --rar: #f5e9ff; }
+
+/* ---- Incomum e Raro: verniz brilhante na carta ---- */
+#charGroups:not(.effects-off) .char-card.rarity-incomum .card-holo::before,
+#charGroups:not(.effects-off) .char-card.rarity-raro .card-holo::before {
+    background: linear-gradient(135deg,
+        rgba(255, 255, 255, 0.07) 0%,
+        transparent 30%,
+        transparent 70%,
+        rgba(255, 255, 255, 0.04) 100%);
+}
+
+/* Raro e Super Raro: reflexo que atravessa a carta de tempos em tempos. */
+#charGroups:not(.effects-off) .char-card.rarity-raro .card-holo::after,
+#charGroups:not(.effects-off) .char-card.rarity-super-raro .card-holo::after {
+    background: linear-gradient(115deg,
+        transparent 40%,
+        rgba(255, 255, 255, 0.05) 46%,
+        rgba(255, 255, 255, 0.14) 50%,
+        rgba(255, 255, 255, 0.05) 54%,
+        transparent 60%);
+    background-size: 250% 100%;
+    background-repeat: no-repeat;
+    background-position: 150% 0;
+    mix-blend-mode: screen;
+    animation: star-card-shine 6s ease-in-out infinite;
+}
+
+/* ---- Super Raro: foil arco-íris (estilo reverse holo) ---- */
+#charGroups:not(.effects-off) .char-card.rarity-super-raro .card-holo::before {
+    background: repeating-linear-gradient(115deg,
+        hsl(0 100% 65%) 0%,
+        hsl(55 100% 62%) 4%,
+        hsl(130 90% 60%) 8%,
+        hsl(190 100% 62%) 12%,
+        hsl(250 100% 72%) 16%,
+        hsl(310 100% 68%) 20%,
+        hsl(360 100% 65%) 24%);
+    background-size: 300% 300%;
+    mix-blend-mode: screen;
+    opacity: .12;
+    animation: holo-drift 9s ease-in-out infinite alternate;
+}
+
+/* ---- Lendário: foil dourado ---- */
+#charGroups:not(.effects-off) .char-card.rarity-lendario .card-holo::before {
+    background:
+        linear-gradient(115deg,
+            transparent 30%,
+            rgba(255, 236, 190, 0.6) 48%,
+            transparent 66%),
+        repeating-linear-gradient(115deg,
+            hsl(40 100% 55%) 0%,
+            hsl(18 100% 58%) 5%,
+            hsl(335 85% 62%) 10%,
+            hsl(48 100% 60%) 15%,
+            hsl(40 100% 55%) 20%);
+    background-size: 300% 300%, 300% 300%;
+    mix-blend-mode: screen;
+    opacity: .16;
+    animation: holo-drift 7s ease-in-out infinite alternate;
+}
+
+/* ---- Extraordinário: arco-íris branco (estilo rainbow rare) ---- */
+#charGroups:not(.effects-off) .char-card.rarity-extraordinario .card-holo::before {
+    background:
+        repeating-linear-gradient(115deg,
+            rgba(255, 255, 255, 0) 0px,
+            rgba(255, 255, 255, 0) 6px,
+            rgba(255, 255, 255, 0.4) 7px,
+            rgba(255, 255, 255, 0) 9px),
+        linear-gradient(115deg,
+            #ff9ad5 0%,
+            #ffe98a 12%,
+            #8affd9 25%,
+            #8ac6ff 37%,
+            #d29aff 50%,
+            #ff9ad5 62%,
+            #ffe98a 75%,
+            #8affd9 87%,
+            #8ac6ff 100%);
+    background-size: 100% 100%, 220% 220%;
+    mix-blend-mode: screen;
+    opacity: .22;
+    animation: holo-drift 6s ease-in-out infinite alternate;
+}
+
+/* ---- Foto: só a moldura do tier (discreta) ---- */
+#charGroups:not(.effects-off) .char-card:not(.char-unclaimed):not(.rarity-comum) .char-photo.has-image::after {
+    border: 1.5px solid color-mix(in srgb, var(--rar) 70%, transparent);
+}
+
+#charGroups:not(.effects-off) .char-card.rarity-extraordinario:not(.char-unclaimed) .char-photo.has-image::after {
+    border: none;
+    padding: 1.5px;
+    background: conic-gradient(from var(--holo-angle),
+        #ff9ad5, #ffe98a, #8affd9, #8ac6ff, #d29aff, #ff9ad5);
+    -webkit-mask: linear-gradient(#000 0 0) content-box, linear-gradient(#000 0 0);
+    -webkit-mask-composite: xor;
+    mask: linear-gradient(#000 0 0) content-box exclude, linear-gradient(#000 0 0);
+    animation: holo-ring 6s linear infinite;
+}
+
+/* ---- Selo de kakera na cor do tier ---- */
+#charGroups:not(.effects-off) .char-card.rarity-incomum:not(.char-unclaimed) :is(.tag.kakera, .compact-kakera) {
+    background: rgba(52, 211, 153, 0.12);
+    color: #34d399;
+}
+
+#charGroups:not(.effects-off) .char-card.rarity-raro:not(.char-unclaimed) :is(.tag.kakera, .compact-kakera) {
+    background: rgba(56, 189, 248, 0.12);
+    color: #38bdf8;
+}
+
+#charGroups:not(.effects-off) .char-card.rarity-super-raro:not(.char-unclaimed) :is(.tag.kakera, .compact-kakera) {
+    background: var(--purple-soft);
+    color: #c084fc;
+}
+
+#charGroups:not(.effects-off) .char-card.rarity-lendario:not(.char-unclaimed) :is(.tag.kakera, .compact-kakera) {
+    background: rgba(245, 158, 11, 0.14);
+    color: #fbbf24;
+    text-shadow: 0 0 8px rgba(245, 158, 11, 0.6);
+}
+
+#charGroups:not(.effects-off) .char-card.rarity-extraordinario:not(.char-unclaimed) :is(.tag.kakera, .compact-kakera) {
+    background: linear-gradient(90deg,
+        rgba(255, 154, 213, 0.22), rgba(255, 233, 138, 0.22),
+        rgba(138, 255, 217, 0.22), rgba(138, 198, 255, 0.22), rgba(210, 154, 255, 0.22));
+    color: #fff;
+    text-shadow: 0 0 8px rgba(255, 220, 250, 0.8);
+}
+
+/* ---- Carta ampliada: a lâmina segue o ângulo do ponteiro ---- */
+.card-inspect-tilt.is-tilting .card-holo::before {
+    animation: none !important;
+    background-position: var(--mx, 50%) var(--my, 50%);
+}
+
+@keyframes holo-drift {
+    from { background-position: 0% 0%; }
+    to { background-position: 100% 100%; }
+}
+
+@keyframes holo-ring {
+    to { --holo-angle: 360deg; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+    .card-holo::before,
+    .card-holo::after,
+    .char-photo.has-image::after {
+        animation: none !important;
+    }
+}
+
+
+/* ============ Botão EFEITOS desligado ============
+   Volta os cards ao visual simples: sem raridade, sem fundo azul
+   e sem os reflexos. Cores de categoria e a borda do $ec continuam. */
+#charGroups.effects-off .char-card.keys-highlight:not(.selection-selected) {
+    background: var(--bg-panel);
+    box-shadow: none;
+}
+
+#charGroups.effects-off .char-card.keys-highlight:not(.has-embed-color):not(.selection-selected) {
+    border-color: #94a3b824;
+}
+
+#charGroups.effects-off .char-card::before,
+#charGroups.effects-off .char-card::after {
+    content: none;
+}
+
+#charGroups.effects-off .char-card .char-name {
+    background: none;
+    -webkit-background-clip: border-box;
+    background-clip: border-box;
+}
+
+#charGroups.effects-off .char-card.cat-favoritos .char-name { color: var(--pink); }
+#charGroups.effects-off .char-card.cat-estrelas .char-name { color: var(--yellow); }
+#charGroups.effects-off .char-card.cat-comuns .char-name { color: var(--cyan); }
+
+#charGroups.effects-off .char-card .char-cat-icon {
+    text-shadow: none;
+}
+
+/* Toolbar: com o botão EFEITOS a primeira linha ficou mais cheia; categorias
+   e série mantêm largura mínima e os controles de visualização quebram de linha. */
+#view-chars .toolbar-categories {
+    min-width: 320px;
+}
+
+#view-chars .toolbar-field:has(#filterSeries) {
+    min-width: 240px;
+}
+
+
+
+/* ============ Nome na cor da raridade (Super Raro para cima) ============
+   Do Super Raro em diante o nome (junto com o ♥/★ ao lado) assume a
+   cor/efeito da raridade. Abaixo disso o nome segue a cor da categoria. */
+#charGroups:not(.effects-off) .char-card:is(.rarity-super-raro, .rarity-lendario, .rarity-extraordinario):not(.char-unclaimed) .char-name {
+    -webkit-background-clip: text;
+    background-clip: text;
+    color: transparent;
+}
+
+#charGroups:not(.effects-off) .char-card.rarity-super-raro:not(.char-unclaimed) .char-name {
+    background-image: linear-gradient(90deg, #c084fc, #e9d5ff 45%, #c084fc 70%, #a855f7);
+}
+
+#charGroups:not(.effects-off) .char-card.rarity-lendario:not(.char-unclaimed) .char-name {
+    background-image: linear-gradient(90deg, #f59e0b, #fde68a 45%, #fbbf24 70%, #f97316);
+    filter: drop-shadow(0 0 6px rgba(245, 158, 11, 0.4));
+}
+
+#charGroups:not(.effects-off) .char-card.rarity-extraordinario:not(.char-unclaimed) .char-name {
+    background-image: linear-gradient(90deg, #ff9ad5, #ffe98a, #8affd9, #8ac6ff, #d29aff, #ff9ad5);
+    background-size: 200% 100%;
+    filter: drop-shadow(0 0 6px rgba(255, 214, 250, 0.45));
+    animation: rarity-name-shimmer 6s linear infinite;
+}
+
+/* ♥ e ★ entram no degradê do nome (mesma cor/efeito da raridade).
+   O 👥 dos comuns é emoji colorido e fica como está. */
+#charGroups:not(.effects-off) .char-card:is(.cat-favoritos, .cat-estrelas):is(.rarity-super-raro, .rarity-lendario, .rarity-extraordinario):not(.char-unclaimed) .char-cat-icon {
+    color: transparent;
+    -webkit-text-fill-color: transparent;
+    text-shadow: none;
+}
+
+#charGroups:not(.effects-off) .char-card.cat-comuns:is(.rarity-super-raro, .rarity-lendario, .rarity-extraordinario):not(.char-unclaimed) .char-cat-icon {
+    -webkit-text-fill-color: initial;
+}
+
+/* Na grade compacta o ícone fica escondido; aqui ele volta para
+   favoritos/estrelas, já que o nome não mostra mais a categoria. */
+#charGroups.view-grid.grid-compact:not(.effects-off) .char-card:is(.cat-favoritos, .cat-estrelas):is(.rarity-super-raro, .rarity-lendario, .rarity-extraordinario):not(.char-unclaimed) .char-cat-icon {
+    display: inline;
+}
+
+@keyframes rarity-name-shimmer {
+    to { background-position: -200% 0; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+    #charGroups .char-card .char-name {
+        animation: none !important;
+    }
 }

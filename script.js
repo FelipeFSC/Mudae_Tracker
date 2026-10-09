@@ -49,8 +49,27 @@ const DEFAULT_CONFIG = {
 
     // Exibe todas as informações nos cards da grade. Quando false, a grade
     // destaca a imagem e mantém somente nome, kakera e botões de ação.
-    gridDetailsEnabled: true
+    gridDetailsEnabled: true,
+
+    // Efeitos visuais dos cards (raridade, estrelas, 10+ chaves, $ec).
+    // Só muda a aparência; desligado, os cards voltam ao visual simples.
+    effectsEnabled: true
 };
+
+// Raridade do personagem pelo valor de kakera (efeito "carta especial").
+const RARITY_TIERS = [
+    { key: "extraordinario", label: "Extraordinário", min: 1000 },
+    { key: "lendario", label: "Lendário", min: 701 },
+    { key: "super-raro", label: "Super Raro", min: 400 },
+    { key: "raro", label: "Raro", min: 250 },
+    { key: "incomum", label: "Incomum", min: 150 },
+    { key: "comum", label: "Comum", min: 0 }
+];
+
+function getRarity(kakera) {
+    const value = Number(kakera) || 0;
+    return RARITY_TIERS.find(tier => value >= tier.min) || RARITY_TIERS[RARITY_TIERS.length - 1];
+}
 
 function cloneDefaultConfig() {
     return JSON.parse(JSON.stringify(DEFAULT_CONFIG));
@@ -976,6 +995,7 @@ const viewToggle = document.getElementById("viewToggle");
 const gridDetailsToggle = document.getElementById("gridDetailsToggle");
 const gridDetailsControl = document.getElementById("gridDetailsControl");
 const groupBySeriesToggle = document.getElementById("groupBySeriesToggle");
+const effectsToggle = document.getElementById("effectsToggle");
 const appEl = document.getElementById("app");
 const btnClearHarem = document.getElementById("btnClearHarem");
 
@@ -1243,6 +1263,13 @@ function applyViewMode() {
     charGroupsEl.classList.toggle("view-list", mode === "list");
     charGroupsEl.classList.toggle("grid-compact", mode === "grid" && !detailsEnabled);
 
+    const effectsEnabled = state.config.effectsEnabled !== false;
+    charGroupsEl.classList.toggle("effects-off", !effectsEnabled);
+    if (effectsToggle) {
+        effectsToggle.checked = effectsEnabled;
+        effectsToggle.setAttribute("aria-checked", String(effectsEnabled));
+    }
+
     if (viewToggle) {
         viewToggle.querySelectorAll(".view-toggle-btn").forEach(btn => {
             btn.classList.toggle("active", btn.dataset.viewMode === mode);
@@ -1276,6 +1303,15 @@ if (gridDetailsToggle) {
         // O modo compacto é apenas uma apresentação; os cálculos continuam sendo
         // produzidos e voltam intactos quando as informações são reativadas.
         renderCharacters();
+        scheduleSaveConfig();
+    });
+}
+
+if (effectsToggle) {
+    effectsToggle.addEventListener("change", () => {
+        state.config.effectsEnabled = effectsToggle.checked;
+        // Efeitos são só CSS: basta alternar a classe, sem redesenhar a lista.
+        applyViewMode();
         scheduleSaveConfig();
     });
 }
@@ -1624,14 +1660,15 @@ function renderCharCard(c) {
     const inSelectionMode = clearHaremSelectionMode;
     const isSelected = inSelectionMode && clearHaremSelectedIds.has(String(c.id));
     const embedColor = normalizeEmbedColor(c.embedColor);
-    // Destaque azul para 10+ chaves; estrelas mantêm o dourado como prioridade.
+    // Destaque azul para 10+ chaves (estrelas ficam de fora: terão design próprio).
     const isKeysHighlight = c.category !== "estrelas" && (Number(c.keys) || 0) >= 10;
-    card.className = "char-card cat-" + c.category + (isKeysHighlight ? " keys-highlight" : "") + (embedColor ? " has-embed-color" : "") + (c.claimed === false ? " char-unclaimed" : "") + (opStatus.any ? " op-has-buff" : "") + (opStatus.maxed ? " op-maxed" : "") + (inSelectionMode ? " selection-mode" : "") + (isSelected ? " selection-selected" : "");
+    const rarity = getRarity(c.kakera);
+    card.className = "char-card cat-" + c.category + " rarity-" + rarity.key + (isKeysHighlight ? " keys-highlight" : "") + (embedColor ? " has-embed-color" : "") + (c.claimed === false ? " char-unclaimed" : "") + (opStatus.any ? " op-has-buff" : "") + (opStatus.maxed ? " op-maxed" : "") + (inSelectionMode ? " selection-mode" : "") + (isSelected ? " selection-selected" : "");
     if (embedColor) card.style.setProperty("--embed-color", embedColor);
     card.dataset.charId = c.id;
 
     const photoBlock = c.photo
-        ? `<div class="char-photo has-image"><img src="${c.photo}" alt="${escapeXml(c.name)}" /></div>`
+        ? `<div class="char-photo has-image" title="${rarity.label}"><img src="${c.photo}" alt="${escapeXml(c.name)}" /></div>`
         : `<div class="char-photo">⬆<span>FOTO</span></div>`;
 
     // No modo de seleção (ver "LIMPAR HAREM"), os botões de ação viram um
@@ -1649,7 +1686,10 @@ function renderCharCard(c) {
       <button class="icon-btn delete-btn" title="Remover personagem">✕</button>
     </div>`;
 
+    // .card-holo é a lâmina holográfica da raridade: fica no fundo da
+    // carta inteira, por baixo do conteúdo (ver CSS "Raridade").
     card.innerHTML = `
+    <span class="card-holo" aria-hidden="true"></span>
     ${photoBlock}
     <div class="char-info">
       <div class="char-name"><span class="char-cat-icon" title="${escapeXml(CAT_META[c.category]?.label || "")}">${CAT_META[c.category]?.icon || ""}</span> ${c.name}</div>
@@ -1786,20 +1826,17 @@ function renderCharCard(c) {
    ============================================================ */
 let cardInspect = null;
 
-function getCardInspectTransform(rect) {
+function getCardInspectScale(rect) {
     const vw = window.innerWidth;
     const vh = window.innerHeight;
-    const scale = Math.min(1.8, (vw * 0.9) / rect.width, (vh * 0.8) / rect.height, Math.max(1, 480 / rect.width));
-    const dx = vw / 2 - (rect.left + rect.width / 2);
-    const dy = vh / 2 - (rect.top + rect.height / 2);
-    return `translate(${dx}px, ${dy}px) scale(${scale})`;
+    return Math.min(1.8, (vw * 0.9) / rect.width, (vh * 0.8) / rect.height, Math.max(1, 480 / rect.width));
 }
 
-function placeCardInspectHolder(holder, rect) {
-    holder.style.left = rect.left + "px";
-    holder.style.top = rect.top + "px";
-    holder.style.width = rect.width + "px";
-    holder.style.height = rect.height + "px";
+// Transform que leva a carta (já no centro, em tamanho final) de volta ao
+// retângulo do card original. Usado só durante as animações de ida e volta.
+function getCardInspectReturnTransform(rect) {
+    const { left, top, width } = cardInspect.frame;
+    return `translate(${rect.left - left}px, ${rect.top - top}px) scale(${rect.width / width})`;
 }
 
 function onCardInspectKeydown(event) {
@@ -1831,16 +1868,40 @@ function openCardInspect(card) {
     tilt.append(clone, glare);
     holder.appendChild(tilt);
     overlay.append(holder, hint);
-    placeCardInspectHolder(holder, rect);
+
+    // A carta é desenhada já no tamanho final (zoom no clone, não scale()),
+    // para o navegador renderizar texto e imagem nítidos em vez de esticar
+    // a versão pequena. O transform só existe durante a animação.
+    const scale = getCardInspectScale(rect);
+    const width = rect.width * scale;
+    const height = rect.height * scale;
+    const frame = {
+        left: (window.innerWidth - width) / 2,
+        top: (window.innerHeight - height) / 2,
+        width
+    };
+    holder.style.left = frame.left + "px";
+    holder.style.top = frame.top + "px";
+    holder.style.width = width + "px";
+    holder.style.height = height + "px";
+    clone.style.width = rect.width + "px";
+    clone.style.height = rect.height + "px";
+    clone.style.zoom = scale;
+    const radius = 12 * scale;
+    tilt.style.borderRadius = `${radius}px ${radius}px ${radius}px 0`;
+
     charGroupsEl.appendChild(overlay);
     card.classList.add("card-inspect-source");
 
-    cardInspect = { card, overlay, holder, tilt, glare };
+    cardInspect = { card, overlay, holder, tilt, glare, frame };
 
-    // Força o layout na posição original antes de animar até o centro.
+    // Começa sobre o card original e anima até o centro.
+    holder.style.transition = "none";
+    holder.style.transform = getCardInspectReturnTransform(rect);
     holder.getBoundingClientRect();
+    holder.style.transition = "";
     overlay.classList.add("active");
-    holder.style.transform = getCardInspectTransform(rect);
+    holder.style.transform = "none";
 
     overlay.addEventListener("click", event => {
         if (!event.target.closest(".card-inspect-holder")) closeCardInspect();
@@ -1854,25 +1915,32 @@ function openCardInspect(card) {
         const y = (event.clientY - r.top) / r.height;
         if (x < 0 || x > 1 || y < 0 || y > 1) {
             tilt.style.transform = "";
+            tilt.classList.remove("is-tilting");
             glare.style.opacity = "0";
             return;
         }
         const rotateY = (x - 0.5) * 26;
         const rotateX = (0.5 - y) * 26;
         tilt.style.transform = `rotateX(${rotateX}deg) rotateY(${rotateY}deg) scale(1.03)`;
+        // A lâmina holográfica da raridade acompanha o ângulo da carta.
+        tilt.classList.add("is-tilting");
+        tilt.style.setProperty("--mx", `${x * 100}%`);
+        tilt.style.setProperty("--my", `${y * 100}%`);
         glare.style.setProperty("--gx", `${x * 100}%`);
         glare.style.setProperty("--gy", `${y * 100}%`);
         glare.style.opacity = "1";
     });
     overlay.addEventListener("pointerleave", () => {
         tilt.style.transform = "";
+        tilt.classList.remove("is-tilting");
         glare.style.opacity = "0";
     });
 }
 
 function closeCardInspect(immediate = false) {
     if (!cardInspect) return;
-    const { card, overlay, holder, tilt } = cardInspect;
+    const inspect = cardInspect;
+    const { card, overlay, holder, tilt } = inspect;
     cardInspect = null;
     document.removeEventListener("keydown", onCardInspectKeydown);
 
@@ -1885,16 +1953,11 @@ function closeCardInspect(immediate = false) {
         return;
     }
 
-    // Reancora no lugar atual do card (a página pode ter rolado) mantendo
-    // a carta visualmente no centro e anima de volta.
+    // Anima de volta até onde o card está agora (a página pode ter rolado).
     const rect = card.getBoundingClientRect();
-    holder.style.transition = "none";
-    placeCardInspectHolder(holder, rect);
-    holder.style.transform = getCardInspectTransform(rect);
+    const { left, top, width } = inspect.frame;
     tilt.style.transform = "";
-    holder.getBoundingClientRect();
-    holder.style.transition = "";
-    holder.style.transform = "none";
+    holder.style.transform = `translate(${rect.left - left}px, ${rect.top - top}px) scale(${rect.width / width})`;
     overlay.classList.remove("active");
     overlay.classList.add("closing");
     setTimeout(finish, 480);
@@ -4328,6 +4391,7 @@ function migrateLegacyConfig() {
     state.config.boostWishRolls = Math.max(0, Number(state.config.boostWishRolls) || 0);
     state.config.useSlashCommands = Boolean(state.config.useSlashCommands);
     if (typeof state.config.gridDetailsEnabled !== "boolean") state.config.gridDetailsEnabled = true;
+    if (typeof state.config.effectsEnabled !== "boolean") state.config.effectsEnabled = true;
     state.characters = state.characters.map(c => ({
         ...c,
         claimed: c.claimed !== false,
