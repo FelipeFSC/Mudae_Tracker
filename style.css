@@ -4592,3 +4592,102 @@ select#mCategory {
         opacity: 0;
     }
 }
+
+
+/* ============ Visualização do personagem como "carta" ============ */
+.char-card.card-inspect-source {
+    visibility: hidden;
+}
+
+.card-inspect-overlay {
+    position: fixed;
+    inset: 0;
+    z-index: 95;
+    background: rgba(4, 6, 12, 0);
+    -webkit-backdrop-filter: blur(0px);
+    backdrop-filter: blur(0px);
+    transition: background .4s ease, backdrop-filter .4s ease, -webkit-backdrop-filter .4s ease;
+}
+
+.card-inspect-overlay.active {
+    background: rgba(4, 6, 12, 0.55);
+    -webkit-backdrop-filter: blur(6px);
+    backdrop-filter: blur(6px);
+}
+
+.card-inspect-overlay.closing {
+    pointer-events: none;
+}
+
+.card-inspect-holder {
+    position: fixed;
+    transform-origin: center;
+    perspective: 900px;
+    transition: transform .45s cubic-bezier(.2, .9, .25, 1);
+}
+
+.card-inspect-tilt {
+    position: relative;
+    width: 100%;
+    height: 100%;
+    border-radius: 12px 12px 12px 0;
+    box-shadow: 0 30px 60px -24px rgba(0, 0, 0, 0.8);
+    transition: transform .18s ease-out;
+    will-change: transform;
+}
+
+.card-inspect-overlay:not(.active) .card-inspect-tilt {
+    box-shadow: none;
+}
+
+.card-inspect-tilt > .char-card.card-inspect-card {
+    width: 100%;
+    height: 100%;
+    margin: 0;
+    flex: none;
+    cursor: default;
+}
+
+/* Reflexo de luz que acompanha o ponteiro sobre a carta. */
+.card-inspect-glare {
+    position: absolute;
+    inset: 0;
+    z-index: 5;
+    border-radius: inherit;
+    pointer-events: none;
+    opacity: 0;
+    transition: opacity .25s ease;
+    background: radial-gradient(circle at var(--gx, 50%) var(--gy, 50%),
+        rgba(255, 255, 255, 0.22), rgba(255, 255, 255, 0.04) 35%, transparent 60%);
+    mix-blend-mode: soft-light;
+}
+
+.card-inspect-hint {
+    position: absolute;
+    left: 50%;
+    bottom: calc(24px + env(safe-area-inset-bottom, 0px));
+    transform: translateX(-50%);
+    font-family: var(--mono);
+    font-size: 11px;
+    letter-spacing: .08em;
+    color: var(--muted);
+    opacity: 0;
+    transition: opacity .4s ease .15s;
+    pointer-events: none;
+    white-space: nowrap;
+}
+
+.card-inspect-overlay.active .card-inspect-hint {
+    opacity: 1;
+}
+
+#charGroups .char-card:not(.selection-mode) {
+    cursor: pointer;
+}
+
+@media (prefers-reduced-motion: reduce) {
+    .card-inspect-holder,
+    .card-inspect-tilt {
+        transition-duration: .01s;
+    }
+}

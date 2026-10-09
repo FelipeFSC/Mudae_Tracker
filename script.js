@@ -1449,6 +1449,7 @@ if (clearHaremConfirmBtn) {
 }
 
 function renderCharacters() {
+    closeCardInspect(true);
     charGroupsEl.innerHTML = "";
     updateHaremCountDisplay();
     document.getElementById("charsSubServer").textContent = state.config.serverName;
@@ -1744,6 +1745,17 @@ function renderCharCard(c) {
         if (!wasOpen) card.classList.add("compact-actions-open");
     });
 
+    // Clique no card (fora das ações) abre a visualização em "carta".
+    // Na grade compacta sem hover o toque continua revelando as ações.
+    card.addEventListener("click", event => {
+        if (event.target.closest(".char-actions")) return;
+        const compactGrid = charGroupsEl.classList.contains("view-grid") &&
+            charGroupsEl.classList.contains("grid-compact");
+        const noHover = window.matchMedia && window.matchMedia("(hover: none), (pointer: coarse)").matches;
+        if (compactGrid && noHover) return;
+        openCardInspect(card);
+    });
+
     card.querySelector(".delete-btn").addEventListener("click", async () => {
         const confirmado = await showSystemConfirm(
             `Remover "${c.name}" da lista de personagens?`,
@@ -1764,6 +1776,128 @@ function renderCharCard(c) {
         renderCharacters();
     });
     return card;
+}
+
+/* ============================================================
+   VISUALIZAÇÃO EM "CARTA": o card clicado vai para o centro da tela,
+   o fundo desfoca e a carta inclina em 3D seguindo o ponteiro.
+   O overlay fica dentro de #charGroups para herdar o layout atual
+   (lista, grade ou grade compacta) sem duplicar CSS.
+   ============================================================ */
+let cardInspect = null;
+
+function getCardInspectTransform(rect) {
+    const vw = window.innerWidth;
+    const vh = window.innerHeight;
+    const scale = Math.min(1.8, (vw * 0.9) / rect.width, (vh * 0.8) / rect.height, Math.max(1, 480 / rect.width));
+    const dx = vw / 2 - (rect.left + rect.width / 2);
+    const dy = vh / 2 - (rect.top + rect.height / 2);
+    return `translate(${dx}px, ${dy}px) scale(${scale})`;
+}
+
+function placeCardInspectHolder(holder, rect) {
+    holder.style.left = rect.left + "px";
+    holder.style.top = rect.top + "px";
+    holder.style.width = rect.width + "px";
+    holder.style.height = rect.height + "px";
+}
+
+function onCardInspectKeydown(event) {
+    if (event.key === "Escape") closeCardInspect();
+}
+
+function openCardInspect(card) {
+    if (cardInspect) return;
+    const rect = card.getBoundingClientRect();
+    const reduceMotion = window.matchMedia && window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+
+    const overlay = document.createElement("div");
+    overlay.className = "card-inspect-overlay";
+    const holder = document.createElement("div");
+    holder.className = "card-inspect-holder";
+    const tilt = document.createElement("div");
+    tilt.className = "card-inspect-tilt";
+    const clone = card.cloneNode(true);
+    clone.classList.remove("compact-actions-open");
+    clone.classList.add("card-inspect-card");
+    clone.removeAttribute("data-char-id");
+    clone.querySelector(".char-actions")?.remove();
+    const glare = document.createElement("div");
+    glare.className = "card-inspect-glare";
+    const hint = document.createElement("div");
+    hint.className = "card-inspect-hint";
+    hint.textContent = "ESC ou clique fora para fechar";
+
+    tilt.append(clone, glare);
+    holder.appendChild(tilt);
+    overlay.append(holder, hint);
+    placeCardInspectHolder(holder, rect);
+    charGroupsEl.appendChild(overlay);
+    card.classList.add("card-inspect-source");
+
+    cardInspect = { card, overlay, holder, tilt, glare };
+
+    // Força o layout na posição original antes de animar até o centro.
+    holder.getBoundingClientRect();
+    overlay.classList.add("active");
+    holder.style.transform = getCardInspectTransform(rect);
+
+    overlay.addEventListener("click", event => {
+        if (!event.target.closest(".card-inspect-holder")) closeCardInspect();
+    });
+    document.addEventListener("keydown", onCardInspectKeydown);
+
+    if (reduceMotion) return;
+    overlay.addEventListener("pointermove", event => {
+        const r = holder.getBoundingClientRect();
+        const x = (event.clientX - r.left) / r.width;
+        const y = (event.clientY - r.top) / r.height;
+        if (x < 0 || x > 1 || y < 0 || y > 1) {
+            tilt.style.transform = "";
+            glare.style.opacity = "0";
+            return;
+        }
+        const rotateY = (x - 0.5) * 26;
+        const rotateX = (0.5 - y) * 26;
+        tilt.style.transform = `rotateX(${rotateX}deg) rotateY(${rotateY}deg) scale(1.03)`;
+        glare.style.setProperty("--gx", `${x * 100}%`);
+        glare.style.setProperty("--gy", `${y * 100}%`);
+        glare.style.opacity = "1";
+    });
+    overlay.addEventListener("pointerleave", () => {
+        tilt.style.transform = "";
+        glare.style.opacity = "0";
+    });
+}
+
+function closeCardInspect(immediate = false) {
+    if (!cardInspect) return;
+    const { card, overlay, holder, tilt } = cardInspect;
+    cardInspect = null;
+    document.removeEventListener("keydown", onCardInspectKeydown);
+
+    const finish = () => {
+        overlay.remove();
+        card.classList.remove("card-inspect-source");
+    };
+    if (immediate || !card.isConnected) {
+        finish();
+        return;
+    }
+
+    // Reancora no lugar atual do card (a página pode ter rolado) mantendo
+    // a carta visualmente no centro e anima de volta.
+    const rect = card.getBoundingClientRect();
+    holder.style.transition = "none";
+    placeCardInspectHolder(holder, rect);
+    holder.style.transform = getCardInspectTransform(rect);
+    tilt.style.transform = "";
+    holder.getBoundingClientRect();
+    holder.style.transition = "";
+    holder.style.transform = "none";
+    overlay.classList.remove("active");
+    overlay.classList.add("closing");
+    setTimeout(finish, 480);
 }
 
 /* ============================================================
