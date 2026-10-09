@@ -6,7 +6,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>Mudae-Tracker</title>
     <link rel="icon" type="image/webp" href="Mudae.webp" />
-    <link rel="stylesheet" href="style.css?v=72" />
+    <link rel="stylesheet" href="style.css?v=79" />
     <meta name="referrer" content="no-referrer">
 </head>
 
@@ -275,7 +275,8 @@
             </div>
 
             <div class="panel chars-toolbar">
-                <div class="toolbar-row">
+                <!-- Faixa 1: categoria e série -->
+                <div class="toolbar-row toolbar-row-main">
                     <div class="field toolbar-field toolbar-categories">
                         <label>CATEGORIA</label>
                         <div class="cat-toggle-row" id="filterCategoryRow">
@@ -284,7 +285,7 @@
                             <button type="button" class="cat-toggle-btn cat-cyan" data-category="comuns">👥 COMUNS</button>
                         </div>
                     </div>
-                    <div class="field toolbar-field">
+                    <div class="field toolbar-field toolbar-series">
                         <label>SÉRIE</label>
                         <div class="series-filter-row">
                             <select id="filterSeries">
@@ -293,29 +294,10 @@
                             <button type="button" class="pill yellow" id="btnOpenSeriesOrder" title="Gerar o comando pra organizar a ordem das séries no seu harém do Mudae">⇅ ORGANIZAR</button>
                         </div>
                     </div>
-                    <div class="view-controls">
-                        <label class="grid-details-control" id="groupBySeriesControl" title="Agrupar personagens por série dentro de cada categoria">
-                            <span class="grid-details-label">AGRUPAR POR SÉRIE</span>
-                            <input type="checkbox" id="groupBySeriesToggle" />
-                            <span class="switch-track" aria-hidden="true"><span class="switch-thumb"></span></span>
-                        </label>
-                        <label class="grid-details-control" id="effectsControl" title="Liga/desliga os efeitos visuais dos cards (raridade, estrelas, chaves e $ec)">
-                            <span class="grid-details-label">EFEITOS</span>
-                            <input type="checkbox" id="effectsToggle" checked />
-                            <span class="switch-track" aria-hidden="true"><span class="switch-thumb"></span></span>
-                        </label>
-                        <div class="view-toggle" id="viewToggle" title="Formato de exibição">
-                            <button type="button" class="view-toggle-btn active" data-view-mode="list" title="Lista">☰</button>
-                            <button type="button" class="view-toggle-btn" data-view-mode="grid" title="Grade">▦</button>
-                        </div>
-                        <label class="grid-details-control" id="gridDetailsControl" hidden>
-                            <span class="grid-details-label">INFORMAÇÕES</span>
-                            <input type="checkbox" id="gridDetailsToggle" checked />
-                            <span class="switch-track" aria-hidden="true"><span class="switch-thumb"></span></span>
-                        </label>
-                    </div>
                 </div>
-                <div class="toolbar-row">
+
+                <!-- Faixa 2: kakera, ordenações e gêneros -->
+                <div class="toolbar-row toolbar-row-filters">
                     <div class="field toolbar-field">
                         <label>KAKERA MÍNIMO</label>
                         <input type="number" id="filterKakeraMin" min="0" placeholder="0" />
@@ -349,7 +331,35 @@
                             <button type="button" class="gender-btn" data-gender="hg">$hg</button>
                         </div>
                     </div>
-                    <button id="btnClearFilters" class="btn-clear-filters">LIMPAR FILTROS</button>
+                </div>
+
+                <!-- Rodapé: opções de exibição (não são filtros) -->
+                <div class="toolbar-footer">
+                    <div class="view-controls">
+                        <span class="toolbar-footer-label">EXIBIÇÃO</span>
+                        <label class="grid-details-control" id="groupBySeriesControl" title="Agrupar personagens por série dentro de cada categoria">
+                            <span class="grid-details-label">AGRUPAR POR SÉRIE</span>
+                            <input type="checkbox" id="groupBySeriesToggle" />
+                            <span class="switch-track" aria-hidden="true"><span class="switch-thumb"></span></span>
+                        </label>
+                        <label class="grid-details-control" id="effectsControl" title="Liga/desliga os efeitos visuais dos cards (raridade, estrelas, chaves e $ec)">
+                            <span class="grid-details-label">EFEITOS</span>
+                            <input type="checkbox" id="effectsToggle" checked />
+                            <span class="switch-track" aria-hidden="true"><span class="switch-thumb"></span></span>
+                        </label>
+                        <label class="grid-details-control" id="gridDetailsControl" hidden>
+                            <span class="grid-details-label">INFORMAÇÕES</span>
+                            <input type="checkbox" id="gridDetailsToggle" checked />
+                            <span class="switch-track" aria-hidden="true"><span class="switch-thumb"></span></span>
+                        </label>
+                    </div>
+                    <div class="toolbar-footer-actions">
+                        <div class="view-toggle" id="viewToggle" title="Formato de exibição">
+                            <button type="button" class="view-toggle-btn active" data-view-mode="list" title="Lista">☰</button>
+                            <button type="button" class="view-toggle-btn" data-view-mode="grid" title="Grade">▦</button>
+                        </div>
+                        <button id="btnClearFilters" class="btn-clear-filters">LIMPAR FILTROS</button>
+                    </div>
                 </div>
             </div>
 
@@ -829,7 +839,7 @@
     <script src="mudae-import.js?v=53"></script>
     <script src="OrbeSolver.js?v=53"></script>
     <script src="OrbeSolverOQ.js?v=53"></script>
-    <script src="script.js?v=68"></script>
+    <script src="script.js?v=76"></script>
 </body>
 
 </html>

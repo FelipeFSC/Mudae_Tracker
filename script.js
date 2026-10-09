@@ -288,25 +288,17 @@ const CAT_META = {
     comuns: { label: "COMUNS", icon: "👥", color: "var(--cyan)" }
 };
 
-// Seções exibidas na listagem de personagens. Favoritos e Estrelas viram UMA
-// seção só (ordenada pela posição compartilhada da $wishlist), já que no
-// Mudae de verdade elas são a mesma lista — só a cor/borda de cada card
-// continua diferenciando quem é ♥ e quem é ★ (ver CSS .char-card.cat-*).
-// "Comuns" continua em uma seção separada.
+// Seções exibidas na listagem de personagens. Todas as categorias ficam
+// juntas numa seção só — a separação fica a cargo do filtro de categoria e
+// do ícone ♥/★/👥 de cada card. Sem ordenação escolhida, a wishlist
+// (favoritos + estrelas, pela posição compartilhada) vem antes dos comuns.
 const LIST_SECTIONS = [
     {
-        key: "wishlist",
-        label: "FAVORITOS & ESTRELAS",
-        icon: "♥★",
+        key: "todos",
+        label: "PERSONAGENS",
+        icon: "♥★👥",
         color: "var(--pink)",
-        categories: WISHLIST_CATEGORIES
-    },
-    {
-        key: "comuns",
-        label: "COMUNS",
-        icon: "👥",
-        color: "var(--cyan)",
-        categories: ["comuns"]
+        categories: ["favoritos", "estrelas", "comuns"]
     }
 ];
 
@@ -1510,9 +1502,11 @@ function renderCharacters() {
         if (charFilters.categories.size > 0 && !section.categories.some(cat => charFilters.categories.has(cat))) return;
 
         let items = filteredCharacters.filter(c => section.categories.includes(c.category));
-        if (section.key === "wishlist") {
-            items = [...items].sort((a, b) => (Number(a.wishlistPosition) || 0) - (Number(b.wishlistPosition) || 0));
-        }
+        // Ordem padrão: wishlist pela posição, depois os comuns na ordem em que estão.
+        const wishlistRank = c => WISHLIST_CATEGORIES.includes(c.category) ? 0 : 1;
+        items = [...items].sort((a, b) =>
+            wishlistRank(a) - wishlistRank(b) ||
+            (wishlistRank(a) === 0 ? (Number(a.wishlistPosition) || 0) - (Number(b.wishlistPosition) || 0) : 0));
         if (charFilters.sortKakera === "asc") {
             items = [...items].sort((a, b) => a.kakera - b.kakera);
         } else if (charFilters.sortKakera === "desc") {
@@ -1552,7 +1546,7 @@ function renderCharacters() {
         } else if (items.length === 0) {
             const empty = document.createElement("div");
             empty.className = "group-empty";
-            empty.textContent = "Nenhum personagem nesta categoria ainda. Use o botão \"ADICIONAR PERSONAGEM\" no topo da página.";
+            empty.textContent = "Nenhum personagem ainda. Use o botão \"ADICIONAR PERSONAGEM\" no topo da página.";
             body.appendChild(empty);
         } else if (charFilters.groupBySeries) {
             body.classList.add("grouped-by-series");
@@ -1865,6 +1859,11 @@ function openCardInspect(card) {
     hint.className = "card-inspect-hint";
     hint.textContent = "ESC ou clique fora para fechar";
 
+    // Lâmina que aparece ao passar o mouse, no tom do fundo da carta e por
+    // baixo do conteúdo (não cobre a foto). O CSS decide em quais cartas aparece.
+    const foil = document.createElement("div");
+    foil.className = "card-inspect-foil";
+    clone.prepend(foil);
     tilt.append(clone, glare);
     holder.appendChild(tilt);
     overlay.append(holder, hint);
