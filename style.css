@@ -4691,3 +4691,255 @@ select#mCategory {
         transition-duration: .01s;
     }
 }
+
+
+/* ============ CONFIGURAÇÕES: layout e acabamento ============ */
+#view-config .panel {
+    background:
+        linear-gradient(180deg, rgba(255, 255, 255, 0.018), transparent 120px),
+        var(--bg-panel);
+    box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.03);
+}
+
+#view-config .panel-desc {
+    line-height: 1.6;
+    margin-bottom: 18px;
+}
+
+#view-config .field input,
+#view-config .field select {
+    transition: border-color .15s ease, box-shadow .15s ease, background .15s ease;
+}
+
+#view-config .field input:hover,
+#view-config .field select:hover {
+    border-color: rgba(148, 163, 184, 0.26);
+}
+
+#view-config .field input:focus,
+#view-config .field select:focus {
+    border-color: var(--cyan);
+    background: #101729;
+    box-shadow: 0 0 0 3px var(--cyan-soft);
+}
+
+/* ---- Resumo de chances no topo ---- */
+.config-hero {
+    position: relative;
+    overflow: hidden;
+}
+
+#view-config .panel.config-hero {
+    border-color: rgba(168, 85, 247, 0.28);
+    background:
+        radial-gradient(90% 140% at 0% 0%, rgba(168, 85, 247, 0.12), transparent 60%),
+        radial-gradient(60% 120% at 100% 100%, rgba(34, 211, 238, 0.06), transparent 60%),
+        var(--bg-panel);
+}
+
+.config-hero-head {
+    display: flex;
+    align-items: baseline;
+    justify-content: space-between;
+    gap: 8px 16px;
+    flex-wrap: wrap;
+    margin-bottom: 16px;
+}
+
+.config-hero-head .panel-title {
+    margin-bottom: 0;
+}
+
+.config-hero-note {
+    font-family: var(--mono);
+    font-size: 10.5px;
+    color: var(--muted-2);
+    letter-spacing: .3px;
+}
+
+.config-hero .stat-row {
+    margin-top: 0;
+}
+
+.config-hero .stat-box {
+    position: relative;
+    text-align: left;
+    padding: 16px 18px;
+    background: rgba(8, 10, 18, 0.45);
+    border-color: rgba(168, 85, 247, 0.2);
+    transition: border-color .2s ease, transform .2s ease;
+}
+
+.config-hero .stat-box:hover {
+    border-color: rgba(168, 85, 247, 0.45);
+    transform: translateY(-1px);
+}
+
+.config-hero .stat-label {
+    font-family: var(--mono);
+    font-size: 10.5px;
+    font-weight: 700;
+    letter-spacing: 1px;
+    text-transform: uppercase;
+    color: var(--muted);
+    margin-bottom: 6px;
+}
+
+.config-hero .stat-value {
+    font-size: 30px;
+    line-height: 1.1;
+    font-variant-numeric: tabular-nums;
+    background: linear-gradient(90deg, #c084fc, #a855f7 60%, #8b5cf6);
+    -webkit-background-clip: text;
+    background-clip: text;
+    color: transparent;
+    margin-bottom: 4px;
+}
+
+.config-hero-foot {
+    display: flex;
+    gap: 8px;
+    align-items: flex-start;
+    margin: 16px 0 0;
+    padding-top: 14px;
+    border-top: 1px solid var(--border-soft);
+    color: var(--muted);
+    font-size: 12px;
+    line-height: 1.6;
+}
+
+/* ---- Perfil + Identificação lado a lado ---- */
+.config-split {
+    display: grid;
+    grid-template-columns: minmax(0, 3fr) minmax(0, 2fr);
+    gap: 20px;
+    margin-bottom: 20px;
+}
+
+.config-split > .panel {
+    margin-bottom: 0;
+}
+
+.config-stack {
+    display: grid;
+    gap: 16px;
+}
+
+#view-config .profile-actions-row {
+    margin-top: 14px;
+}
+
+/* ---- Subgrupos dentro de um painel ---- */
+.config-group-label {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    margin: 24px 0 12px;
+    font-family: var(--mono);
+    font-size: 10px;
+    font-weight: 700;
+    letter-spacing: 1.2px;
+    color: var(--muted-2);
+}
+
+.panel-title + .config-group-label {
+    margin-top: 0;
+}
+
+.config-group-label::after {
+    content: "";
+    flex: 1;
+    height: 1px;
+    background: linear-gradient(90deg, var(--border), transparent);
+}
+
+.roll-chip {
+    display: inline-block;
+    padding: 2px 8px;
+    border-radius: 6px;
+    border: 1px solid rgba(245, 197, 24, 0.35);
+    background: var(--yellow-soft);
+    color: var(--yellow);
+    font-family: var(--mono);
+    font-size: 10.5px;
+    letter-spacing: .5px;
+}
+
+/* ---- Medalhas: cada nível com a cor da gema ---- */
+.medal-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(118px, 1fr));
+    gap: 12px;
+}
+
+.medal-field {
+    --medal: #94a3b8;
+}
+
+.medal-bronze { --medal: #d08b5b; }
+.medal-prata { --medal: #cbd5e1; }
+.medal-ouro { --medal: #f5c518; }
+.medal-safira { --medal: #3b82f6; }
+.medal-ruby { --medal: #f43f5e; }
+.medal-esmeralda { --medal: #10b981; }
+.medal-diamante { --medal: #a5f3fc; }
+
+.medal-field label {
+    display: flex;
+    align-items: center;
+    gap: 7px;
+}
+
+.medal-gem {
+    width: 8px;
+    height: 8px;
+    flex: none;
+    transform: rotate(45deg);
+    border-radius: 2px;
+    background: var(--medal);
+    box-shadow: 0 0 8px var(--medal);
+}
+
+#view-config .medal-field input {
+    border-left: 3px solid color-mix(in srgb, var(--medal) 55%, transparent);
+}
+
+#view-config .medal-field input:focus {
+    border-color: var(--medal);
+    box-shadow: 0 0 0 3px color-mix(in srgb, var(--medal) 18%, transparent);
+}
+
+/* ---- Loja: lista inteira visível dentro do painel ---- */
+#view-config .shop-buff-list {
+    max-height: none;
+    margin-bottom: 0;
+    padding-right: 0;
+}
+
+@media (max-width: 980px) {
+    #view-config .grid-4 {
+        grid-template-columns: 1fr 1fr;
+    }
+
+    .config-split {
+        grid-template-columns: 1fr;
+    }
+}
+
+@media (max-width: 720px) {
+    #view-config .pool-grid {
+        grid-template-columns: 1fr 1fr;
+    }
+
+    .config-hero .stat-value {
+        font-size: 24px;
+    }
+}
+
+/* Alinha os inputs pela base mesmo quando o rótulo tem botão de info. */
+#view-config .grid-3 > .field,
+#view-config .grid-4 > .field {
+    display: flex;
+    flex-direction: column;
+    justify-content: flex-end;
+}

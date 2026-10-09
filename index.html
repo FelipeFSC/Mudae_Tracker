@@ -6,7 +6,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>Mudae-Tracker</title>
     <link rel="icon" type="image/webp" href="Mudae.webp" />
-    <link rel="stylesheet" href="style.css?v=53" />
+    <link rel="stylesheet" href="style.css?v=54" />
     <meta name="referrer" content="no-referrer">
 </head>
 
@@ -45,77 +45,103 @@
                 <p class="subtitle">Configure seus parâmetros para calcular probabilidades</p>
             </div>
 
-            <div class="panel">
-                <div class="panel-title"><span class="bar green"></span>PERFIL</div>
-                <p class="subtitle">Cada perfil tem sua própria lista de personagens e configuração — nada é
-                    compartilhado entre eles. Crie um perfil novo (ex: "Felipe V2") para começar do zero sem perder o
-                    que já está salvo aqui.</p>
+            <!-- Resumo no topo: o resultado das configurações fica sempre visível -->
+            <div class="panel config-hero">
+                <div class="config-hero-head">
+                    <div class="panel-title"><span class="bar purple"></span>CHANCE BASE POR PERSONAGEM</div>
+                    <span class="config-hero-note">sem buffs individuais · atualiza ao editar</span>
+                </div>
+                <div class="grid-3 stat-row">
+                    <div class="stat-box purple">
+                        <div class="stat-label">1 dia</div>
+                        <div class="stat-value" id="baseChance1d">--</div>
+                        <div class="stat-sub">por personagem (sem buff)</div>
+                    </div>
+                    <div class="stat-box purple">
+                        <div class="stat-label">7 dias</div>
+                        <div class="stat-value" id="baseChance7d">--</div>
+                        <div class="stat-sub">acumulado</div>
+                    </div>
+                    <div class="stat-box purple">
+                        <div class="stat-label">30 dias</div>
+                        <div class="stat-value" id="baseChance30d">--</div>
+                        <div class="stat-sub">acumulado</div>
+                    </div>
+                </div>
+                <p class="config-hero-foot"><span class="info-ico">↻</span> A probabilidade é calculada por roll e acumulada pelo número total de rolls. Medalhas, tutorial, Tower, slash, $boostwish, OP e Shop 1 são somados como bônus aditivos antes do cálculo.</p>
+            </div>
 
-                <br/>
-                <div class="grid-2">
+            <div class="config-split">
+                <div class="panel">
+                    <div class="panel-title"><span class="bar green"></span>PERFIL</div>
+                    <p class="subtitle panel-desc">Cada perfil tem sua própria lista de personagens e configuração — nada é
+                        compartilhado entre eles. Crie um perfil novo (ex: "Felipe V2") para começar do zero sem perder o
+                        que já está salvo aqui.</p>
                     <div class="field">
                         <label>PERFIL ATIVO</label>
                         <select id="profileSelect"></select>
                     </div>
-                    <div class="field">
-                        <label>AÇÕES</label>
-                        <div class="pill-row profile-actions-row">
-                            <button type="button" class="pill cyan" id="btnNewProfile">➕ NOVO PERFIL</button>
-                            <button type="button" class="pill purple" id="btnRenameProfile">✎ RENOMEAR</button>
-                            <button type="button" class="pill red" id="btnDeleteProfile">🗑 EXCLUIR</button>
-                        </div>
+                    <div class="pill-row profile-actions-row">
+                        <button type="button" class="pill cyan" id="btnNewProfile">➕ NOVO PERFIL</button>
+                        <button type="button" class="pill purple" id="btnRenameProfile">✎ RENOMEAR</button>
+                        <button type="button" class="pill red" id="btnDeleteProfile">🗑 EXCLUIR</button>
                     </div>
+                    <p class="backup-status" id="profileStatus"></p>
                 </div>
-                <p class="backup-status" id="profileStatus"></p>
-            </div>
 
-            <div class="panel">
-                <div class="panel-title"><span class="bar cyan"></span>IDENTIFICAÇÃO</div>
-                <div class="grid-2">
-                    <div class="field">
-                        <label>NOME DO SERVIDOR</label>
-                        <input type="text" id="cfgServerName" />
-                    </div>
-                    <div class="field">
-                        <label>SEU NOME / TAG</label>
-                        <input type="text" id="cfgUserTag" />
+                <div class="panel">
+                    <div class="panel-title"><span class="bar cyan"></span>IDENTIFICAÇÃO</div>
+                    <div class="config-stack">
+                        <div class="field">
+                            <label>NOME DO SERVIDOR</label>
+                            <input type="text" id="cfgServerName" />
+                        </div>
+                        <div class="field">
+                            <label>SEU NOME / TAG</label>
+                            <input type="text" id="cfgUserTag" />
+                        </div>
                     </div>
                 </div>
             </div>
 
             <div class="panel">
                 <div class="panel-title"><span class="bar yellow"></span>CONFIGURAÇÕES DE SERVIDOR</div>
-                <div class="grid-3">
+
+                <div class="config-group-label">POOL / LIMROUL</div>
+                <div class="grid-4 pool-grid">
                     <div class="field">
-                        <label>POOL / LIMROUL $WA</label>
+                        <label for="cfgPoolWA"><span class="roll-chip">$WA</span></label>
                         <input type="number" id="cfgPoolWA" min="1" />
                     </div>
                     <div class="field">
-                        <label>POOL / LIMROUL $HA</label>
+                        <label for="cfgPoolHA"><span class="roll-chip">$HA</span></label>
                         <input type="number" id="cfgPoolHA" min="1" />
                     </div>
                     <div class="field">
-                        <label>POOL / LIMROUL $WG</label>
+                        <label for="cfgPoolWG"><span class="roll-chip">$WG</span></label>
                         <input type="number" id="cfgPoolWG" min="1" />
                     </div>
                     <div class="field">
-                        <label>POOL / LIMROUL $HG</label>
+                        <label for="cfgPoolHG"><span class="roll-chip">$HG</span></label>
                         <input type="number" id="cfgPoolHG" min="1" />
                     </div>
+                </div>
+
+                <div class="config-group-label">ROTINA</div>
+                <div class="grid-3">
                     <div class="field rolls-base-field">
-                        <label>ROLLS POR HORA (BASE)</label>
+                        <label for="cfgRollsPerHour">ROLLS POR HORA (BASE)</label>
                         <div class="rolls-base-row">
                             <input type="number" id="cfgRollsPerHour" min="0" />
                             <span id="totalRollsPerHour" class="total-rolls-label" aria-live="polite">→ Total de rolls: 0</span>
                         </div>
                     </div>
-
                     <div class="field">
-                        <label>TOTAL DE HORAS JOGADAS POR DIA</label>
+                        <label for="cfgHourGameplay">HORAS JOGADAS POR DIA</label>
                         <input type="number" id="cfgHourGameplay" min="0" placeholder="Ex: 5" />
                     </div>
                     <div class="field">
-                        <label>TOTAL DE PERSONAGENS NO HAREM</label>
+                        <label for="cfgHaremLimit">PERSONAGENS NO HAREM</label>
                         <input type="number" id="cfgHaremLimit" min="0" placeholder="0 = sem limite" />
                     </div>
                 </div>
@@ -123,14 +149,14 @@
 
             <div class="panel">
                 <div class="panel-title"><span class="bar purple"></span>BUFFS DO JOGADOR</div>
-                <div class="grid-3">
+                <div class="grid-4">
                     <div class="field">
-                        <label>PÁGINA ATUAL DO TUTORIAL</label>
+                        <label for="cfgTutorialPage">PÁGINA DO TUTORIAL</label>
                         <input type="number" id="cfgTutorialPage" min="0" />
                     </div>
                     <div class="field boostwish-field">
                         <div class="field-label-with-info">
-                            <label for="cfgBoostWishRolls">ROLLS INVESTIDOS EM $BOOSTWISH</label>
+                            <label for="cfgBoostWishRolls">ROLLS EM $BOOSTWISH</label>
                             <span class="info-tooltip">
                                 <button type="button" class="info-tooltip-trigger" aria-label="Ver bônus do boostwish" aria-describedby="boostWishSummary">i</button>
                                 <span id="boostWishSummary" class="boostwish-summary" role="tooltip" aria-live="polite">
@@ -144,45 +170,46 @@
                         <input type="number" id="cfgBoostWishRolls" min="0" step="1" />
                     </div>
                     <div class="field">
-                        <label>$PERSONALRARE (APROX.)</label>
+                        <label for="cfgPersonalRare">$PERSONALRARE (APROX.)</label>
                         <input type="number" id="cfgPersonalRare" min="1" max="10" />
                     </div>
                     <div class="field">
-                        <label>ROLLS COM COMANDO SLASH</label>
+                        <label for="cfgUseSlashCommands">ROLLS COM SLASH</label>
                         <select id="cfgUseSlashCommands">
                             <option value="false">Não</option>
                             <option value="true">Sim (+10% wishes)</option>
                         </select>
                     </div>
+                </div>
 
-                    <div class="field">
-                        <label>NIVEL BRONZE</label>
+                <div class="config-group-label">NÍVEL DAS MEDALHAS</div>
+                <div class="medal-grid">
+                    <div class="field medal-field medal-bronze">
+                        <label for="cfgLevelBronze"><span class="medal-gem"></span>BRONZE</label>
                         <input type="number" id="cfgLevelBronze" min="0" />
                     </div>
-                    <div class="field">
-                        <label>NIVEL PRATA</label>
+                    <div class="field medal-field medal-prata">
+                        <label for="cfgLevelPrata"><span class="medal-gem"></span>PRATA</label>
                         <input type="number" id="cfgLevelPrata" min="0" />
                     </div>
-                    <div class="field">
-                        <label>NIVEL OURO</label>
+                    <div class="field medal-field medal-ouro">
+                        <label for="cfgLevelOuro"><span class="medal-gem"></span>OURO</label>
                         <input type="number" id="cfgLevelOuro" min="0" />
                     </div>
-
-                    <div class="field">
-                        <label>NIVEL SAFIRA</label>
+                    <div class="field medal-field medal-safira">
+                        <label for="cfgLevelSafira"><span class="medal-gem"></span>SAFIRA</label>
                         <input type="number" id="cfgLevelSafira" min="0" />
                     </div>
-                    <div class="field">
-                        <label>NIVEL RUBY</label>
+                    <div class="field medal-field medal-ruby">
+                        <label for="cfgLevelRuby"><span class="medal-gem"></span>RUBY</label>
                         <input type="number" id="cfgLevelRuby" min="0" />
                     </div>
-                    <div class="field">
-                        <label>NIVEL ESMERALDA</label>
+                    <div class="field medal-field medal-esmeralda">
+                        <label for="cfgLevelEsmeralda"><span class="medal-gem"></span>ESMERALDA</label>
                         <input type="number" id="cfgLevelEsmeralda" min="0" />
                     </div>
-
-                    <div class="field">
-                        <label>NIVEL DIAMANTE</label>
+                    <div class="field medal-field medal-diamante">
+                        <label for="cfgLevelDiamante"><span class="medal-gem"></span>DIAMANTE</label>
                         <input type="number" id="cfgLevelDiamante" min="0" />
                     </div>
                 </div>
@@ -196,7 +223,7 @@
 
             <div class="panel">
                 <div class="panel-title"><span class="bar cyan"></span>LOJA ($shop)</div>
-                <p class="subtitle">Buffs de perfil (não são por personagem). O item 1 afeta diretamente o spawn. Os itens 2–10 possuem os dez níveis oficiais e são exibidos com seus efeitos econômicos/de recursos; não são somados artificialmente à chance de spawn.</p>
+                <p class="subtitle panel-desc">Buffs de perfil (não são por personagem). O item 1 afeta diretamente o spawn. Os itens 2–10 possuem os dez níveis oficiais e são exibidos com seus efeitos econômicos/de recursos; não são somados artificialmente à chance de spawn.</p>
                 <div class="op-buff-list shop-buff-list" id="shopBuffList"></div>
             </div>
 
@@ -216,31 +243,6 @@
                 <p class="backup-status" id="backupStatus"></p>
             </div>
             -->
-
-            <div class="panel">
-                <div class="grid-3 stat-row">
-                    <div class="stat-box purple">
-                        <div class="stat-value" id="baseChance1d">--</div>
-                        <div class="stat-label">Chance em 1 dia</div>
-                        <div class="stat-sub">por personagem (sem buff)</div>
-                    </div>
-                    <div class="stat-box purple">
-                        <div class="stat-value" id="baseChance7d">--</div>
-                        <div class="stat-label">Chance em 7 dias</div>
-                        <div class="stat-sub">acumulado</div>
-                    </div>
-                    <div class="stat-box purple">
-                        <div class="stat-value" id="baseChance30d">--</div>
-                        <div class="stat-label">Chance em 30 dias</div>
-                        <div class="stat-sub">acumulado</div>
-                    </div>
-                </div>
-            </div>
-
-            <div class="info-box">
-                <span class="info-ico">↻</span>
-                <p>A probabilidade é calculada por roll e acumulada pelo número total de rolls. Medalhas, tutorial, Tower, slash, $boostwish, OP e Shop 1 são somados como bônus aditivos antes do cálculo.</p>
-            </div>
         </section>
 
         <!-- ============ PERSONAGENS ============ -->
