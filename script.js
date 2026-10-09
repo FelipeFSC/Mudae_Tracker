@@ -1623,7 +1623,9 @@ function renderCharCard(c) {
     const inSelectionMode = clearHaremSelectionMode;
     const isSelected = inSelectionMode && clearHaremSelectedIds.has(String(c.id));
     const embedColor = normalizeEmbedColor(c.embedColor);
-    card.className = "char-card cat-" + c.category + (embedColor ? " has-embed-color" : "") + (c.claimed === false ? " char-unclaimed" : "") + (opStatus.any ? " op-has-buff" : "") + (opStatus.maxed ? " op-maxed" : "") + (inSelectionMode ? " selection-mode" : "") + (isSelected ? " selection-selected" : "");
+    // Destaque azul para 10+ chaves; estrelas mantêm o dourado como prioridade.
+    const isKeysHighlight = c.category !== "estrelas" && (Number(c.keys) || 0) >= 10;
+    card.className = "char-card cat-" + c.category + (isKeysHighlight ? " keys-highlight" : "") + (embedColor ? " has-embed-color" : "") + (c.claimed === false ? " char-unclaimed" : "") + (opStatus.any ? " op-has-buff" : "") + (opStatus.maxed ? " op-maxed" : "") + (inSelectionMode ? " selection-mode" : "") + (isSelected ? " selection-selected" : "");
     if (embedColor) card.style.setProperty("--embed-color", embedColor);
     card.dataset.charId = c.id;
 

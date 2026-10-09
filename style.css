@@ -4532,3 +4532,63 @@ select#mCategory {
         opacity: 0;
     }
 }
+
+
+/* ============ 10+ chaves: mesmo acabamento das estrelas, em azul ============
+   A classe keys-highlight só é aplicada fora da categoria estrelas,
+   então o dourado sempre tem prioridade. */
+.char-card.keys-highlight:not(.char-unclaimed):not(.selection-selected) {
+    background:
+        radial-gradient(120% 80% at 0% 0%, rgba(56, 189, 248, 0.14), transparent 60%),
+        radial-gradient(90% 70% at 100% 100%, rgba(34, 211, 238, 0.08), transparent 65%),
+        linear-gradient(160deg, #0b1320 0%, var(--bg-panel) 55%, #0a111c 100%);
+    box-shadow:
+        inset 0 1px 0 rgba(165, 225, 255, 0.10),
+        inset 0 0 24px -10px rgba(56, 189, 248, 0.35),
+        0 6px 26px -18px rgba(56, 189, 248, 0.55);
+}
+
+.char-card.keys-highlight:not(.has-embed-color):not(.char-unclaimed):not(.selection-selected) {
+    border-color: rgba(56, 189, 248, 0.28);
+}
+
+.char-card.keys-highlight:not(.char-unclaimed)::after {
+    content: "";
+    position: absolute;
+    inset: 0;
+    border-radius: inherit;
+    pointer-events: none;
+    z-index: 3;
+    background: linear-gradient(115deg,
+        transparent 0%,
+        transparent 40%,
+        rgba(186, 230, 253, 0.10) 47%,
+        rgba(224, 242, 254, 0.18) 50%,
+        rgba(186, 230, 253, 0.10) 53%,
+        transparent 60%,
+        transparent 100%);
+    background-size: 250% 100%;
+    background-repeat: no-repeat;
+    background-position: 150% 0;
+    mix-blend-mode: screen;
+    animation: star-card-shine 7s ease-in-out infinite;
+}
+
+.char-card.keys-highlight:not(.char-unclaimed) .char-name {
+    background: linear-gradient(90deg, #38bdf8, #bae6fd 45%, #38bdf8 70%, #0ea5e9);
+    -webkit-background-clip: text;
+    background-clip: text;
+    color: transparent;
+}
+
+.char-card.keys-highlight:not(.char-unclaimed) .char-cat-icon {
+    -webkit-text-fill-color: initial;
+    text-shadow: 0 0 8px rgba(56, 189, 248, 0.45);
+}
+
+@media (prefers-reduced-motion: reduce) {
+    .char-card.keys-highlight::after {
+        animation: none;
+        opacity: 0;
+    }
+}
