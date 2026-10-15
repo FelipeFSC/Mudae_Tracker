@@ -1,0 +1,73 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<!-- mesma política do index.html: as fotos do Mudae carregam sem referrer -->
+<meta name="referrer" content="no-referrer">
+<title>Efeitos da Carta — Mudae Tracker</title>
+<link rel="icon" type="image/webp" href="Mudae.webp">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Bangers&family=Cinzel:wght@700;900&family=Orbitron:wght@500;800&family=Press+Start+2P&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="card-effects.css?v=1">
+</head>
+<!--
+  Editor dos efeitos de uma carta (v1.0).
+  - Dentro do tracker: aberto num iframe como card-effects.html?embed=1.
+    Recebe o personagem por postMessage e devolve a config ao salvar.
+  - Aberto direto no navegador: funciona sozinho com um personagem de
+    exemplo editável (útil para testar visuais).
+-->
+<body data-page="card-editor">
+
+<header class="hero">
+  <h1>Efeitos da Carta</h1>
+  <p>Monte a carta do seu jeito: escolha um modelo pronto ou combine moldura, foil, filtro, textura e animação. Algumas opções liberam conforme as chaves e o kakera do personagem. Clique na carta para ver em 3D.</p>
+</header>
+
+<main class="editor">
+  <div class="preview">
+    <div id="card" tabindex="0" role="button" aria-label="Ver carta em 3D"></div>
+    <div class="actions">
+      <div class="actions-row">
+        <button class="btn" data-act="random">Aleatório</button>
+        <button class="btn primary" data-act="3d">Ver em 3D</button>
+        <button class="btn" data-act="reset">Resetar</button>
+      </div>
+      <div class="actions-row">
+        <button class="btn" data-act="copy">Copiar config</button>
+        <button class="btn" data-act="paste">Colar config</button>
+      </div>
+      <!-- só dentro do tracker (?embed=1) -->
+      <div class="actions-row actions-final embed-only">
+        <button class="btn save" data-act="save">Salvar</button>
+        <button class="btn" data-act="cancel">Cancelar</button>
+      </div>
+    </div>
+    <div class="preview-hint">Passe o mouse para ver o foil reagir à luz.</div>
+  </div>
+  <div class="panel" id="panel"></div>
+</main>
+
+<div class="toast" id="toast"></div>
+
+<div class="modal" id="pasteModal" hidden>
+  <div class="modal-box" role="dialog" aria-modal="true" aria-labelledby="pasteTitle">
+    <h3 id="pasteTitle">Colar config</h3>
+    <p>Cole o JSON gerado pelo botão "Copiar config". Ele muda só o visual da carta (moldura, foil, filtro, efeitos, texto); nome, kakera, chaves e os outros dados do personagem continuam como estão. Pode ser a config inteira ou só uma parte, como <code>{ "foil": "gold" }</code>.</p>
+    <textarea id="pasteText" spellcheck="false" placeholder="{ ... }"></textarea>
+    <div class="modal-error" id="pasteError" hidden></div>
+    <div class="modal-actions">
+      <button class="btn" data-paste="cancel">Cancelar</button>
+      <button class="btn primary" data-paste="apply">Aplicar</button>
+    </div>
+  </div>
+</div>
+
+<!-- filtro usado pelo efeito "Distorção de calor" -->
+<svg width="0" height="0" style="position:absolute" aria-hidden="true"><filter id="heat"><feTurbulence type="fractalNoise" baseFrequency="0.012 0.04" numOctaves="2" seed="3"><animate attributeName="baseFrequency" dur="6s" values="0.012 0.04;0.018 0.065;0.012 0.04" repeatCount="indefinite"/></feTurbulence><feDisplacementMap in="SourceGraphic" scale="10"/></filter></svg>
+
+<script src="card-effects.js?v=1"></script>
+</body>
+</html>

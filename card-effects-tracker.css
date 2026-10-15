@@ -1,0 +1,182 @@
+/* ============================================================
+   CARD-EFFECTS-TRACKER.CSS — encaixe das cartas novas no tracker (v1.0)
+   ------------------------------------------------------------
+   Só o layout em volta da carta: a grade, o botão ✦ e a janela do
+   editor. O visual da carta em si fica em card-effects.css, dentro do
+   Shadow DOM de cada carta (não colide com o style.css).
+   Tudo aqui só vale com o modo "CARTAS" ligado (#charGroups.mce-on).
+   ============================================================ */
+
+/* ---- Lista vira uma grade de cartas (em lista ou grade) ---- */
+#charGroups.mce-on .group-body:not(.grouped-by-series),
+#charGroups.mce-on .group-body.grouped-by-series .series-body {
+    display: grid !important;
+    grid-template-columns: repeat(auto-fill, minmax(190px, 1fr)) !important;
+    justify-items: center;
+    align-items: start;
+    gap: 26px 18px !important;
+}
+
+#charGroups.mce-on .group-body > .group-empty,
+#charGroups.mce-on .group-body > .add-char-btn {
+    grid-column: 1 / -1;
+    justify-self: stretch;
+}
+
+/* ---- O card antigo vira só a "moldura" da carta nova + botões ---- */
+#charGroups.mce-on .char-card.mce-tcg {
+    display: flex !important;
+    flex-direction: column;
+    align-items: center;
+    gap: 10px;
+    width: 100% !important;
+    max-width: 250px;
+    flex: initial !important;
+    padding: 0 !important;
+    background: none !important;
+    border: 0 !important;
+    border-radius: 0 !important;
+    box-shadow: none !important;
+    overflow: visible !important;
+    transform: none !important;
+    animation: none !important;
+}
+
+#charGroups.mce-on .char-card.mce-tcg::before,
+#charGroups.mce-on .char-card.mce-tcg::after {
+    display: none !important;
+}
+
+/* esconde o conteúdo antigo (foto, informações, lâmina holográfica) */
+#charGroups.mce-on .char-card.mce-tcg > :not(.mce-host):not(.char-actions) {
+    display: none !important;
+}
+
+.mce-host {
+    display: block;
+    width: 100%;
+    aspect-ratio: 5 / 8; /* mesma proporção da carta; reserva o espaço da carta antes do CSS dela carregar */
+    cursor: pointer;
+}
+
+/* botões (OP, ✦, editar, excluir): igual ao modo clássico, um painel no
+   canto da carta que só aparece ao passar o mouse (ou com foco do teclado) */
+#charGroups.mce-on .char-card.mce-tcg {
+    position: relative;
+}
+
+#charGroups.mce-on .char-card.mce-tcg .char-actions {
+    position: absolute !important;
+    inset: 15% 10px auto auto !important;
+    z-index: 4;
+    display: flex !important;
+    flex-direction: column !important;
+    gap: 6px;
+    margin: 0 !important;
+    padding: 6px;
+    border: 1px solid var(--border);
+    border-radius: 9px;
+    background: rgba(8, 10, 18, 0.88);
+    backdrop-filter: blur(6px);
+    opacity: 0 !important;
+    visibility: hidden !important;
+    pointer-events: none !important;
+    transform: translateY(-5px) !important;
+    transition: opacity .16s ease, transform .16s ease, visibility .16s ease;
+}
+
+#charGroups.mce-on .char-card.mce-tcg:hover .char-actions,
+#charGroups.mce-on .char-card.mce-tcg:focus-within .char-actions {
+    opacity: 1 !important;
+    visibility: visible !important;
+    pointer-events: auto !important;
+    transform: translateY(0) !important;
+}
+
+#charGroups.mce-on .char-card.mce-tcg .char-actions .icon-btn {
+    width: 30px;
+    min-width: 30px;
+    height: 30px;
+    padding: 0;
+    background: rgba(15, 20, 36, 0.95);
+}
+
+#charGroups.mce-on .char-card.mce-tcg .char-actions .op-btn {
+    font-size: 9px;
+}
+
+/* telas de toque não têm "passar o mouse": os botões ficam sempre
+   visíveis, numa linha abaixo da carta */
+@media (hover: none), (pointer: coarse) {
+    #charGroups.mce-on .char-card.mce-tcg .char-actions {
+        position: static !important;
+        flex-direction: row !important;
+        justify-content: center;
+        padding: 0;
+        border: 0;
+        background: none;
+        backdrop-filter: none;
+        opacity: 1 !important;
+        visibility: visible !important;
+        pointer-events: auto !important;
+        transform: none !important;
+    }
+}
+
+.icon-btn.mce-fx-btn {
+    color: #f0abfc;
+    border-color: rgba(240, 171, 252, 0.45);
+    font-size: 13px;
+}
+
+.icon-btn.mce-fx-btn:hover {
+    background: #c026d3;
+    border-color: #c026d3;
+    color: #fff;
+}
+
+/* não reivindicado: carta apagada, como no visual antigo */
+#charGroups.mce-on .char-card.mce-tcg.char-unclaimed .mce-host {
+    filter: grayscale(0.85) brightness(0.85);
+}
+
+/* modo de seleção (LIMPAR HAREM) */
+#charGroups.mce-on .char-card.mce-tcg.selection-selected .mce-host {
+    outline: 3px solid var(--pink, #ec2f9c);
+    outline-offset: 4px;
+    border-radius: 14px;
+}
+
+/* ---- Janela do editor de efeitos (iframe com card-effects.html) ---- */
+.mce-editor-overlay {
+    position: fixed;
+    inset: 0;
+    z-index: 2147482000;
+    display: grid;
+    place-items: center;
+    padding: 2vh 2vw;
+    background: rgba(5, 6, 12, 0.78);
+    backdrop-filter: blur(6px);
+    animation: mce-fade 0.2s ease;
+}
+
+.mce-editor-frame {
+    width: min(1320px, 100%);
+    height: 100%;
+    border-radius: 16px;
+    overflow: hidden;
+    border: 1px solid rgba(255, 255, 255, 0.12);
+    box-shadow: 0 30px 80px rgba(0, 0, 0, 0.6);
+    background: #0c0e19;
+}
+
+.mce-editor-frame iframe {
+    display: block;
+    width: 100%;
+    height: 100%;
+    border: 0;
+}
+
+@keyframes mce-fade {
+    from { opacity: 0; }
+}
