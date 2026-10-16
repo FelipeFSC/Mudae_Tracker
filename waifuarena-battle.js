@@ -613,12 +613,9 @@
             <p class="wa-diff-desc" id="waDiffDesc">${DIFFICULTIES.normal.desc}</p>
           </div>
           <div class="field">
-            <label>SEU TIME</label>
+            <label>SEU TIME <span class="wa-label-hint">· clique numa carta para ajustar os pontos</span></label>
             <div class="wa-team" id="waTeam"></div>
-          </div>
-          <div class="field">
-            <label for="waChar">CARTA DO SLOT <span id="waSlotN">1</span></label>
-            <select id="waChar"></select>
+            <button type="button" class="pill cyan wa-swap" id="waSwap">⇄ TROCAR PERSONAGEM DO SLOT <span id="waSlotN">1</span></button>
           </div>
         </div>
 
@@ -714,7 +711,8 @@
       const host = CE.createCardHost(cardData(c));
       host.title = 'Clique para ver a carta em 3D';
       host.addEventListener('click', ev => {
-        if (host.closest('.wa-bench-card.pickable')) return; // no banco, o clique serve para trocar
+        // no banco (ao trocar), nos slots e nas janelas de escolha o clique serve para escolher a carta
+        if (host.closest('.wa-bench-card.pickable, [data-pick]')) return;
         ev.stopPropagation();
         CE.openViewer(cardData(c), { title: c.name, desc: c.series && c.series !== '—' ? c.series : '' });
       });
@@ -765,23 +763,38 @@
       if (!setup.slots.some(s => String(s.id) === String(c.id))) setup.slots.push({ id: c.id, skills: savedSkills(c) });
     }
     setup.current = Math.min(setup.current, Math.max(0, setup.slots.length - 1));
-    $.char.innerHTML = list.map(c => `<option value="${esc(c.id)}">${esc(c.name)} · ◈ ${Number(c.kakera) || 0}</option>`).join('');
+    setupHosts.clear();   // a lista pode ter mudado (fotos, efeitos): recria as cartas
     renderSetup();
+  }
+
+  /* cartas da montagem do time, reaproveitadas entre renderizações (sem piscar) */
+  const setupHosts = new Map();
+  function setupHost(c) {
+    const key = String(c.id);
+    if (!setupHosts.has(key)) setupHosts.set(key, cardHost(c));
+    return setupHosts.get(key);
   }
 
   function renderSetup() {
     const cur = setup.slots[setup.current];
-    $.team.innerHTML = Array.from({ length: RULES.teamSize }, (_, i) => {
+    $.team.innerHTML = '';
+    for (let i = 0; i < RULES.teamSize; i++) {
       const s = setup.slots[i];
       const c = s && findChar(s.id);
-      const ok = s && skillTotal(s.skills) === RULES.points;
-      return `<button type="button" class="wa-slot${i === setup.current ? ' active' : ''}${ok ? '' : ' warn'}" data-slot="${i}">
-        <span class="wa-slot-n">${i + 1}</span>
-        <span class="wa-slot-body"><b>${c ? esc(c.name) : 'Vazio'}</b><small>${s ? `${skillTotal(s.skills)}/${RULES.points} pontos` : 'escolha uma carta'}</small></span>
-      </button>`;
-    }).join('');
+      const pts = s ? skillTotal(s.skills) : 0;
+      const el = document.createElement('div');
+      el.className = `wa-slot${i === setup.current ? ' active' : ''}${s && pts === RULES.points ? '' : ' warn'}`;
+      el.dataset.slot = i;
+      el.dataset.pick = '';
+      el.tabIndex = 0;
+      el.setAttribute('role', 'button');
+      el.setAttribute('aria-label', `Slot ${i + 1}: ${c ? c.name : 'vazio'}`);
+      el.innerHTML = `<span class="wa-slot-n">${i + 1}</span><div class="wa-slot-card">${c ? '' : '<span class="wa-slot-empty">+</span>'}</div>
+        <small>${s ? `${pts}/${RULES.points} pontos` : 'vazio'}</small>`;
+      if (c) el.querySelector('.wa-slot-card').appendChild(setupHost(c));
+      $.team.appendChild(el);
+    }
     $.slotN.textContent = setup.current + 1;
-    if (cur) $.char.value = cur.id;
     const c = cur && findChar(cur.id);
     $.skillOf.textContent = c ? c.name.toUpperCase() : '';
     const skills = cur ? cur.skills : defaultSkills();
@@ -794,6 +807,92 @@
       $.preview.innerHTML = `<span>Na luta:</span> <b>${f.atk}</b>⚔️ <b>${f.def}</b>🛡️ <b>${f.study}</b>📔 <b>${f.hp}</b>💗 <b>${f.lewdPower}</b>🍓`;
     } else $.preview.innerHTML = '';
     refreshStart();
+  }
+
+  /* coloca a carta no slot atual (se ela já estava no time, os dois slots trocam) */
+  function assignToSlot(id) {
+    const c = findChar(id);
+    if (!c) return;
+    if (waiting) cancelReady();
+    const other = setup.slots.findIndex((s, i) => i !== setup.current && s && String(s.id) === String(id));
+    if (other !== -1) [setup.slots[other], setup.slots[setup.current]] = [setup.slots[setup.current], setup.slots[other]];
+    else setup.slots[setup.current] = { id: c.id, skills: savedSkills(c) };
+    renderSetup();
+    onlineStatus();
+  }
+
+  /* ---------- Janela para escolher a carta do slot ---------- */
+  const PICKER_HTML = `
+  <div class="wa-picker" id="waPicker" hidden>
+    <div class="wa-picker-box" role="dialog" aria-modal="true" aria-labelledby="waPickerTitle">
+      <div class="wa-picker-head">
+        <h3 id="waPickerTitle">Escolha a carta do slot <span id="waPickerSlot">1</span></h3>
+        <button type="button" class="modal-x" id="waPickerClose" title="Fechar (Esc)">✕</button>
+      </div>
+      <input type="search" class="wa-picker-search" id="waPickerSearch" placeholder="Buscar por nome ou série…" autocomplete="off">
+      <div class="wa-picker-grid" id="waPickerGrid"></div>
+      <p class="wa-picker-empty" id="waPickerEmpty" hidden>Nenhuma carta com esse nome ou série.</p>
+    </div>
+  </div>`;
+
+  const pickerHosts = new Map();
+  let pickerObserver = null;
+
+  function openPicker() {
+    const list = characters();
+    $.pickerSlot.textContent = setup.current + 1;
+    $.pickerSearch.value = '';
+    $.pickerEmpty.hidden = true;
+    $.pickerGrid.innerHTML = '';
+    if (pickerObserver) pickerObserver.disconnect();
+    // as cartas só são desenhadas quando aparecem na tela (o harém pode ser grande)
+    pickerObserver = new IntersectionObserver(entries => {
+      for (const en of entries) {
+        if (!en.isIntersecting) continue;
+        const slot = en.target.querySelector('.wa-pick-card');
+        const id = en.target.dataset.id;
+        if (!pickerHosts.has(id)) pickerHosts.set(id, cardHost(findChar(id)));
+        slot.appendChild(pickerHosts.get(id));
+        pickerObserver.unobserve(en.target);
+      }
+    }, { root: $.pickerGrid, rootMargin: '300px' });
+    for (const c of list) {
+      const inSlot = setup.slots.findIndex(s => s && String(s.id) === String(c.id));
+      const el = document.createElement('div');
+      el.className = `wa-pick-item${inSlot === setup.current ? ' current' : ''}`;
+      el.dataset.id = c.id;
+      el.dataset.pick = '';
+      el.dataset.search = `${c.name} ${c.series || ''}`.toLowerCase();
+      el.tabIndex = 0;
+      el.setAttribute('role', 'button');
+      el.setAttribute('aria-label', c.name);
+      el.innerHTML = `<div class="wa-pick-card"></div>${inSlot !== -1 ? `<span class="wa-pick-badge">${inSlot === setup.current ? 'NESTE SLOT' : `NO SLOT ${inSlot + 1}`}</span>` : ''}`;
+      $.pickerGrid.appendChild(el);
+      pickerObserver.observe(el);
+    }
+    $.picker.hidden = false;
+    document.body.style.overflow = 'hidden';
+    setTimeout(() => $.pickerSearch.focus(), 50);
+  }
+
+  function closePicker() {
+    if ($.picker.hidden) return;
+    $.picker.hidden = true;
+    document.body.style.overflow = '';
+    if (pickerObserver) pickerObserver.disconnect();
+    $.pickerGrid.innerHTML = '';
+    $.swap.focus();
+  }
+
+  function filterPicker() {
+    const q = $.pickerSearch.value.trim().toLowerCase();
+    let shown = 0;
+    $.pickerGrid.querySelectorAll('.wa-pick-item').forEach(el => {
+      const ok = !q || el.dataset.search.includes(q);
+      el.hidden = !ok;
+      if (ok) shown++;
+    });
+    $.pickerEmpty.hidden = shown > 0;
   }
 
   const teamReady = () => setup.slots.length === RULES.teamSize && setup.slots.every(s => findChar(s.id) && skillTotal(s.skills) === RULES.points);
@@ -1036,11 +1135,12 @@
     resolve(value);
   }
 
+  /* opção de carta nas janelas de escolha: a carta desenhada + vida e atributos */
   function cardChoiceHTML(c, i, extra = '') {
-    return `<button type="button" class="wa-choice" data-choice="${i}" ${c.ko ? 'disabled' : ''}>
-      <b>${esc(c.name)}</b>
-      <span>${c.ko ? 'NOCAUTEADA' : `${c.hp}/${c.hpMax}💗 · ⚔️${c.atk} 🛡️${c.def} 📔${c.study}`}</span>${extra}
-    </button>`;
+    return `<div class="wa-choice${c.ko ? ' is-off' : ''}" data-choice="${i}" data-pick tabindex="${c.ko ? -1 : 0}" role="button" aria-label="${esc(c.name)}">
+      <div class="wa-choice-card"></div>
+      <span class="wa-choice-stats">${c.ko ? 'NOCAUTEADA' : `${c.hp}/${c.hpMax}💗 · ⚔️${c.atk} 🛡️${c.def} 📔${c.study}`}</span>${extra}
+    </div>`;
   }
 
   function showOverlay(req) {
@@ -1063,6 +1163,10 @@
         <div class="wa-choices">${T.cards.map((c, i) => cardChoiceHTML(c, i, i === T.active ? '<em>NA FRENTE</em>' : '<em>NO BANCO</em>')).join('')}</div></div>`;
     }
     $.overlay.innerHTML = html;
+    $.overlay.querySelectorAll('[data-choice]').forEach(el => {
+      const c = T.cards[Number(el.dataset.choice)];
+      if (c) el.querySelector('.wa-choice-card').appendChild(cardHost(c.char));
+    });
     $.overlay.hidden = false;
     $.overlay.dataset.kind = req.kind;
     $.overlay.dataset.pickItem = '0';
@@ -1479,7 +1583,7 @@
 
     const byId = id => document.getElementById(id);
     $ = {
-      setup: byId('waSetup'), char: byId('waChar'), diff: byId('waDiff'), diffDesc: byId('waDiffDesc'), skills: byId('waSkills'),
+      setup: byId('waSetup'), swap: byId('waSwap'), diff: byId('waDiff'), diffDesc: byId('waDiffDesc'), skills: byId('waSkills'),
       points: byId('waPoints'), preview: byId('waPreview'), start: byId('waStart'), empty: byId('waEmpty'),
       team: byId('waTeam'), slotN: byId('waSlotN'), skillOf: byId('waSkillOf'),
       board: byId('waBoard'), opp: byId('waOpp'), me: byId('waMe'), turn: byId('waTurn'), pickOpp: byId('waPickOpp'), pickMe: byId('waPickMe'),
@@ -1500,22 +1604,34 @@
       const b = ev.target.closest('[data-slot]');
       if (!b) return;
       setup.current = Number(b.dataset.slot);
-      if (!setup.slots[setup.current]) {   // slot vazio: pega a primeira carta livre
-        const free = characters().find(c => !setup.slots.some(s => String(s.id) === String(c.id)));
-        if (free) setup.slots[setup.current] = { id: free.id, skills: savedSkills(free) };
-      }
       renderSetup();
+      if (!setup.slots[setup.current]) openPicker();   // slot vazio: já abre a escolha
     });
-    $.char.addEventListener('change', () => {
-      if (waiting) cancelReady();
-      const id = $.char.value;
-      const c = findChar(id);
-      if (!c) return;
-      const other = setup.slots.findIndex((s, i) => i !== setup.current && String(s.id) === String(id));
-      if (other !== -1) [setup.slots[other], setup.slots[setup.current]] = [setup.slots[setup.current], setup.slots[other]]; // já estava no time: troca de lugar
-      else setup.slots[setup.current] = { id: c.id, skills: savedSkills(c) };
-      renderSetup();
-      onlineStatus();
+    $.swap.addEventListener('click', openPicker);
+
+    // janela de escolha da carta
+    document.body.insertAdjacentHTML('beforeend', PICKER_HTML);
+    Object.assign($, {
+      picker: byId('waPicker'), pickerSlot: byId('waPickerSlot'), pickerSearch: byId('waPickerSearch'),
+      pickerGrid: byId('waPickerGrid'), pickerEmpty: byId('waPickerEmpty'),
+    });
+    $.pickerSearch.addEventListener('input', filterPicker);
+    byId('waPickerClose').addEventListener('click', closePicker);
+    $.picker.addEventListener('click', ev => {
+      if (ev.target === $.picker) return closePicker();
+      const item = ev.target.closest('.wa-pick-item');
+      if (!item) return;
+      assignToSlot(item.dataset.id);
+      closePicker();
+    });
+    document.addEventListener('keydown', ev => { if (ev.key === 'Escape' && !$.picker.hidden) closePicker(); });
+
+    // Enter/Espaço nas cartas que funcionam como botão (slots, janela de escolha, opções do duelo)
+    document.addEventListener('keydown', ev => {
+      if ((ev.key === 'Enter' || ev.key === ' ') && ev.target instanceof HTMLElement && ev.target.matches('#waBattle [data-pick][role="button"], #waPicker [data-pick][role="button"]')) {
+        ev.preventDefault();
+        ev.target.click();
+      }
     });
     $.skills.addEventListener('click', ev => {
       const btn = ev.target.closest('[data-step]');
@@ -1554,7 +1670,7 @@
         return;
       }
       const choice = ev.target.closest('[data-choice]');
-      if (!choice || choice.disabled) return;
+      if (!choice || choice.classList.contains('is-off')) return;
       const idx = Number(choice.dataset.choice);
       if (kind === 'item') answerMine({ item: Number($.overlay.dataset.pickItem) || 0, target: idx });
       else answerMine(idx);
