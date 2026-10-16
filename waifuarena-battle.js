@@ -10,9 +10,10 @@
    - A cada turno a carta da frente faz uma reação (⚔️ atacar,
      🛡️ proteger, 📔 estudar, 🍓 lewd) OU o jogador 🔄 troca de carta.
      As escolhas são feitas ao mesmo tempo e reveladas juntas.
-   - Trocar enquanto o rival ataca: se o ataque dele for MAIOR que a
-     defesa da carta da frente, ela toma o golpe e depois troca; se
-     não, a troca acontece antes e a carta que entrou toma o golpe.
+   - Trocar enquanto o rival ataca (vale para os dois lados): se o
+     ataque dele for MAIOR OU IGUAL à vida MÁXIMA da carta da frente,
+     ela toma o golpe e depois troca; se não, a troca acontece antes e
+     a carta que entrou toma o golpe.
    - Cartas no banco recuperam +5💗 por turno (até a vida máxima).
    - Carta da frente nocauteada: o dono escolhe quem entra. Perde
      quem ficar sem cartas de pé.
@@ -424,7 +425,7 @@
       if (!String(acts[s]).startsWith('switch:')) continue;
       const to = Number(String(acts[s]).split(':')[1]);
       const me = front(B, s), foe = front(B, other(s));
-      if (acts[other(s)] === 'attack' && rawAttack(foe, me) > defense(me)) {
+      if (acts[other(s)] === 'attack' && rawAttack(foe, me) >= me.hpMax) {
         late[s] = to;
         B.log(`${me.name} tentou sair, mas o ataque de ${foe.name} chega antes!`, 'fx', me);
       } else {
@@ -1302,7 +1303,7 @@
     if (mode !== 'online') return refreshStart();
     const net = NET();
     let text;
-    if (!net || !net.role()) text = 'Crie ou entre numa sala no painel <b>SALA</b>, mais abaixo, e chame outro jogador.';
+    if (!net || !net.role()) text = 'Crie ou entre numa sala no painel <b>SALA</b>, acima, e chame outro jogador.';
     else if (net.players().length < 2) text = 'Sala aberta. Aguardando outro jogador entrar…';
     else {
       const r = rival.ready ? `<b>${esc(rival.name || 'O rival')}</b> está pronto ✔` : 'O rival ainda está montando o time.';
@@ -1471,9 +1472,10 @@
      MONTAGEM
      ============================================================ */
   function init() {
-    const head = document.querySelector('#view-arena .page-head');
-    if (!head || document.getElementById('waBattle')) return;
-    head.insertAdjacentHTML('afterend', SECTION_HTML);
+    // a batalha fica abaixo da sala e dos jogadores (waifuarena.js)
+    const room = document.querySelector('#view-arena .arena-grid');
+    if (!room || document.getElementById('waBattle')) return;
+    room.insertAdjacentHTML('afterend', SECTION_HTML);
 
     const byId = id => document.getElementById(id);
     $ = {

@@ -32,8 +32,9 @@
     margin-bottom: 0;
 }
 
-.arena-test {
-    grid-column: 1 / -1;
+/* sala e jogadores ficam acima da batalha */
+.arena-grid {
+    margin-bottom: 20px;
 }
 
 @media (max-width: 820px) {
@@ -153,8 +154,7 @@
     font-size: 11px;
 }
 
-.arena-players,
-.arena-log {
+.arena-players {
     list-style: none;
     margin: 0;
     padding: 0;
@@ -211,69 +211,7 @@
     background: none !important;
 }
 
-/* ---- Teste de números ---- */
-.arena-send {
-    display: flex;
-    gap: 8px;
-    margin-bottom: 14px;
-}
-
-.arena-send input {
-    flex: 1;
-    min-width: 0;
-    background: var(--bg-panel-2);
-    border: 1px solid var(--border);
-    border-radius: 8px;
-    padding: 10px 12px;
-    color: var(--text);
-    font-family: var(--mono);
-    font-size: 13px;
-    outline: none;
-    transition: border-color .15s ease;
-}
-
-.arena-send input:focus {
-    border-color: var(--cyan);
-}
-
-.arena-send .pill:disabled,
 .arena-grid .pill:disabled {
     opacity: 0.4;
     cursor: not-allowed;
-}
-
-.arena-log {
-    max-height: 340px;
-    overflow-y: auto;
-}
-
-.arena-log li {
-    padding: 8px 12px;
-    border-radius: 8px;
-    border: 1px solid var(--border-soft);
-    background: rgba(255, 255, 255, 0.02);
-    font-size: 13px;
-}
-
-.arena-log li.mine {
-    border-color: rgba(168, 85, 247, 0.4);
-    background: rgba(168, 85, 247, 0.06);
-}
-
-.arena-log li.system {
-    color: var(--muted);
-    font-size: 12px;
-    font-style: italic;
-}
-
-.arena-time {
-    color: var(--muted-2);
-    font-size: 11px;
-    margin-right: 6px;
-}
-
-.arena-num {
-    color: var(--purple);
-    font-weight: 800;
-    font-size: 15px;
 }

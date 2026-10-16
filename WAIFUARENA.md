@@ -419,7 +419,7 @@ Buscas feitas em 2026-10-15 (wiki, fórum da wiki, web) não encontraram nada al
 - Decisões tomadas: atributos **fiéis ao `$sk` do Mudae** (por enquanto). ~~1 carta por jogador~~ → **substituído em 2026-10-16 pelo modo de TIME (v2)**:
   - Time de **3 cartas**, cada uma com os próprios pontos do `$sk`; no início cada um escolhe quem começa na frente.
   - Por turno: a carta da frente faz 1 das 4 reações **ou** o jogador **troca** por uma do banco.
-  - Trocar enquanto o rival ataca: se o ataque dele for **maior que a defesa** da carta da frente, ela toma o golpe e depois troca; senão troca antes e a carta que entrou toma o golpe.
+  - Trocar enquanto o rival ataca: (vale para os dois lados) se o ataque dele for **maior ou igual à vida máxima** da carta da frente, ela toma o golpe e depois troca; senão troca antes e a carta que entrou toma o golpe.
   - Banco recupera **+5💗/turno** (até a vida máxima). Carta da frente nocauteada → dono escolhe quem entra; perde quem ficar sem cartas.
   - 📔 mostra **1 a 3 itens** (+1 opção a cada 4📔, provisório); o jogador escolhe **o item e para qual carta** ele vai (combos só na mesma carta).
   - Ideias de estratégia ainda NÃO feitas: triângulo de reações (🛡️>⚔️, 🍓>🛡️, ⚔️>📔, 📔>🍓), energia/recarga.

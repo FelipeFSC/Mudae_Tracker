@@ -12,7 +12,6 @@
    - Quem cria a sala é o ANFITRIÃO e recebe um código de 6 letras.
      Os outros entram digitando o código. Tudo passa pelo anfitrião,
      que repassa as mensagens para todos (até 8 jogadores).
-   - Teste atual: cada jogador manda um número e todos veem.
 
    A tela é montada por este arquivo (como o OrbeSolver faz) e o
    script.js a descobre pelo id "view-arena".
@@ -31,7 +30,7 @@
   <section id="view-arena" class="view arena-view" aria-label="Waifu Arena">
     <div class="page-head">
       <h1 class="pink-title"><span class="page-icon">⚔</span> WAIFU ARENA <span class="arena-beta">EM TESTE</span></h1>
-      <p class="subtitle">Isto ainda <b>não é o jogo final</b>: é um protótipo da batalha contra bot e um teste de conexão online.</p>
+      <p class="subtitle">Isto ainda <b>não é o jogo final</b>: é um protótipo da batalha, contra o bot ou online numa sala.</p>
     </div>
 
     <div class="arena-grid">
@@ -74,17 +73,6 @@
           <li class="arena-empty">Ninguém na sala ainda.</li>
         </ul>
       </div>
-
-      <div class="panel arena-test">
-        <div class="panel-title"><span class="bar purple"></span> TESTE DE NÚMEROS</div>
-        <form class="arena-send" id="arenaSend">
-          <input type="number" id="arenaNumber" placeholder="Digite um número" disabled />
-          <button type="submit" class="pill purple" id="arenaSendBtn" disabled>ENVIAR</button>
-        </form>
-        <ul class="arena-log" id="arenaLog">
-          <li class="arena-empty">Entre numa sala para trocar números.</li>
-        </ul>
-      </div>
     </div>
   </section>`;
 
@@ -103,7 +91,6 @@
 
   /* ---------- Utilitários ---------- */
   const esc = s => String(s).replace(/[&<>"]/g, ch => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[ch]));
-  const time = () => new Date().toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit', second: '2-digit' });
   const newCode = () => Array.from({ length: 6 }, () => CODE_CHARS[Math.floor(Math.random() * CODE_CHARS.length)]).join('');
   const cleanName = n => String(n || '').trim().slice(0, 24) || 'Jogador';
 
@@ -131,8 +118,6 @@
     $.lobby.hidden = inRoom;
     $.room.hidden = !inRoom;
     $.name.disabled = inRoom;
-    $.number.disabled = !inRoom;
-    $.sendBtn.disabled = !inRoom;
     if (!inRoom) {
       $.players.innerHTML = '<li class="arena-empty">Ninguém na sala ainda.</li>';
       $.count.textContent = `0/${MAX_PLAYERS}`;
@@ -174,19 +159,6 @@
     ).join('');
   }
 
-  function log(entry) {
-    const empty = $.log.querySelector('.arena-empty');
-    if (empty) empty.remove();
-    const li = document.createElement('li');
-    if (entry.system) {
-      li.className = 'system';
-      li.innerHTML = `<span class="arena-time">${entry.at || time()}</span> ${esc(entry.text)}`;
-    } else {
-      li.className = entry.from === S.name ? 'mine' : '';
-      li.innerHTML = `<span class="arena-time">${esc(entry.at)}</span> <b>${esc(entry.from)}</b> enviou <span class="arena-num">${esc(entry.value)}</span>`;
-    }
-    $.log.prepend(li);
-  }
 
   /* ---------- Anfitrião ---------- */
   function hostPlayers() {
@@ -225,17 +197,7 @@
       if (msg.t === 'hello') {
         entry.name = uniqueName(cleanName(msg.name));
         conn.send({ t: 'welcome', name: entry.name, code: S.code });
-        const sys = { t: 'system', text: `${entry.name} entrou na sala.`, at: time() };
-        log({ system: true, ...sys });
-        broadcast(sys);
         hostUpdatePlayers();
-      }
-      if (msg.t === 'num' && entry.name) {
-        const value = Number(msg.value);
-        if (!Number.isFinite(value)) return;
-        const out = { t: 'num', from: entry.name, value, at: time() };
-        log(out);
-        broadcast(out);
       }
       if (typeof msg.t === 'string' && msg.t.startsWith('duel-') && entry.name) emit(msg, { from: conn.peer, name: entry.name });
     });
@@ -245,11 +207,6 @@
       if (!entry) return;
       S.conns.delete(conn.peer);
       emit({ t: 'net-drop' }, { from: conn.peer, name: entry.name });
-      if (entry.name) {
-        const sys = { t: 'system', text: `${entry.name} saiu da sala.`, at: time() };
-        log({ system: true, ...sys });
-        broadcast(sys);
-      }
       hostUpdatePlayers();
     };
     conn.on('close', drop);
@@ -274,7 +231,6 @@
       $.roomHint.textContent = 'Mande este código para quem vai jogar com você. Mantenha esta aba aberta: você é o anfitrião da sala.';
       setStatus('Sala criada · aguardando jogadores', 'ok');
       hostUpdatePlayers();
-      log({ system: true, text: `Sala ${code} criada.` });
     });
     peer.on('connection', onHostConnection);
     peer.on('error', err => {
@@ -324,16 +280,13 @@
           $.roomCode.textContent = msg.code;
           $.roomHint.textContent = 'Você entrou na sala. Se o anfitrião fechar a aba, a sala acaba.';
           setStatus(`Conectado à sala ${msg.code}`, 'ok');
-          log({ system: true, text: `Você entrou na sala ${msg.code} como ${msg.name}.` });
         }
         if (msg.t === 'players') renderPlayers(msg.list);
-        if (msg.t === 'num') log(msg);
-        if (msg.t === 'system') log({ system: true, text: msg.text, at: msg.at });
         if (msg.t === 'full') { setStatus('A sala está cheia (8 jogadores).', 'error'); leaveRoom(true); }
         if (typeof msg.t === 'string' && msg.t.startsWith('duel-')) emit(msg, { from: 'host' });
       });
       conn.on('close', () => {
-        if (S.role === 'guest') { log({ system: true, text: 'A sala foi encerrada pelo anfitrião.' }); setStatus('Sala encerrada', 'warn'); leaveRoom(true); }
+        if (S.role === 'guest') { setStatus('Sala encerrada', 'warn'); leaveRoom(true); }
       });
     });
     peer.on('error', err => {
@@ -355,21 +308,6 @@
     return map[err && err.type] || (err && err.message) || 'falha desconhecida.';
   }
 
-  function sendNumber(ev) {
-    ev.preventDefault();
-    const value = Number($.number.value);
-    if ($.number.value === '' || !Number.isFinite(value)) return;
-    if (S.role === 'host') {
-      const out = { t: 'num', from: S.name, value, at: time() };
-      log(out);
-      broadcast(out);
-    } else if (S.role === 'guest' && S.hostConn && S.hostConn.open) {
-      S.hostConn.send({ t: 'num', value });
-    }
-    $.number.value = '';
-    $.number.focus();
-  }
-
   function leaveRoom(silent = false) {
     const wasIn = !!S.role;
     S.role = null;
@@ -384,10 +322,7 @@
     setBusy(false);
     setInRoom(false);
     if (wasIn) emit({ t: 'net-left' });
-    if (!silent) {
-      setStatus('Desconectado', 'idle');
-      if (wasIn) log({ system: true, text: 'Você saiu da sala.' });
-    }
+    if (!silent) setStatus('Desconectado', 'idle');
   }
 
   async function copyCode() {
@@ -412,7 +347,6 @@
       create: byId('arenaCreate'), code: byId('arenaCode'), join: byId('arenaJoin'),
       roomCode: byId('arenaRoomCode'), roomHint: byId('arenaRoomHint'), copy: byId('arenaCopy'), leave: byId('arenaLeave'),
       players: byId('arenaPlayers'), count: byId('arenaCount'),
-      number: byId('arenaNumber'), sendBtn: byId('arenaSendBtn'), send: byId('arenaSend'), log: byId('arenaLog'),
     };
 
     try { $.name.value = localStorage.getItem(NAME_KEY) || ''; } catch (err) { /* sem armazenamento */ }
@@ -423,7 +357,6 @@
     $.join.addEventListener('click', joinRoom);
     $.leave.addEventListener('click', () => leaveRoom());
     $.copy.addEventListener('click', copyCode);
-    $.send.addEventListener('submit', sendNumber);
 
     // fecha a conexão direitinho ao sair da página
     window.addEventListener('beforeunload', () => leaveRoom(true));
