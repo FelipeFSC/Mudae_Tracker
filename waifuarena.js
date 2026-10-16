@@ -31,7 +31,7 @@
   <section id="view-arena" class="view arena-view" aria-label="Waifu Arena">
     <div class="page-head">
       <h1 class="pink-title"><span class="page-icon">⚔</span> WAIFU ARENA <span class="arena-beta">EM TESTE</span></h1>
-      <p class="subtitle">Isto ainda <b>não é o jogo</b>: é só um teste de conexão online. Crie uma sala, chame alguém pelo código e troquem números para ver se a conexão funciona.</p>
+      <p class="subtitle">Isto ainda <b>não é o jogo final</b>: é um protótipo da batalha contra bot e um teste de conexão online.</p>
     </div>
 
     <div class="arena-grid">

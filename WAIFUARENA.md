@@ -410,7 +410,14 @@ Buscas feitas em 2026-10-15 (wiki, fórum da wiki, web) não encontraram nada al
 - **Objetivo novo:** simular a Waifuarena. O documento deve ter **só regras consolidadas, sem estratégias prontas**.
 - Pergunta em aberto: jogar **online** usando só HTML/CSS/JS, com o site hospedado no GitHub (Pages). Resposta dada: dá, via WebRTC ponto a ponto (ex.: PeerJS ou troca manual de códigos), com um jogador como anfitrião; Hamachi é opcional.
 - **Próximo passo:** o usuário vai fazer os testes da seção 4.2 no Discord e trazer os resultados para completar o documento.
-- Nenhum código foi escrito sobre a Waifuarena até agora.
+- **Teste de conexão online feito e funcionando** (aba "ARENA (TESTE)": `waifuarena.js` + `waifuarena.css`, PeerJS, anfitrião + até 8 jogadores, troca de números).
+- **Objetivo final:** batalhas online no estilo Waifuarena — um jogador cria a sala, cada um escolhe cartas do próprio harém (do tracker) e luta contra o outro.
+- **Protótipo de batalha local feito** (`waifuarena-battle.js` + `.css`): 1 carta do harém contra 1 bot, dificuldades Fácil (aleatório, 80% de vida), Normal e Difícil (+20% de vida), visual de duelo com as cartas com efeitos. Pontos do `$sk` salvos em `character.arenaSkills`.
+  Regras **provisórias** (objeto `RULES` no arquivo, trocar após os testes 4.2): base 3⚔️ 1🛡️ 1📔 20💗; Yandere +2⚔️, Tsundere +1🛡️, Kuudere +2📔, Dandere +4💗 por ponto, Deredere +1 força do 🍓 a cada 2 pontos; dano = ⚔️ − 🛡️ do alvo (mín. 1), −2 se protegeu; raridade do item cresce com o 📔.
+  Ordem do turno: efeitos de início → 🛡️ → 🍓 → 📔 → ⚔️ (ataques simultâneos). Itens sem efeito conhecido (Death Note, Shinigami Eyes…) só dão os atributos.
+  Próximos passos combinados: escolha de cartas (feito, 1 carta), online usando o motor (`window.WaifuArenaBattle`), acabamento visual.
+- Decisões tomadas: atributos **fiéis ao `$sk` do Mudae** (por enquanto) e **1 carta por jogador**.
+- Decisão antiga (resolvida acima): de onde vêm os atributos das cartas (fiel ao `$sk` do Mudae, que ainda não sabemos como funciona, ou adaptação com dados do tracker: kakera, chaves, OP).
 
 ### Contexto anterior: cartas com efeitos (v1.0) — concluído, sem commit
 Implementado no tracker, em arquivos separados:
