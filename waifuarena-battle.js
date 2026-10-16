@@ -567,17 +567,31 @@
   const skillTotal = s => Object.values(s).reduce((t, v) => t + v, 0);
 
   /* ---------- Carta (mesmo visual das cartas com efeitos) ---------- */
+  // card-effects.js declara MudaeCardEffects com "const" (não fica em window)
+  const cardFx = () => (typeof MudaeCardEffects !== 'undefined' ? MudaeCardEffects : null);
+
+  /* links http:// não carregam num site https: tenta a versão segura */
+  const photoUrl = src => (typeof src === 'string' ? src.trim().replace(/^http:\/\//i, 'https://') : '');
+
+  function cardData(c) {
+    const CE = cardFx();
+    const op = typeof getOpStatus === 'function' ? getOpStatus(c) : { any: false, maxed: false };
+    const roletas = typeof normalizeCharacterGenders === 'function' ? normalizeCharacterGenders(c.genders) : [];
+    return {
+      ...CE.DEFAULT_VISUAL, ...CE.readConfig(c.cardStyle).config,
+      name: c.name || '', series: c.series && c.series !== '—' ? c.series : '', img: photoUrl(c.photo),
+      kakera: Number(c.kakera) || 0, keys: Number(c.keys) || 0, op: op.maxed ? 'max' : op.any ? 'some' : 'none', roletas,
+    };
+  }
+
   function cardHost(c) {
-    // card-effects.js declara MudaeCardEffects com "const" (não fica em window)
-    const CE = typeof MudaeCardEffects !== 'undefined' ? MudaeCardEffects : null;
+    const CE = cardFx();
     if (CE && CE.createCardHost) {
-      const op = typeof getOpStatus === 'function' ? getOpStatus(c) : { any: false, maxed: false };
-      const roletas = typeof normalizeCharacterGenders === 'function' ? normalizeCharacterGenders(c.genders) : [];
-      return CE.createCardHost({
-        ...CE.DEFAULT_VISUAL, ...CE.readConfig(c.cardStyle).config,
-        name: c.name || '', series: c.series && c.series !== '—' ? c.series : '', img: c.photo || '',
-        kakera: Number(c.kakera) || 0, keys: Number(c.keys) || 0, op: op.maxed ? 'max' : op.any ? 'some' : 'none', roletas,
-      });
+      const host = CE.createCardHost(cardData(c));
+      // clicar na carta abre o visualizador 3D
+      host.title = 'Clique para ver a carta em 3D';
+      host.addEventListener('click', () => CE.openViewer(cardData(c), { title: c.name, desc: c.series && c.series !== '—' ? c.series : '' }));
+      return host;
     }
     const el = document.createElement('div');
     el.className = 'wa-card-fallback';
@@ -644,10 +658,40 @@
     $.opp.querySelector('.wa-card-slot').appendChild(cardHost(B.b.char));
     $.me.querySelector('.wa-card-slot').appendChild(cardHost(B.p.char));
     $.log.innerHTML = '';
+    checkPhoto(B.b, $.opp.querySelector('.wa-card-slot'));
+    checkPhoto(B.p, $.me.querySelector('.wa-card-slot'));
     $.end.hidden = true;
     $.pickOpp.textContent = '?';
     $.pickMe.textContent = '?';
     updateBoard();
+  }
+
+  /* Diz por que a foto de uma carta não aparece (sem foto ou link que não abre aqui) */
+  function describePhoto(src) {
+    if (src.startsWith('data:')) return `arquivo enviado pelo tracker, ${Math.round(src.length / 1024)} KB`;
+    try { return `link de ${new URL(src).host}`; } catch (err) { return 'link inválido'; }
+  }
+  function checkPhoto(f, slot) {
+    const mine = f === B.p;
+    const note = (short, long) => {
+      const el = document.createElement('div');
+      el.className = 'wa-photo-note';
+      el.textContent = short;
+      el.title = long;
+      slot.appendChild(el);
+      addLog(`⚠️ ${esc(long)}`, 'fx', f);
+      console.warn('[Waifu Arena]', long, f.char && f.char.photo ? String(f.char.photo).slice(0, 200) : '(sem foto)');
+    };
+    const src = photoUrl(f.char && f.char.photo);
+    if (!src) {
+      return note('SEM FOTO', mine
+        ? `${f.name} não tem foto no seu tracker.`
+        : `${f.name} não tem foto no tracker do rival. Ele precisa adicionar a foto lá.`);
+    }
+    const img = new Image();
+    img.referrerPolicy = 'no-referrer';
+    img.onerror = () => note('FOTO NÃO CARREGOU', `A foto de ${f.name} não abriu neste navegador (${describePhoto(src)}).${mine ? '' : ' O link pode ter expirado ou só funcionar para o rival.'}`);
+    img.src = src;
   }
 
   const FLAG_LABELS = {

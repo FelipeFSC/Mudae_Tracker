@@ -227,6 +227,32 @@
     transition: filter .3s ease;
 }
 
+.wa-card-slot .mce-host {
+    cursor: zoom-in;
+}
+
+/* aviso em cima da carta quando a foto não aparece */
+.wa-photo-note {
+    position: absolute;
+    left: 50%;
+    top: 45%;
+    z-index: 4;
+    transform: translate(-50%, -50%);
+    max-width: 90%;
+    padding: 6px 10px;
+    border-radius: 8px;
+    border: 1px solid rgba(245, 197, 24, 0.5);
+    background: rgba(8, 10, 18, 0.88);
+    color: var(--yellow);
+    font-size: 10.5px;
+    font-weight: 800;
+    letter-spacing: .6px;
+    text-align: center;
+    white-space: nowrap;
+    pointer-events: auto;
+    cursor: help;
+}
+
 .wa-card-fallback {
     aspect-ratio: 5 / 8;
     border-radius: 12px;

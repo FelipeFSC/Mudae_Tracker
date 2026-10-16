@@ -27,7 +27,7 @@ const MudaeCardEffects = (() => {
   /* ============================================================
      1. NÚCLEO
      ============================================================ */
-  const CSS_HREF = 'card-effects.css?v=1';
+  const CSS_HREF = 'card-effects.css?v=2';
   const KAKERA_DIR = 'kakerasImg';
   const BACK_IMG = 'Mudae.png';
 
@@ -232,7 +232,7 @@ const MudaeCardEffects = (() => {
     return `<div class="card-inner">
     <div class="frame"><div class="content"><div class="fx frame-fx"></div>
       <div class="top">${op}<div class="tl-kak" title="${tier.label} · ${tier.pt}"><img src="${kakeraIcon(tier)}" alt=""><span class="kak-val">${fmtNum(s.kakera)}</span></div></div>
-      <div class="art"><div class="art-img"></div><div class="fx art-fx"></div></div>
+      <div class="art"><div class="art-img">${s.img ? `<img class="art-photo" src="${esc(s.img)}" referrerpolicy="no-referrer" alt="" draggable="false">` : ''}</div><div class="fx art-fx"></div></div>
       <div class="tl-sign">
         <div class="tl-id"><span class="tl-name">${esc(s.name)}</span><span class="tl-series">${esc(s.series)}</span></div>
         <div class="tl-keys key-${keyTier(s.keys)}">${KEY_SVG}<span>${fmtNum(s.keys)}</span></div>
