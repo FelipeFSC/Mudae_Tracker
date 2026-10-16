@@ -144,8 +144,30 @@
     $.join.disabled = busy;
   }
 
+  /* ---------- Canal para outros módulos (batalha online) ----------
+     Mensagens "duel-*" são repassadas para quem se inscrever com
+     WaifuArenaNet.on(fn). Também avisa mudanças na sala:
+     "net-players" (lista mudou), "net-drop" (jogador saiu, só no
+     anfitrião) e "net-left" (você saiu ou a sala acabou). */
+  const listeners = new Set();
+  function emit(msg, meta = {}) {
+    for (const fn of listeners) {
+      try { fn(msg, meta); } catch (err) { console.error('WaifuArenaNet:', err); }
+    }
+  }
+  window.WaifuArenaNet = {
+    on(fn) { listeners.add(fn); return () => listeners.delete(fn); },
+    role: () => S.role,
+    name: () => S.name,
+    players: () => S.players.slice(),
+    sendToHost(msg) { if (S.hostConn && S.hostConn.open) S.hostConn.send(msg); },
+    sendTo(peerId, msg) { const e = S.conns.get(peerId); if (e && e.conn.open) e.conn.send(msg); },
+    broadcast(msg) { broadcast(msg); },
+  };
+
   function renderPlayers(list) {
     S.players = list;
+    setTimeout(() => emit({ t: 'net-players' }), 0);
     $.count.textContent = `${list.length}/${MAX_PLAYERS}`;
     $.players.innerHTML = list.map(p =>
       `<li class="${p.name === S.name ? 'me' : ''}"><span class="arena-dot"></span>${esc(p.name)}${p.host ? ' <span class="arena-tag">ANFITRIÃO</span>' : ''}${p.name === S.name ? ' <span class="arena-tag you">VOCÊ</span>' : ''}</li>`
@@ -215,12 +237,14 @@
         log(out);
         broadcast(out);
       }
+      if (typeof msg.t === 'string' && msg.t.startsWith('duel-') && entry.name) emit(msg, { from: conn.peer, name: entry.name });
     });
 
     const drop = () => {
       const entry = S.conns.get(conn.peer);
       if (!entry) return;
       S.conns.delete(conn.peer);
+      emit({ t: 'net-drop' }, { from: conn.peer, name: entry.name });
       if (entry.name) {
         const sys = { t: 'system', text: `${entry.name} saiu da sala.`, at: time() };
         log({ system: true, ...sys });
@@ -306,6 +330,7 @@
         if (msg.t === 'num') log(msg);
         if (msg.t === 'system') log({ system: true, text: msg.text, at: msg.at });
         if (msg.t === 'full') { setStatus('A sala está cheia (8 jogadores).', 'error'); leaveRoom(true); }
+        if (typeof msg.t === 'string' && msg.t.startsWith('duel-')) emit(msg, { from: 'host' });
       });
       conn.on('close', () => {
         if (S.role === 'guest') { log({ system: true, text: 'A sala foi encerrada pelo anfitrião.' }); setStatus('Sala encerrada', 'warn'); leaveRoom(true); }
@@ -355,8 +380,10 @@
     if (S.peer) try { S.peer.destroy(); } catch (err) { /* ignora */ }
     S.peer = null;
     S.code = null;
+    S.players = [];
     setBusy(false);
     setInRoom(false);
+    if (wasIn) emit({ t: 'net-left' });
     if (!silent) {
       setStatus('Desconectado', 'idle');
       if (wasIn) log({ system: true, text: 'Você saiu da sala.' });

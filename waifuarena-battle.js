@@ -486,6 +486,14 @@
             <select id="waChar"></select>
           </div>
           <div class="field">
+            <label>MODO</label>
+            <div class="wa-diff" id="waMode">
+              <button type="button" class="gender-btn active" data-mode="bot">Contra bot</button>
+              <button type="button" class="gender-btn" data-mode="online">Online (sala)</button>
+            </div>
+          </div>
+          <p class="wa-online" id="waOnline" hidden></p>
+          <div class="field" id="waDiffField">
             <label>DIFICULDADE DO BOT</label>
             <div class="wa-diff" id="waDiff">
               ${Object.entries(DIFFICULTIES).map(([k, d]) => `<button type="button" class="gender-btn${k === 'normal' ? ' active' : ''}" data-diff="${k}" title="${d.desc}">${d.label}</button>`).join('')}
@@ -601,7 +609,7 @@
     const total = skillTotal(setupSkills);
     $.points.textContent = `${total}/${RULES.points}`;
     $.points.classList.toggle('ok', total === RULES.points);
-    $.start.disabled = total !== RULES.points || !characters().length;
+    refreshStart();
     // prévia dos atributos com esses pontos
     const c = findChar($.char.value);
     if (!c) { $.preview.innerHTML = ''; return; }
@@ -622,7 +630,7 @@
     return `
       <div class="wa-card-slot" data-side="${side}"></div>
       <div class="wa-info">
-        <div class="wa-name">${esc(f.name)} <span class="wa-tag ${side}">${side === 'me' ? 'VOCÊ' : `BOT · ${DIFFICULTIES[B.difficulty].label.toUpperCase()}`}</span></div>
+        <div class="wa-name">${esc(f.name)} <span class="wa-tag ${side}">${side === 'me' ? 'VOCÊ' : B.online ? 'RIVAL ONLINE' : `BOT · ${DIFFICULTIES[B.difficulty].label.toUpperCase()}`}</span></div>
         <div class="wa-lp"><span class="wa-lp-label">💗</span><div class="wa-lp-bar"><i></i></div><b class="wa-lp-val"></b></div>
         <div class="wa-stats"></div>
         <div class="wa-flags"></div>
@@ -712,6 +720,7 @@
   }
 
   async function play(action) {
+    if (B && B.online) return playOnline(action);
     if (!B || B.over || busy) return;
     busy = true;
     $.actions.classList.add('locked');
@@ -740,9 +749,14 @@
 
   function endBattle(result) {
     B.over = true;
-    const t = { win: ['VITÓRIA', `${B.p.name} venceu em ${B.turn} turnos!`], lose: ['DERROTA', `${B.b.name} venceu em ${B.turn} turnos.`], draw: ['EMPATE', 'As duas cartas caíram ao mesmo tempo.'] }[result];
-    addLog(`<b>${t[0]}</b> — ${t[1]}`, 'end');
-    $.end.className = `wa-end ${result}`;
+    const t = {
+      win: ['VITÓRIA', `${B.p.name} venceu em ${B.turn} turnos!`],
+      lose: ['DERROTA', `${B.b.name} venceu em ${B.turn} turnos.`],
+      draw: ['EMPATE', 'As duas cartas caíram ao mesmo tempo.'],
+      lost: ['CONEXÃO PERDIDA', 'O rival saiu da sala.'],
+    }[result];
+    addLog(`<b>${t[0]}</b> — ${esc(t[1])}`, 'end');
+    $.end.className = `wa-end ${result === 'lost' ? 'draw' : result}`;
     $.end.innerHTML = `<div class="wa-end-box"><h2>${t[0]}</h2><p>${esc(t[1])}</p>
       <div class="wa-end-actions"><button type="button" class="btn-add" data-end="again">REVANCHE</button><button type="button" class="pill cyan" data-end="back">VOLTAR</button></div></div>`;
     $.end.hidden = false;
@@ -753,18 +767,318 @@
     $.board.hidden = true;
     $.setup.hidden = false;
     fillCharacters();
+    onlineStatus();
   }
 
   async function startBattle() {
     const c = findChar($.char.value);
     if (!c || skillTotal(setupSkills) !== RULES.points) return;
     await saveSkills(c);
+    if (mode === 'online') return readyOnline(c);
     newBattle(c, setupSkills, difficulty);
     $.setup.hidden = true;
     $.board.hidden = false;
     mountBoard();
     addLog(`<b>Duelo!</b> ${esc(B.p.name)} contra ${esc(B.b.name)} (bot ${DIFFICULTIES[difficulty].label}). Zere o 💗 do rival para vencer.`, 'turn');
     $.board.scrollIntoView({ behavior: 'smooth', block: 'start' });
+  }
+
+  /* ============================================================
+     ONLINE (1 contra 1, usando a sala do waifuarena.js)
+     - Cada um escolhe a carta e os pontos no próprio navegador e
+       clica ESTOU PRONTO; a carta (dados do tracker) vai junto.
+     - O ANFITRIÃO roda o motor: recebe as reações, resolve o turno e
+       manda o pacote (eventos + atributos) para o convidado.
+     - Os dois repetem o mesmo pacote na tela, então veem a mesma luta.
+     ============================================================ */
+  const NET = () => window.WaifuArenaNet || null;
+  let mode = 'bot';
+  let waiting = false;                     // já clicou ESTOU PRONTO
+  let rival = { ready: false, name: '' };  // situação do outro jogador no lobby
+  let lastReady = null;                    // { char, skills } para a revanche
+  const lobby = { host: null, guest: null };
+
+  const cleanText = (s, n = 60) => String(s == null ? '' : s).replace(/[<>&"]/g, '').slice(0, n);
+  /* html vindo do outro navegador: só deixa passar <b> */
+  const safeHtml = html => esc(html).replace(/&lt;(\/?)b&gt;/g, '<$1b>');
+
+  function cardPayload(c) {
+    return { id: c.id, name: c.name, series: c.series, photo: c.photo, kakera: c.kakera, keys: c.keys, opLevels: c.opLevels, genders: c.genders, cardStyle: c.cardStyle };
+  }
+  function cleanPayload(p) {
+    if (!p || typeof p !== 'object') return null;
+    return {
+      id: cleanText(p.id, 40), name: cleanText(p.name) || 'Jogador', series: cleanText(p.series),
+      photo: typeof p.photo === 'string' ? p.photo : '', kakera: Number(p.kakera) || 0, keys: Number(p.keys) || 0,
+      opLevels: p.opLevels && typeof p.opLevels === 'object' ? p.opLevels : {}, genders: Array.isArray(p.genders) ? p.genders : [],
+      cardStyle: p.cardStyle && typeof p.cardStyle === 'object' ? p.cardStyle : null,
+    };
+  }
+  function cleanSkills(s) {
+    if (!s || typeof s !== 'object') return null;
+    const out = Object.fromEntries(SKILLS.map(([k]) => [k, Number(s[k])]));
+    const ok = Object.values(out).every(v => Number.isInteger(v) && v >= 0) && skillTotal(out) === RULES.points;
+    return ok ? out : null;
+  }
+
+  const ser = f => ({ name: f.name, atk: f.atk, def: f.def, study: f.study, hp: f.hp, hpMax: f.hpMax, lewdPower: f.lewdPower, items: [...f.items], fx: { ...f.fx } });
+  const otherSide = s => (s === 'host' ? 'guest' : 'host');
+  const sideObj = s => (s === B.online ? B.p : B.b);
+
+  function inRoom() {
+    const net = NET();
+    return !!(net && net.role() && net.players().length >= 2);
+  }
+
+  function refreshStart() {
+    const total = skillTotal(setupSkills || {});
+    const base = total === RULES.points && characters().length > 0;
+    if (mode === 'bot') {
+      $.start.textContent = 'INICIAR DUELO';
+      $.start.disabled = !base;
+    } else {
+      $.start.textContent = waiting ? 'AGUARDANDO O RIVAL…' : 'ESTOU PRONTO';
+      $.start.disabled = !base || waiting || !inRoom();
+    }
+  }
+
+  function onlineStatus() {
+    if (!$) return;
+    $.online.hidden = mode !== 'online';
+    if (mode !== 'online') return refreshStart();
+    const net = NET();
+    let text;
+    if (!net || !net.role()) text = 'Crie ou entre numa sala no painel <b>SALA</b>, mais abaixo, e chame outro jogador.';
+    else if (net.players().length < 2) text = 'Sala aberta. Aguardando outro jogador entrar…';
+    else {
+      const r = rival.ready ? `<b>${esc(rival.name || 'O rival')}</b> está pronto ✔` : 'O rival ainda está escolhendo a carta.';
+      text = `${waiting ? 'Você está pronto. ' : 'Escolha sua carta e clique em <b>ESTOU PRONTO</b>. '}${r}`;
+    }
+    $.online.innerHTML = text;
+    refreshStart();
+  }
+
+  function setMode(m) {
+    mode = m;
+    $.mode.querySelectorAll('[data-mode]').forEach(b => b.classList.toggle('active', b.dataset.mode === m));
+    $.diffField.hidden = m !== 'bot';
+    if (m === 'bot' && waiting) cancelReady();
+    onlineStatus();
+  }
+
+  function readyOnline(c) {
+    lastReady = { char: cardPayload(c), skills: { ...setupSkills } };
+    sendReady();
+  }
+
+  function sendReady() {
+    const net = NET();
+    if (!lastReady || !inRoom()) return onlineStatus();
+    waiting = true;
+    if (net.role() === 'host') {
+      lobby.host = { ...lastReady, name: net.name() };
+      hostLobbyChanged();
+    } else {
+      net.sendToHost({ t: 'duel-ready', char: lastReady.char, skills: lastReady.skills });
+    }
+    onlineStatus();
+  }
+
+  function cancelReady() {
+    waiting = false;
+    const net = NET();
+    if (net && net.role() === 'host') { lobby.host = null; hostLobbyChanged(); }
+    else if (net && net.role()) net.sendToHost({ t: 'duel-unready' });
+  }
+
+  /* anfitrião: avisa o lobby e começa quando os dois estão prontos */
+  function hostLobbyChanged() {
+    const net = NET();
+    net.broadcast({ t: 'duel-lobby', hostReady: !!lobby.host, hostName: net.name() });
+    rival = { ready: !!lobby.guest, name: lobby.guest ? lobby.guest.name : '' };
+    onlineStatus();
+    if (lobby.host && lobby.guest && !B) hostStartDuel();
+  }
+
+  function hostStartDuel() {
+    const net = NET();
+    const h = lobby.host, g = lobby.guest;
+    lobby.host = lobby.guest = null;
+    waiting = false;
+    rival = { ready: false, name: '' };
+    const E = {
+      online: 'host', guestPeer: g.peer, difficulty: 'normal', turn: 0, over: false, events: [],
+      picks: { host: null, guest: null }, myPick: null, oppPicked: false,
+      p: makeFighter(h.char, h.skills, false), b: makeFighter(g.char, g.skills, false),
+    };
+    // no online o motor só registra; a tela é desenhada ao repetir o pacote
+    E.log = (html, kind, f) => E.events.push({ e: 'log', html, kind, side: f ? (f === E.p ? 'host' : 'guest') : null });
+    E.fxPop = (f, text, kind) => E.events.push({ e: 'pop', side: f === E.p ? 'host' : 'guest', text, kind });
+    E.attackAnim = (src, tgt, dmg) => E.events.push({ e: 'atk', src: src === E.p ? 'host' : 'guest', dmg });
+    B = E;
+    net.sendTo(g.peer, { t: 'duel-start', host: { char: h.char, f: ser(E.p) }, guest: { char: g.char, f: ser(E.b) } });
+    enterOnlineBoard();
+  }
+
+  function guestStartDuel(msg) {
+    const hc = cleanPayload(msg.host && msg.host.char), gc = cleanPayload(msg.guest && msg.guest.char);
+    if (!hc || !gc) return;
+    const p = makeFighter(gc, {}, false), b = makeFighter(hc, {}, false);
+    Object.assign(p, msg.guest.f, { name: gc.name });
+    Object.assign(b, msg.host.f, { name: hc.name });
+    waiting = false;
+    rival = { ready: false, name: '' };
+    B = { online: 'guest', difficulty: 'normal', turn: 0, over: false, p, b, myPick: null, oppPicked: false };
+    enterOnlineBoard();
+  }
+
+  function enterOnlineBoard() {
+    $.setup.hidden = true;
+    $.board.hidden = false;
+    mountBoard();
+    addLog(`<b>Duelo online!</b> ${esc(B.p.name)} contra ${esc(B.b.name)}. Escolham as reações: elas são reveladas juntas.`, 'turn');
+    $.board.scrollIntoView({ behavior: 'smooth', block: 'start' });
+  }
+
+  function playOnline(action) {
+    if (B.over || busy || B.myPick) return;
+    B.myPick = action;
+    $.pickMe.textContent = ACTIONS[action].ico;
+    $.pickMe.classList.add('show');
+    if (!B.oppPicked) $.pickOpp.textContent = '⏳';
+    $.actions.classList.add('locked');
+    const net = NET();
+    if (B.online === 'host') {
+      B.picks.host = action;
+      net.sendTo(B.guestPeer, { t: 'duel-picked' });
+      hostTryResolve();
+    } else {
+      net.sendToHost({ t: 'duel-pick', action });
+    }
+  }
+
+  function hostTryResolve() {
+    if (!B || B.over || !B.picks.host || !B.picks.guest) return;
+    const picks = { ...B.picks };
+    B.picks = { host: null, guest: null };
+    B.events = [];
+    resolveTurn(B, picks.host, picks.guest);
+    const pDead = B.p.hp <= 0, bDead = B.b.hp <= 0;
+    const result = pDead || bDead || B.turn >= RULES.maxTurns ? (pDead && bDead ? 'draw' : bDead ? 'host' : pDead ? 'guest' : 'draw') : null;
+    const pkg = { t: 'duel-turn', picks, events: B.events, f: { host: ser(B.p), guest: ser(B.b) }, turn: B.turn, result };
+    NET().sendTo(B.guestPeer, pkg);
+    replayTurn(pkg);
+  }
+
+  async function replayTurn(pkg) {
+    if (!B || !B.online) return;
+    busy = true;
+    $.actions.classList.add('locked');
+    const me = B.online, them = otherSide(me);
+    $.pickMe.textContent = ACTIONS[pkg.picks[me]] ? ACTIONS[pkg.picks[me]].ico : '?';
+    $.pickMe.classList.add('show');
+    await sleep(250);
+    $.pickOpp.textContent = ACTIONS[pkg.picks[them]] ? ACTIONS[pkg.picks[them]].ico : '?';
+    $.pickOpp.classList.add('show');
+    await sleep(450);
+
+    B.turn = Number(pkg.turn) || B.turn;
+    const keepName = (f, data) => Object.assign(f, data, { name: f.name });
+    keepName(B.p, pkg.f[me]);
+    keepName(B.b, pkg.f[them]);
+    for (const ev of pkg.events || []) {
+      if (ev.e === 'log') addLog(B.online === 'guest' ? safeHtml(ev.html) : ev.html, ev.kind, ev.side ? sideObj(ev.side) : null);
+      if (ev.e === 'pop') popOver(sideObj(ev.side), String(ev.text), ev.kind);
+      if (ev.e === 'atk') { const src = sideObj(ev.src); animAttack(src, src === B.p ? B.b : B.p, Number(ev.dmg) || 0); }
+    }
+    updateBoard();
+    await sleep(700);
+    $.pickMe.classList.remove('show');
+    $.pickOpp.classList.remove('show');
+    $.pickMe.textContent = '?';
+    $.pickOpp.textContent = '?';
+    B.myPick = null;
+    B.oppPicked = false;
+    if (pkg.result) endBattle(pkg.result === 'draw' ? 'draw' : pkg.result === me ? 'win' : 'lose');
+    busy = false;
+    $.actions.classList.remove('locked');
+  }
+
+  function quitOnline() {
+    const net = NET();
+    if (B.online === 'host') net.sendTo(B.guestPeer, { t: 'duel-quit' });
+    else net.sendToHost({ t: 'duel-quit' });
+    endBattle('lose');
+    addLog('Você desistiu.', 'end');
+  }
+
+  function onNet(msg, meta) {
+    const net = NET();
+    const role = net && net.role();
+    switch (msg.t) {
+      case 'net-players':
+        onlineStatus();
+        break;
+      case 'net-left':
+        waiting = false;
+        rival = { ready: false, name: '' };
+        lobby.host = lobby.guest = null;
+        if (B && B.online && !B.over) endBattle('lost');
+        onlineStatus();
+        break;
+      case 'net-drop':
+        if (lobby.guest && lobby.guest.peer === meta.from) { lobby.guest = null; hostLobbyChanged(); }
+        if (B && B.online === 'host' && !B.over && B.guestPeer === meta.from) endBattle('lost');
+        break;
+      // ---- no anfitrião ----
+      case 'duel-ready': {
+        if (role !== 'host') break;
+        const busyNow = (B && B.online && !B.over) || (lobby.guest && lobby.guest.peer !== meta.from);
+        if (busyNow) { net.sendTo(meta.from, { t: 'duel-busy' }); break; }
+        const char = cleanPayload(msg.char), skills = cleanSkills(msg.skills);
+        if (!char || !skills) break;
+        lobby.guest = { char, skills, peer: meta.from, name: meta.name };
+        hostLobbyChanged();
+        break;
+      }
+      case 'duel-unready':
+        if (role === 'host' && lobby.guest && lobby.guest.peer === meta.from) { lobby.guest = null; hostLobbyChanged(); }
+        break;
+      case 'duel-pick':
+        if (role !== 'host' || !B || B.online !== 'host' || B.over || meta.from !== B.guestPeer || B.picks.guest || !ACTIONS[msg.action]) break;
+        B.picks.guest = msg.action;
+        B.oppPicked = true;
+        if (!busy) $.pickOpp.textContent = '✔';
+        hostTryResolve();
+        break;
+      // ---- no convidado ----
+      case 'duel-lobby':
+        if (role !== 'guest') break;
+        rival = { ready: !!msg.hostReady, name: cleanText(msg.hostName) };
+        onlineStatus();
+        break;
+      case 'duel-busy':
+        waiting = false;
+        onlineStatus();
+        $.online.innerHTML = 'O anfitrião já está num duelo com outro jogador. Tente de novo quando acabar.';
+        break;
+      case 'duel-start':
+        if (role === 'guest') guestStartDuel(msg);
+        break;
+      case 'duel-picked':
+        if (role === 'guest' && B && B.online === 'guest') {
+          B.oppPicked = true;
+          if (!busy) $.pickOpp.textContent = '✔';
+        }
+        break;
+      case 'duel-turn':
+        if (role === 'guest' && B && B.online === 'guest') replayTurn(msg);
+        break;
+      // ---- nos dois ----
+      case 'duel-quit':
+        if (B && B.online && !B.over) { addLog(`${esc(B.b.name)} desistiu.`, 'end'); endBattle('win'); }
+        break;
+    }
   }
 
   /* ---------- Montagem ---------- */
@@ -779,9 +1093,16 @@
       points: byId('waPoints'), preview: byId('waPreview'), start: byId('waStart'), empty: byId('waEmpty'),
       board: byId('waBoard'), opp: byId('waOpp'), me: byId('waMe'), turn: byId('waTurn'), pickOpp: byId('waPickOpp'), pickMe: byId('waPickMe'),
       actions: byId('waActions'), end: byId('waEnd'), log: byId('waLog'), quit: byId('waQuit'),
+      mode: byId('waMode'), online: byId('waOnline'), diffField: byId('waDiffField'),
     };
 
-    $.char.addEventListener('change', loadSkills);
+    $.mode.addEventListener('click', ev => {
+      const btn = ev.target.closest('[data-mode]');
+      if (btn) setMode(btn.dataset.mode);
+    });
+    if (NET()) NET().on(onNet);
+
+    $.char.addEventListener('change', () => { if (waiting) cancelReady(); loadSkills(); onlineStatus(); });
     $.diff.addEventListener('click', ev => {
       const btn = ev.target.closest('[data-diff]');
       if (!btn) return;
@@ -805,11 +1126,16 @@
     });
     $.end.addEventListener('click', ev => {
       const act = ev.target.closest('[data-end]')?.dataset.end;
-      if (act === 'again') startBattle();
+      const wasOnline = B && B.online;
+      if (act === 'again') {
+        if (wasOnline) { showSetup(); sendReady(); }   // revanche online: fica pronto com a mesma carta
+        else startBattle();
+      }
       if (act === 'back') showSetup();
     });
     $.quit.addEventListener('click', () => {
-      if (B && !B.over) { endBattle('lose'); addLog('Você desistiu.', 'end'); }
+      if (B && B.online && !B.over) quitOnline();
+      else if (B && !B.over) { endBattle('lose'); addLog('Você desistiu.', 'end'); }
       else showSetup();
     });
 

@@ -8,8 +8,25 @@
     margin-bottom: 20px;
 }
 
+.wa-online {
+    margin: -4px 0 14px;
+    padding: 10px 12px;
+    border-radius: 8px;
+    border: 1px solid rgba(34, 211, 238, 0.35);
+    background: rgba(34, 211, 238, 0.06);
+    color: var(--muted);
+    font-size: 12px;
+    line-height: 1.5;
+}
+
+.wa-online b {
+    color: var(--cyan);
+}
+
 .wa-board[hidden],
-.wa-setup[hidden] {
+.wa-setup[hidden],
+.wa-online[hidden],
+#waDiffField[hidden] {
     display: none !important;
 }
 
