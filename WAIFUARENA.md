@@ -416,7 +416,13 @@ Buscas feitas em 2026-10-15 (wiki, fórum da wiki, web) não encontraram nada al
   Regras **provisórias** (objeto `RULES` no arquivo, trocar após os testes 4.2): base 3⚔️ 1🛡️ 1📔 20💗; Yandere +2⚔️, Tsundere +1🛡️, Kuudere +2📔, Dandere +4💗 por ponto, Deredere +1 força do 🍓 a cada 2 pontos; dano = ⚔️ − 🛡️ do alvo (mín. 1), −2 se protegeu; raridade do item cresce com o 📔.
   Ordem do turno: efeitos de início → 🛡️ → 🍓 → 📔 → ⚔️ (ataques simultâneos). Itens sem efeito conhecido (Death Note, Shinigami Eyes…) só dão os atributos.
   Próximos passos combinados: escolha de cartas (feito, 1 carta), online usando o motor (`window.WaifuArenaBattle`), acabamento visual.
-- Decisões tomadas: atributos **fiéis ao `$sk` do Mudae** (por enquanto) e **1 carta por jogador**.
+- Decisões tomadas: atributos **fiéis ao `$sk` do Mudae** (por enquanto). ~~1 carta por jogador~~ → **substituído em 2026-10-16 pelo modo de TIME (v2)**:
+  - Time de **3 cartas**, cada uma com os próprios pontos do `$sk`; no início cada um escolhe quem começa na frente.
+  - Por turno: a carta da frente faz 1 das 4 reações **ou** o jogador **troca** por uma do banco.
+  - Trocar enquanto o rival ataca: se o ataque dele for **maior que a defesa** da carta da frente, ela toma o golpe e depois troca; senão troca antes e a carta que entrou toma o golpe.
+  - Banco recupera **+5💗/turno** (até a vida máxima). Carta da frente nocauteada → dono escolhe quem entra; perde quem ficar sem cartas.
+  - 📔 mostra **1 a 3 itens** (+1 opção a cada 4📔, provisório); o jogador escolhe **o item e para qual carta** ele vai (combos só na mesma carta).
+  - Ideias de estratégia ainda NÃO feitas: triângulo de reações (🛡️>⚔️, 🍓>🛡️, ⚔️>📔, 📔>🍓), energia/recarga.
 - Decisão antiga (resolvida acima): de onde vêm os atributos das cartas (fiel ao `$sk` do Mudae, que ainda não sabemos como funciona, ou adaptação com dados do tracker: kakera, chaves, OP).
 
 ### Contexto anterior: cartas com efeitos (v1.0) — concluído, sem commit
