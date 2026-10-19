@@ -17,6 +17,7 @@
    - Cartas no banco recuperam +5💗 por turno (até a vida máxima).
    - Carta da frente nocauteada: o dono escolhe quem entra. Perde
      quem ficar sem cartas de pé.
+   - Cada time tem 3 📔 estudos para a partida inteira (RULES.studies).
    - 📔 mostra de 1 a 3 itens (mais 📔 = mais opções); o jogador
      escolhe 1 item e para qual carta do time ele vai.
 
@@ -40,19 +41,69 @@
     benchHeal: 5,              // vida recuperada por turno no banco
     // PROVISÓRIO: atributos base e o que cada ponto do $sk dá
     base: { atk: 3, def: 1, study: 1, hp: 20 },
-    perPoint: { yandere: ['atk', 2], tsundere: ['def', 1], kuudere: ['study', 2], dandere: ['hp', 4] },
+    perPoint: { yandere: ['atk', 2], tsundere: ['def', 1], dandere: ['hp', 4] },
+    studies: 3,                // 📔 por TIME na partida inteira (usa quando quiser)
     deredereLewdEvery: 2,      // PROVISÓRIO: +1 de força do 🍓 a cada 2 pontos de Deredere
     // PROVISÓRIO: dano = ⚔️ do atacante − 🛡️ do alvo (mínimo 1); se o alvo protegeu, −2
     minDamage: 1,
     offerEvery: 4,             // PROVISÓRIO: +1 opção de item a cada 4📔 (de 1 a 3 opções)
     maxOffers: 3,
     maxTurns: 150,
+    // eventos de arena: aleatórios, anunciados 1 turno antes
+    eventChance: 0.2,          // chance por turno de anunciar um evento (quando não há nenhum)
+    eventTurns: 3,             // duração
+    // medidor de especial (⚡), por carta; não zera ao trocar
+    meterMax: 5,
+    meterHurt: 2,              // tomou dano
+    meterHit: 1,               // acertou um ataque
+    meterBlock: 1,             // bloqueou com 🛡️
   };
+
+  /* Eventos de arena. Afetam os dois lados igualmente. */
+  const EVENTS = {
+    moon:     { ico: '🌕', name: 'Lua Cheia',        desc: '+3⚔️ em todas as cartas', atk: 3 },
+    wall:     { ico: '🏰', name: 'Muralha',          desc: '🛡️ Proteger reduz 5 de dano', protect: 5 },
+    festival: { ico: '🎪', name: 'Festival',         desc: 'O banco cura +10💗', benchHeal: 10 },
+    rain:     { ico: '🌧️', name: 'Chuva de Kakera',  desc: '📔 mostra 3 opções e não gasta estudo' },
+    romance:  { ico: '💕', name: 'Noite Romântica',  desc: '🍓 com efeito dobrado' },
+    silence:  { ico: '🤐', name: 'Silêncio',         desc: 'Ninguém pode usar 🛡️' },
+    storm:    { ico: '⚡', name: 'Tempestade',       desc: 'O medidor ⚡ carrega em dobro' },
+  };
+
+  /* ============================================================
+     CLASSES (escolhidas antes da partida; uma por carta, sem repetir no time)
+     Cada classe: passiva (a partida inteira), ✨ especial (usa o medidor ⚡) e fraqueza.
+     soon: true = aparece na escolha como "EM BREVE" (ainda não implementada)
+     ============================================================ */
+  const CLASSES = {
+    berserker:   { ico: '🪓', name: 'Berserker',  color: '#f87171', short: 'Mais dano com pouca vida',
+                   passive: '+3⚔️ abaixo de 50% da vida', weak: '🛡️ Proteger reduz só 1',
+                   special: 'Fúria', specialDesc: 'Ataque com ⚔️ ×2; no turno seguinte não pode usar 🛡️' },
+    paladin:     { ico: '🛡️', name: 'Paladino',   color: '#60a5fa', short: 'Muro do time',
+                   passive: '🛡️ Proteger reduz 3 (em vez de 2)', weak: '−1⚔️', atk: -1,
+                   special: 'Juramento', specialDesc: 'Por 2 turnos (este e o próximo), todo dano recebido cai pela metade' },
+    cleric:      { ico: '✚', name: 'Clérigo',     color: '#4ade80', short: 'Cura o banco',
+                   passive: 'Enquanto está no banco, o banco cura +8💗 (em vez de +5)', weak: '−2⚔️', atk: -2,
+                   special: 'Ressurreição', specialDesc: 'Revive uma aliada nocauteada com 40% da vida, no banco (1× por partida)' },
+    assassin:    { ico: '🗡️', name: 'Assassino',  color: '#94a3b8', short: 'Fura a defesa',
+                   passive: 'O ⚔️ ignora 2🛡️ do alvo', weak: '−4💗', hp: -4,
+                   special: 'Emboscada', specialDesc: 'Se o rival trocar, acerta quem sai e quem entra; se não, ⚔️ +50%' },
+    idol:        { ico: '🎤', name: 'Idol',       color: '#f472b6', short: 'Fortalece o time',
+                   passive: 'O 🍓 tira +1 a mais', weak: '−1⚔️', atk: -1, lewd: 1,
+                   special: 'Show ao Vivo', specialDesc: 'O time inteiro (banco também) ganha +2⚔️ por 3 turnos' },
+    necromancer: { ico: '💀', name: 'Necromante', color: '#a78bfa', short: 'Fica forte com as quedas', soon: true },
+    mage:        { ico: '📖', name: 'Mago',       color: '#22d3ee', short: 'Estuda melhor', soon: true },
+    rogue:       { ico: '🎭', name: 'Ladino',     color: '#fbbf24', short: 'Rouba itens', soon: true },
+    archer:      { ico: '🏹', name: 'Arqueira',   color: '#86efac', short: 'Pune quem troca', soon: true },
+    witch:       { ico: '🧙‍♀️', name: 'Bruxa',      color: '#c084fc', short: 'Veneno e maldição', soon: true },
+  };
+  const CLASS_KEYS = Object.keys(CLASSES).filter(k => !CLASSES[k].soon);
+  const validClass = k => CLASS_KEYS.includes(k);
+  const clsOf = f => CLASSES[f.cls] || null;
 
   const SKILLS = [
     ['yandere', 'Yandere', '+2 ⚔️ por ponto'],
     ['tsundere', 'Tsundere', '+1 🛡️ por ponto'],
-    ['kuudere', 'Kuudere', '+2 📔 por ponto'],
     ['dandere', 'Dandere', '+4 💗 por ponto'],
     ['deredere', 'Deredere', '+1 força do 🍓 a cada 2 pontos'],
   ];
@@ -68,8 +119,9 @@
     protect: { ico: '🛡️', label: 'PROTEGER', hint: `−${RULES.protect} de dano recebido` },
     study:   { ico: '📔', label: 'ESTUDAR',  hint: 'Escolha um item' },
     lewd:    { ico: '🍓', label: 'LEWD',     hint: `−${RULES.lewd} 🛡️ 📔 💗 do rival` },
+    special: { ico: '✨', label: 'ESPECIAL', hint: `Com ⚡ ${RULES.meterMax}/${RULES.meterMax}` },
   };
-  const SWITCH_ICO = '🔄';
+  const SWITCH_ICO = '⇅';
   const actionIco = a => (typeof a === 'string' && a.startsWith('switch:') ? SWITCH_ICO : ACTIONS[a] ? ACTIONS[a].ico : '?');
 
   /* ============================================================
@@ -235,18 +287,28 @@
   const SIDES = ['host', 'guest'];
   const other = s => (s === 'host' ? 'guest' : 'host');
 
-  function makeFighter(c, skills, side, idx, hpMult = 1) {
-    const s = { yandere: 0, tsundere: 0, kuudere: 0, dandere: 0, deredere: 0, ...skills };
+  function makeFighter(c, skills, side, idx, hpMult = 1, cls = null) {
+    const s = { yandere: 0, tsundere: 0, dandere: 0, deredere: 0, ...skills };
+    const C = CLASSES[cls] || {};
     const f = {
-      char: c, name: c.name, side, idx, skills: s,
+      char: c, name: c.name, side, idx, skills: s, cls: validClass(cls) ? cls : null,
       atk: RULES.base.atk, def: RULES.base.def, study: RULES.base.study, hp: RULES.base.hp,
-      lewdPower: RULES.lewd + Math.floor(s.deredere / RULES.deredereLewdEvery),
+      lewdPower: RULES.lewd + Math.floor(s.deredere / RULES.deredereLewdEvery) + (C.lewd || 0),
       items: [], combos: [], ko: false, protecting: false,
+      // medidor ⚡ e estado dos especiais de classe
+      meter: 0, arena: null,
+      oath: 0,          // Juramento: turnos com dano pela metade
+      show: 0,          // Show ao Vivo: turnos com +2⚔️
+      noProtect: 0,     // Fúria: turno em que não pode usar 🛡️
+      revived: false,   // Ressurreição já usada (1× por partida)
       fx: { horn: false, future: 0, freeItem: 0, bandage: false, doll: false, lewdHp: 0, lewdDouble: false, dynamax: 0, clone: false,
             figleaf: false, lewdItem: false, doubleStudy: false, saitama: false, sharingan: false, stalker: false, succubus: false,
             tentacle: false, lewdStudy: 0, tanuki: false, bento: 0, microwave: false },
     };
     for (const [skill, [stat, per]] of Object.entries(RULES.perPoint)) f[stat] += s[skill] * per;
+    // fraquezas da classe
+    f.atk = Math.max(0, f.atk + (C.atk || 0));
+    f.hp = Math.max(1, f.hp + (C.hp || 0));
     f.hp = Math.max(1, Math.round(f.hp * hpMult));
     f.hpMax = f.hp;
     return f;
@@ -254,6 +316,9 @@
 
   const front = (B, s) => B.teams[s].cards[B.teams[s].active];
   const has = (f, name) => f.items.includes(name);
+  // evento de arena ativo (todas as cartas do duelo apontam para o mesmo B.arena)
+  const eventOf = f => (f && f.arena && f.arena.event ? EVENTS[f.arena.event.key] : null);
+  const eventIs = (f, key) => !!(f && f.arena && f.arena.event && f.arena.event.key === key);
   const clamp0 = f => { f.def = Math.max(0, f.def); f.study = Math.max(0, f.study); f.hp = Math.max(0, f.hp); };
   const alive = T => T.cards.filter(c => !c.ko);
   function addHp(f, n) { f.hp += n; if (f.hp > f.hpMax) f.hpMax = f.hp; }   // itens de 💗 também aumentam a vida máxima
@@ -275,7 +340,7 @@
   function makeOffer(f) {
     const level = f.study + f.fx.future;
     f.fx.future = 0;
-    const count = Math.max(1, Math.min(RULES.maxOffers, 1 + Math.floor(level / RULES.offerEvery)));
+    const count = eventIs(f, 'rain') ? RULES.maxOffers : Math.max(1, Math.min(RULES.maxOffers, 1 + Math.floor(level / RULES.offerEvery)));
     const names = [];
     while (names.length < count) names.push(rollItem(level, names).name);
     return names;
@@ -373,6 +438,7 @@
 
   function doLewd(B, src, tgt, power, boosted) {
     if (tgt.fx.doll) { tgt.fx.doll = false; B.log(`A Doll de ${tgt.name} absorveu o 🍓!`, 'fx', tgt); return; }
+    if (eventIs(src, 'romance')) power *= 2;
     const malus = power * (boosted && src.fx.lewdDouble ? 2 : 1);
     if (!tgt.fx.figleaf) tgt.def -= malus;
     tgt.study -= malus + (boosted ? src.fx.lewdStudy : 0);
@@ -385,8 +451,11 @@
   }
 
   /* Ataque bruto de src contra tgt (com os bônus de "próximo ataque") e defesa de tgt */
-  function rawAttack(src, tgt) {
-    let a = src.atk * (src.fx.dynamax ? 1.5 : 1);
+  function rawAttack(src, tgt, mult = 1) {
+    let base = src.atk + ((eventOf(src) || {}).atk || 0);
+    if (src.cls === 'berserker' && src.hp < src.hpMax * 0.5) base += 3;   // passiva do Berserker
+    if (src.show > 0) base += 2;                                           // Show ao Vivo (Idol)
+    let a = base * (src.fx.dynamax ? 1.5 : 1) * mult;
     if (src.fx.tanuki) a += 15;
     if (src.fx.horn) a += 25;
     if (src.fx.sharingan) a += tgt.def;
@@ -396,10 +465,35 @@
   const defense = f => f.def * (f.fx.dynamax ? 1.5 : 1);
 
   /* Dano que src causaria em tgt agora (também usado pelo bot, sem gastar bônus) */
-  function previewDamage(src, tgt, tgtProtects = false) {
-    let dmg = Math.max(RULES.minDamage, Math.round(rawAttack(src, tgt) - defense(tgt)));
-    if (tgtProtects) dmg = Math.max(0, dmg - RULES.protect);
+  // 🛡️ Proteger: o evento Muralha manda; senão Paladino 3, Berserker 1, os outros 2
+  const protectValue = f => (eventOf(f) || {}).protect || (f.cls === 'paladin' ? 3 : f.cls === 'berserker' ? 1 : RULES.protect);
+
+  function previewDamage(src, tgt, tgtProtects = false, mult = 1) {
+    const def = Math.max(0, defense(tgt) - (src.cls === 'assassin' ? 2 : 0));   // Assassino ignora 2🛡️
+    let dmg = Math.max(RULES.minDamage, Math.round(rawAttack(src, tgt, mult) - def));
+    if (tgtProtects) dmg = Math.max(0, dmg - protectValue(tgt));
+    if (tgt.oath > 0) dmg = Math.ceil(dmg / 2);                                 // Juramento (Paladino)
     return dmg;
+  }
+
+  /* Ressurreição (Clérigo): só com uma aliada nocauteada e 1× por partida */
+  const canRevive = (B, s, f) => f.cls === 'cleric' && !f.revived && B.teams[s].cards.some(c => c.ko);
+
+  /* ⚡ do medidor de especial (Tempestade: em dobro) */
+  function charge(f, n) {
+    if (f.ko || n <= 0) return;
+    f.meter = Math.min(RULES.meterMax, f.meter + n * (eventIs(f, 'storm') ? 2 : 1));
+  }
+
+  /* ações que o lado s pode escolher agora (vale para a tela, o bot e a validação) */
+  function availableActions(B, s) {
+    const T = B.teams[s], f = front(B, s);
+    return Object.keys(ACTIONS).filter(a => {
+      if (a === 'protect') return !eventIs(f, 'silence') && f.noProtect !== B.turn + 1;
+      if (a === 'study') return T.studies > 0 || eventIs(f, 'rain');
+      if (a === 'special') return !!f.cls && f.meter >= RULES.meterMax && (f.cls !== 'cleric' || canRevive(B, s, f));
+      return true;
+    });
   }
 
   function doSwitch(B, s, to) {
@@ -419,13 +513,36 @@
 
     for (const s of SIDES) startOfTurn(B, front(B, s));
 
+    // 0. especiais de classe: gasta o ⚡ (sp[s] = classe de quem usou)
+    const sp = {};
+    for (const s of SIDES) {
+      if (acts[s] !== 'special') continue;
+      const f = front(B, s);
+      sp[s] = f.cls;
+      f.meter = 0;
+      B.pop(f, '✨', 'combo');
+      B.log(`✨ ${f.name} usou <b>${CLASSES[f.cls].special}</b>!`, 'combo', f);
+      if (f.cls === 'berserker') f.noProtect = B.turn + 1;        // Fúria: sem 🛡️ no próximo turno
+      if (f.cls === 'paladin') f.oath = 2;                         // Juramento: este turno e o próximo
+      if (f.cls === 'idol') {                                      // Show ao Vivo: +2⚔️ no time (conta este turno + 3)
+        for (const c of alive(B.teams[s])) c.show = 4;
+        B.log(`O time de ${f.name} ganhou +2⚔️ por 3 turnos.`, 'fx', f);
+      }
+      if (f.cls === 'paladin') B.log(`${f.name} fez um Juramento: dano pela metade por 2 turnos.`, 'fx', f);
+    }
+    // Fúria (Berserker) e Emboscada (Assassino) também atacam
+    const attacking = s => acts[s] === 'attack' || sp[s] === 'berserker' || sp[s] === 'assassin';
+    const switchTo = s => (String(acts[s]).startsWith('switch:') ? Number(String(acts[s]).split(':')[1]) : null);
+    const atkMult = s => (sp[s] === 'berserker' ? 2 : sp[s] === 'assassin' && switchTo(other(s)) === null ? 1.5 : 1);
+    const startFront = { host: front(B, 'host'), guest: front(B, 'guest') };
+
     // 1. trocas: antes do golpe, ou depois se o ataque do rival passar da defesa
     const late = {};
     for (const s of SIDES) {
-      if (!String(acts[s]).startsWith('switch:')) continue;
-      const to = Number(String(acts[s]).split(':')[1]);
+      if (switchTo(s) === null) continue;
+      const to = switchTo(s);
       const me = front(B, s), foe = front(B, other(s));
-      if (acts[other(s)] === 'attack' && rawAttack(foe, me) >= me.hpMax) {
+      if (attacking(other(s)) && rawAttack(foe, me, atkMult(other(s))) >= me.hpMax) {
         late[s] = to;
         B.log(`${me.name} tentou sair, mas o ataque de ${foe.name} chega antes!`, 'fx', me);
       } else {
@@ -440,14 +557,26 @@
       if (f.protecting) B.pop(f, '🛡️', 'protect');
     }
 
-    // 3. lewds (inclusive a succubus da carta da frente, sem bônus)
+    // 3. lewds (inclusive a succubus da carta da frente, sem bônus) e a Ressurreição (Clérigo)
     for (const s of SIDES) if (acts[s] === 'lewd') doLewd(B, front(B, s), front(B, other(s)), front(B, s).lewdPower, true);
+    for (const s of SIDES) {
+      if (sp[s] !== 'cleric') continue;
+      const f = front(B, s);
+      const ko = B.teams[s].cards.filter(c => c.ko).sort((x, y) => y.hpMax - x.hpMax)[0];
+      if (!ko) continue;
+      f.revived = true;
+      Object.assign(ko, { ko: false, hp: Math.max(1, Math.round(ko.hpMax * 0.4)), meter: 0, oath: 0, show: 0 });
+      B.ev({ e: 'revive', side: s, idx: ko.idx });
+      B.pop(ko, `+${ko.hp}💗`, 'heal');
+      B.log(`<b>${ko.name} foi ressuscitada</b> por ${f.name} com ${ko.hp}💗!`, 'combo', ko);
+    }
     for (const s of SIDES) if (front(B, s).fx.succubus) doLewd(B, front(B, s), front(B, other(s)), 1, false);
 
     // 4. estudo: gera as opções (o jogador escolhe depois do turno)
     for (const s of SIDES) {
       if (acts[s] !== 'study') continue;
       const f = front(B, s);
+      if (!eventIs(f, 'rain')) B.teams[s].studies = Math.max(0, B.teams[s].studies - 1);
       const n = f.fx.doubleStudy ? 2 : 1;
       f.fx.doubleStudy = false;
       for (let i = 0; i < n; i++) offers[s].push(makeOffer(f));
@@ -458,18 +587,25 @@
     // 5. ataques (calculados antes de aplicar: são simultâneos)
     const hits = [];
     for (const s of SIDES) {
-      if (acts[s] !== 'attack') continue;
-      const src = front(B, s), tgt = front(B, other(s));
-      const dmg = previewDamage(src, tgt, tgt.protecting);
-      const bonuses = [src.fx.tanuki && 'Wild Tanuki', src.fx.horn && 'Ogro', src.fx.sharingan && 'Sharingan', src.fx.clone && 'Clone'].filter(Boolean);
+      if (!attacking(s)) continue;
+      const src = front(B, s), foe = other(s);
+      // Emboscada com troca do rival: acerta quem saiu e quem entrou
+      const to = switchTo(foe);
+      const targets = sp[s] === 'assassin' && to !== null
+        ? [startFront[foe], B.teams[foe].cards[to]].filter((c, i, l) => c && !c.ko && l.indexOf(c) === i)
+        : [front(B, foe)];
+      const special = sp[s] ? CLASSES[sp[s]].special : null;
+      const bonuses = [special, src.fx.tanuki && 'Wild Tanuki', src.fx.horn && 'Ogro', src.fx.sharingan && 'Sharingan', src.fx.clone && 'Clone'].filter(Boolean);
+      for (const tgt of targets) hits.push([src, tgt, previewDamage(src, tgt, tgt.protecting, atkMult(s)), bonuses]);
       src.fx.tanuki = src.fx.horn = src.fx.sharingan = src.fx.clone = false;
-      hits.push([src, tgt, dmg, bonuses]);
     }
     for (const [src, tgt, dmg, bonuses] of hits) {
       tgt.hp -= dmg;
       if (src.fx.tentacle) tgt.def = Math.max(0, tgt.def - 1);
       B.ev({ e: 'atk', side: src.side, idx: src.idx, tside: tgt.side, tidx: tgt.idx, dmg });
       B.log(`${src.name} atacou ${tgt.name}: <b>−${dmg}💗</b>${bonuses.length ? ` (${bonuses.join(', ')})` : ''}${tgt.protecting ? ' · protegido' : ''}`, 'attack', tgt);
+      if (dmg > 0) { charge(tgt, RULES.meterHurt); charge(src, RULES.meterHit); }
+      if (tgt.protecting) charge(tgt, RULES.meterBlock);
     }
 
     // 6. golpe fatal: Stalker se sacrifica
@@ -479,6 +615,8 @@
         if (f.hp <= 0 && f.fx.stalker) { f.fx.stalker = false; f.hp = 1; B.log(`O Stalker se sacrificou para salvar ${f.name}!`, 'combo', f); }
         clamp0(f);
         f.protecting = false;
+        if (f.oath > 0) f.oath--;
+        if (f.show > 0) f.show--;
       }
       if (front(B, s).fx.dynamax) front(B, s).fx.dynamax--;
     }
@@ -513,10 +651,31 @@
       const T = B.teams[s];
       T.cards.forEach((f, i) => {
         if (i === T.active || f.ko || f.hp >= f.hpMax) return;
-        const n = Math.min(RULES.benchHeal, f.hpMax - f.hp);
+        // Clérigo no banco: o banco cura +8 (o Festival, +10, vale se for maior)
+        const cleric = T.cards.some((c, j) => j !== T.active && !c.ko && c.cls === 'cleric') ? 8 : 0;
+        const n = Math.min(Math.max((eventOf(f) || {}).benchHeal || RULES.benchHeal, cleric), f.hpMax - f.hp);
         f.hp += n;
         B.pop(f, `+${n}💗`, 'heal');
       });
+    }
+  }
+
+  /* Fim do turno: o evento ativo perde 1 turno; o anunciado começa; às vezes anuncia um novo.
+     B.arena = { event: { key, left } | null, next: key | null, forced: key | null (teste) } */
+  function arenaTick(B) {
+    const A = B.arena;
+    if (A.event && --A.event.left <= 0) {
+      B.log(`${EVENTS[A.event.key].ico} <b>${EVENTS[A.event.key].name}</b> terminou.`, 'turn');
+      A.event = null;
+    }
+    if (A.next) {
+      const ev = EVENTS[A.next];
+      A.event = { key: A.next, left: RULES.eventTurns };
+      A.next = null;
+      B.log(`${ev.ico} <b>EVENTO: ${ev.name}</b> — ${ev.desc} (${RULES.eventTurns} turnos).`, 'combo');
+    } else if (!A.event && chance(RULES.eventChance)) {
+      A.next = A.forced || pick(Object.keys(EVENTS));
+      B.log(`⚠️ No próximo turno: ${EVENTS[A.next].ico} <b>${EVENTS[A.next].name}</b> — ${EVENTS[A.next].desc}.`, 'turn');
     }
   }
 
@@ -576,12 +735,24 @@
         if (b.hp > me.hp) return `switch:${b.idx}`;
       }
     }
-    return botAction(me, foe, B.turn, diff);
+    const allowed = availableActions(B, s);
+    // especial: o Fácil usa ao acaso; os outros usam quando faz sentido
+    if (allowed.includes('special') && diff !== 'easy') {
+      // o Paladino guarda o Juramento para quando o golpe do rival pesa
+      if (me.cls !== 'paladin' || previewDamage(foe, me) >= me.hp * 0.3) return 'special';
+    }
+    const act = diff === 'easy' ? pick(allowed) : botAction(me, foe, B.turn, diff);
+    if (allowed.includes(act)) return act;
+    return allowed.includes('attack') ? 'attack' : allowed.includes('protect') ? 'protect' : 'lewd';
   }
 
   /* ---------- Serialização (online) ---------- */
-  const ser = f => ({ name: f.name, atk: f.atk, def: f.def, study: f.study, hp: f.hp, hpMax: f.hpMax, lewdPower: f.lewdPower, items: [...f.items], fx: { ...f.fx }, ko: f.ko });
-  const serState = B => Object.fromEntries(SIDES.map(s => [s, { active: B.teams[s].active, cards: B.teams[s].cards.map(ser) }]));
+  const ser = f => ({ name: f.name, atk: f.atk, def: f.def, study: f.study, hp: f.hp, hpMax: f.hpMax, lewdPower: f.lewdPower, items: [...f.items], fx: { ...f.fx }, ko: f.ko,
+    meter: f.meter, cls: f.cls, oath: f.oath, show: f.show, noProtect: f.noProtect, revived: f.revived });
+  const serState = B => ({
+    ...Object.fromEntries(SIDES.map(s => [s, { active: B.teams[s].active, studies: B.teams[s].studies, cards: B.teams[s].cards.map(ser) }])),
+    arena: { event: B.arena.event ? { ...B.arena.event } : null, next: B.arena.next },
+  });
 
   /* ============================================================
      INTERFACE
@@ -593,17 +764,10 @@
   <div class="wa-battle" id="waBattle">
     <div class="panel wa-setup" id="waSetup">
       <div class="panel-title"><span class="bar yellow"></span> BATALHA <span class="arena-beta">PROTÓTIPO</span></div>
-      <p class="wa-lead">Monte um time de <b>${RULES.teamSize} cartas</b> do seu harém e distribua os ${RULES.points} pontos do <b>$sk</b> de cada uma. Na luta, uma carta fica na frente e as outras no banco (recuperando +${RULES.benchHeal}💗 por turno). As regras seguem a Waifuarena do Mudae; o que a wiki não explica está marcado como <b>provisório</b>.</p>
+      <p class="wa-lead">Monte um time de <b>${RULES.teamSize} cartas</b> do seu harém e distribua os ${RULES.points} pontos do <b>$sk</b> de cada uma. Na luta, uma carta fica na frente e as outras no banco (recuperando +${RULES.benchHeal}💗 por turno). O time tem <b>${RULES.studies} 📔 estudos</b> para a partida inteira. As regras seguem a Waifuarena do Mudae; o que a wiki não explica está marcado como <b>provisório</b>.</p>
 
       <div class="wa-setup-grid">
         <div>
-          <div class="field">
-            <label>MODO</label>
-            <div class="wa-diff" id="waMode">
-              <button type="button" class="gender-btn active" data-mode="bot">Contra bot</button>
-              <button type="button" class="gender-btn" data-mode="online">Online (sala)</button>
-            </div>
-          </div>
           <p class="wa-online" id="waOnline" hidden></p>
           <div class="field" id="waDiffField">
             <label>DIFICULDADE DO BOT</label>
@@ -620,6 +784,16 @@
         </div>
 
         <div>
+          <div class="field">
+            <label>CLASSE · <span id="waClassOf"></span> <span class="wa-label-hint">· uma por carta, sem repetir no time</span></label>
+            <div class="wa-classes" id="waClasses">
+              ${Object.entries(CLASSES).map(([k, C]) => `
+                <button type="button" class="wa-cls${C.soon ? ' soon' : ''}" data-cls="${k}" style="--c:${C.color}" ${C.soon ? 'disabled' : ''}>
+                  <i>${C.ico}</i><b>${C.name.toUpperCase()}</b><small>${C.soon ? 'EM BREVE' : C.short}</small>
+                </button>`).join('')}
+            </div>
+            <div class="wa-cls-detail" id="waClassDetail"></div>
+          </div>
           <div class="field">
             <label>PONTOS DO $SK · <span id="waSkillOf"></span> <span class="wa-points" id="waPoints"></span></label>
             <div class="wa-skills" id="waSkills">
@@ -643,21 +817,32 @@
     </div>
 
     <div class="wa-board" id="waBoard" hidden>
-      <div class="wa-field">
-        <div class="wa-row wa-opp" id="waOpp"></div>
-        <div class="wa-mid">
-          <span class="wa-turn" id="waTurn">TURNO 1</span>
-          <div class="wa-reveal">
-            <span class="wa-pick" id="waPickOpp">?</span>
-            <span class="wa-vs">VS</span>
-            <span class="wa-pick" id="waPickMe">?</span>
+      <!-- TESTE desativado: barra para trocar o evento (ver TEST_BAR_HTML) -->
+      <!-- tabuleiro em perspectiva 3D: rival em cima, você embaixo, a mão de ações reta na frente -->
+      <div class="wa-field" id="waField">
+        <div class="wa-arena-fx" id="waArenaFx" aria-hidden="true"></div>
+        <div class="wa-event" id="waEvent" hidden></div>
+        <div class="wa-scene">
+          <div class="wa-floor">
+            <div class="wa-half wa-opp" id="waOpp"></div>
+            <div class="wa-mid">
+              <span class="wa-turn" id="waTurn">TURNO 1</span>
+              <div class="wa-reveal">
+                <span class="wa-pick" id="waPickOpp">?</span>
+                <span class="wa-vs">VS</span>
+                <span class="wa-pick" id="waPickMe">?</span>
+              </div>
+            </div>
+            <div class="wa-half wa-me" id="waMe"></div>
           </div>
-          <span class="wa-wait" id="waWait"></span>
         </div>
-        <div class="wa-row wa-me" id="waMe"></div>
+        <div class="wa-hud">
+          <span class="wa-hud-studies" id="waStudiesOpp"></span>
+          <span class="wa-wait" id="waWait"></span>
+          <span class="wa-hud-studies" id="waStudiesMe"></span>
+        </div>
         <div class="wa-actions" id="waActions">
           ${Object.entries(ACTIONS).map(([k, a]) => `<button type="button" class="wa-act wa-act-${k}" data-act="${k}"><span class="wa-act-ico">${a.ico}</span><b>${a.label}</b><small>${a.hint}</small></button>`).join('')}
-          <button type="button" class="wa-act wa-act-switch" data-act="switch"><span class="wa-act-ico">${SWITCH_ICO}</span><b>TROCAR</b><small>Escolha uma carta do banco</small></button>
         </div>
         <div class="wa-overlay" id="waOverlay" hidden></div>
         <div class="wa-end" id="waEnd" hidden></div>
@@ -678,15 +863,20 @@
   let busy = false;           // repetindo um pacote na tela
   let pendingMine = null;     // decisão minha em aberto { req, resolve }
   let switchMode = false;     // escolhendo a carta do banco para trocar
+  const clsOpen = { host: false, guest: false };   // descrição da classe aberta ao lado da carta
 
   /* ---------- Personagens do tracker ---------- */
   const characters = () => (typeof state !== 'undefined' && Array.isArray(state.characters) ? state.characters : [])
     .filter(c => c.claimed !== false)
     .sort((a, b) => (Number(b.kakera) || 0) - (Number(a.kakera) || 0));
   const findChar = id => characters().find(c => String(c.id) === String(id));
-  const defaultSkills = () => ({ yandere: 1, tsundere: 1, kuudere: 1, dandere: 1, deredere: 1 });
+  const defaultSkills = () => ({ yandere: 2, tsundere: 1, dandere: 1, deredere: 1 });
   const skillTotal = s => Object.values(s).reduce((t, v) => t + v, 0);
-  const savedSkills = c => (c && c.arenaSkills && skillTotal(c.arenaSkills) === RULES.points ? { ...defaultSkills(), ...c.arenaSkills } : defaultSkills());
+  // só as habilidades atuais (pontos salvos antes da saída do Kuudere voltam ao padrão)
+  const savedSkills = c => {
+    const s = c && c.arenaSkills && Object.fromEntries(SKILLS.map(([k]) => [k, Number(c.arenaSkills[k]) || 0]));
+    return s && skillTotal(s) === RULES.points ? s : defaultSkills();
+  };
 
   /* ---------- Carta (mesmo visual das cartas com efeitos) ---------- */
   // card-effects.js declara MudaeCardEffects com "const" (não fica em window)
@@ -694,7 +884,13 @@
   /* links http:// não carregam num site https: tenta a versão segura */
   const photoUrl = src => (typeof src === 'string' ? src.trim().replace(/^http:\/\//i, 'https://') : '');
 
-  function cardData(c) {
+  // broche da classe, à esquerda da kakera
+  const classBrooch = cls => {
+    const C = CLASSES[cls];
+    return C ? { ico: C.ico, color: C.color, title: `${C.name} · ${C.passive} · ✨ ${C.special}` } : null;
+  };
+
+  function cardData(c, cls = null) {
     const CE = cardFx();
     const op = typeof getOpStatus === 'function' ? getOpStatus(c) : { any: false, maxed: false };
     const roletas = typeof normalizeCharacterGenders === 'function' ? normalizeCharacterGenders(c.genders) : [];
@@ -702,19 +898,20 @@
       ...CE.DEFAULT_VISUAL, ...CE.readConfig(c.cardStyle).config,
       name: c.name || '', series: c.series && c.series !== '—' ? c.series : '', img: photoUrl(c.photo),
       kakera: Number(c.kakera) || 0, keys: Number(c.keys) || 0, op: op.maxed ? 'max' : op.any ? 'some' : 'none', roletas,
+      brooch: classBrooch(cls),
     };
   }
 
-  function cardHost(c) {
+  function cardHost(c, cls = null) {
     const CE = cardFx();
     if (CE && CE.createCardHost) {
-      const host = CE.createCardHost(cardData(c));
+      const host = CE.createCardHost(cardData(c, cls));
       host.title = 'Clique para ver a carta em 3D';
       host.addEventListener('click', ev => {
         // no banco (ao trocar), nos slots e nas janelas de escolha o clique serve para escolher a carta
         if (host.closest('.wa-bench-card.pickable, [data-pick]')) return;
         ev.stopPropagation();
-        CE.openViewer(cardData(c), { title: c.name, desc: c.series && c.series !== '—' ? c.series : '' });
+        CE.openViewer(cardData(c, cls), { title: c.name, desc: c.series && c.series !== '—' ? c.series : '' });
       });
       return host;
     }
@@ -752,15 +949,18 @@
      ============================================================ */
   const setup = { slots: [], current: 0 };   // slots: [{ id, skills }]
 
+  /* classe salva do personagem, se ainda não estiver em outro slot do time */
+  const freeClass = k => (validClass(k) && !setup.slots.some(s => s && s.cls === k) ? k : null);
+
   function fillCharacters() {
     const list = characters();
     $.empty.hidden = list.length >= RULES.teamSize;
     // mantém os slots válidos; completa com os de maior kakera
     const ids = setup.slots.map(s => s.id).filter(id => findChar(id));
-    setup.slots = [...new Set(ids)].map(id => ({ id, skills: setup.slots.find(s => s.id === id).skills }));
+    setup.slots = [...new Set(ids)].map(id => { const old = setup.slots.find(s => s.id === id); return { id, skills: old.skills, cls: old.cls }; });
     for (const c of list) {
       if (setup.slots.length >= RULES.teamSize) break;
-      if (!setup.slots.some(s => String(s.id) === String(c.id))) setup.slots.push({ id: c.id, skills: savedSkills(c) });
+      if (!setup.slots.some(s => String(s.id) === String(c.id))) setup.slots.push({ id: c.id, skills: savedSkills(c), cls: freeClass(c.arenaClass) });
     }
     setup.current = Math.min(setup.current, Math.max(0, setup.slots.length - 1));
     setupHosts.clear();   // a lista pode ter mudado (fotos, efeitos): recria as cartas
@@ -769,9 +969,9 @@
 
   /* cartas da montagem do time, reaproveitadas entre renderizações (sem piscar) */
   const setupHosts = new Map();
-  function setupHost(c) {
-    const key = String(c.id);
-    if (!setupHosts.has(key)) setupHosts.set(key, cardHost(c));
+  function setupHost(c, cls) {
+    const key = `${c.id}|${cls || ''}`;   // trocar a classe redesenha a carta (broche)
+    if (!setupHosts.has(key)) setupHosts.set(key, cardHost(c, cls));
     return setupHosts.get(key);
   }
 
@@ -783,30 +983,56 @@
       const c = s && findChar(s.id);
       const pts = s ? skillTotal(s.skills) : 0;
       const el = document.createElement('div');
-      el.className = `wa-slot${i === setup.current ? ' active' : ''}${s && pts === RULES.points ? '' : ' warn'}`;
+      const C = s && CLASSES[s.cls];
+      el.className = `wa-slot${i === setup.current ? ' active' : ''}${s && pts === RULES.points && C ? '' : ' warn'}`;
       el.dataset.slot = i;
       el.dataset.pick = '';
       el.tabIndex = 0;
       el.setAttribute('role', 'button');
       el.setAttribute('aria-label', `Slot ${i + 1}: ${c ? c.name : 'vazio'}`);
       el.innerHTML = `<span class="wa-slot-n">${i + 1}</span><div class="wa-slot-card">${c ? '' : '<span class="wa-slot-empty">+</span>'}</div>
-        <small>${s ? `${pts}/${RULES.points} pontos` : 'vazio'}</small>`;
-      if (c) el.querySelector('.wa-slot-card').appendChild(setupHost(c));
+        <small>${s ? `${pts}/${RULES.points} pontos` : 'vazio'}</small>
+        ${s ? (C ? `<span class="wa-slot-cls" style="--c:${C.color}">${C.ico} ${C.name.toUpperCase()}</span>` : '<span class="wa-slot-cls none">SEM CLASSE</span>') : ''}`;
+      if (c) el.querySelector('.wa-slot-card').appendChild(setupHost(c, s.cls));
       $.team.appendChild(el);
     }
     $.slotN.textContent = setup.current + 1;
     const c = cur && findChar(cur.id);
     $.skillOf.textContent = c ? c.name.toUpperCase() : '';
+    $.classOf.textContent = c ? c.name.toUpperCase() : '';
+    renderClasses(cur);
     const skills = cur ? cur.skills : defaultSkills();
     for (const [k] of SKILLS) $.skills.querySelector(`[data-skill-val="${k}"]`).textContent = skills[k];
     const total = skillTotal(skills);
     $.points.textContent = `${total}/${RULES.points}`;
     $.points.classList.toggle('ok', total === RULES.points);
     if (c) {
-      const f = makeFighter(c, skills, 'host', 0);
-      $.preview.innerHTML = `<span>Na luta:</span> <b>${f.atk}</b>⚔️ <b>${f.def}</b>🛡️ <b>${f.study}</b>📔 <b>${f.hp}</b>💗 <b>${f.lewdPower}</b>🍓`;
+      const f = makeFighter(c, skills, 'host', 0, 1, cur.cls);
+      const C = CLASSES[cur.cls];
+      $.preview.innerHTML = `<span>Na luta:</span> <b>${f.atk}</b>⚔️ <b>${f.def}</b>🛡️ <b>${f.study}</b>📔 <b>${f.hp}</b>💗 <b>${f.lewdPower}</b>🍓` +
+        (C ? ` <span class="wa-preview-weak">(${C.weak} · ${C.name})</span><div class="wa-preview-special" style="--c:${C.color}"><b>✨ ${C.special}</b> ${C.specialDesc}.</div>`
+           : '<div class="wa-preview-special none">Escolha uma <b>classe</b> para esta carta.</div>');
     } else $.preview.innerHTML = '';
     refreshStart();
+  }
+
+  /* grade de classes: a do slot atual fica marcada; as de outros slots ficam bloqueadas */
+  function renderClasses(cur) {
+    const taken = new Set(setup.slots.filter(s => s && s !== cur && s.cls).map(s => s.cls));
+    $.classes.querySelectorAll('[data-cls]').forEach(b => {
+      const k = b.dataset.cls;
+      b.classList.toggle('sel', !!cur && cur.cls === k);
+      b.classList.toggle('taken', taken.has(k));
+      b.disabled = !!CLASSES[k].soon || taken.has(k) || !cur;
+    });
+    const C = cur && CLASSES[cur.cls];
+    $.classDetail.style.setProperty('--c', C ? C.color : 'var(--border)');
+    $.classDetail.innerHTML = C
+      ? `<h4>${C.ico} ${C.name.toUpperCase()}</h4>
+         <div class="wa-cls-row"><span>PASSIVA</span>${C.passive}</div>
+         <div class="wa-cls-row"><span>✨ ESPECIAL</span><div><b>${C.special}</b>: ${C.specialDesc}</div></div>
+         <div class="wa-cls-row weak"><span>FRAQUEZA</span>${C.weak}</div>`
+      : '<p class="wa-cls-empty">Escolha a classe desta carta. Ela define a passiva, o ✨ especial e a fraqueza.</p>';
   }
 
   /* coloca a carta no slot atual (se ela já estava no time, os dois slots trocam) */
@@ -816,7 +1042,10 @@
     if (waiting) cancelReady();
     const other = setup.slots.findIndex((s, i) => i !== setup.current && s && String(s.id) === String(id));
     if (other !== -1) [setup.slots[other], setup.slots[setup.current]] = [setup.slots[setup.current], setup.slots[other]];
-    else setup.slots[setup.current] = { id: c.id, skills: savedSkills(c) };
+    else {
+      setup.slots[setup.current] = null;   // libera a classe do slot antes de ver se a salva está livre
+      setup.slots[setup.current] = { id: c.id, skills: savedSkills(c), cls: freeClass(c.arenaClass) };
+    }
     renderSetup();
     onlineStatus();
   }
@@ -834,6 +1063,170 @@
       <p class="wa-picker-empty" id="waPickerEmpty" hidden>Nenhuma carta com esse nome ou série.</p>
     </div>
   </div>`;
+
+  /* janela de regras (botão REGRAS no título da arena: qualquer [data-wa-rules]).
+     Os números vêm de RULES, então a janela acompanha as mudanças nas regras. */
+  const wrCard = (cls, txt = '') => `<span class="wr-card ${cls}">${txt}</span>`;
+  const wrRow = (who, frontTxt) => `<div class="wr-row"><span class="wr-who">${who}</span>${wrCard('bench')}${wrCard('bench')}${wrCard('front', frontTxt)}</div>`;
+  const offerBands = [0, 1, 2].map(k => {
+    const from = k * RULES.offerEvery, to = from + RULES.offerEvery - 1;
+    return `<div class="wr-band"><span>${k === RULES.maxOffers - 1 ? `${from}+` : `${from}–${to}`} 📔</span><b>${'🎁'.repeat(k + 1)}</b><small>${k + 1} ${k ? 'opções' : 'opção'}</small></div>`;
+  }).join('');
+
+  const RULES_MODAL_HTML = `
+  <div class="wa-rules" id="waRules" hidden>
+    <div class="wa-rules-box" role="dialog" aria-modal="true" aria-labelledby="waRulesTitle">
+      <div class="wa-rules-head">
+        <h3 id="waRulesTitle">📜 REGRAS DA WAIFU ARENA</h3>
+        <button type="button" class="modal-x" id="waRulesClose" title="Fechar (Esc)">✕</button>
+      </div>
+      <div class="wa-rules-body">
+
+        <section class="wr-sec">
+          <h4><span class="wr-n">1</span> OBJETIVO</h4>
+          <p>Cada jogador tem <b>${RULES.teamSize} cartas</b>. Uma luta na <b>frente</b> e as outras esperam no <b>banco</b>.
+          Vence quem nocautear as ${RULES.teamSize} cartas do rival.</p>
+          <div class="wr-ill wr-field">
+            ${wrRow('RIVAL', 'FRENTE')}
+            <span class="wr-vs">VS</span>
+            ${wrRow('VOCÊ', 'FRENTE')}
+          </div>
+        </section>
+
+        <section class="wr-sec">
+          <h4><span class="wr-n">2</span> ATRIBUTOS</h4>
+          <p>Toda carta começa com:</p>
+          <div class="wr-stats">
+            <span><i>⚔️</i><b>${RULES.base.atk}</b>Ataque</span>
+            <span><i>🛡️</i><b>${RULES.base.def}</b>Defesa</span>
+            <span><i>📔</i><b>${RULES.base.study}</b>Estudo</span>
+            <span><i>💗</i><b>${RULES.base.hp}</b>Vida</span>
+          </div>
+          <p>Depois você distribui <b>${RULES.points} pontos do $sk</b> em cada carta:</p>
+          <div class="wr-table">
+            ${SKILLS.map(([, label, eff]) => `<div><span>${label}</span><b>${eff}</b></div>`).join('')}
+          </div>
+        </section>
+
+        <section class="wr-sec">
+          <h4><span class="wr-n">3</span> O TURNO</h4>
+          <p>Os dois escolhem <b>ao mesmo tempo</b>, sem ver o que o outro escolheu. As escolhas são reveladas juntas.</p>
+          <div class="wr-ill wr-reveal">
+            <span class="wr-pick">?</span><span class="wr-vs">VS</span><span class="wr-pick">?</span>
+            <span class="wr-arrow">➜</span>
+            <span class="wr-pick on">⚔️</span><span class="wr-vs">VS</span><span class="wr-pick on">🛡️</span>
+          </div>
+          <div class="wr-acts">
+            <div><i>⚔️</i><b>ATACAR</b><small>Causa dano na carta da frente do rival.</small></div>
+            <div><i>🛡️</i><b>PROTEGER</b><small>Recebe ${RULES.protect} a menos de dano neste turno.</small></div>
+            <div><i>📔</i><b>ESTUDAR</b><small>Ganha um item. Só ${RULES.studies} por partida.</small></div>
+            <div><i>🍓</i><b>LEWD</b><small>O rival perde ${RULES.lewd} 🛡️, ${RULES.lewd} 📔 e ${RULES.lewd} 💗.</small></div>
+            <div><i>✨</i><b>ESPECIAL</b><small>Com o medidor ⚡ cheio. Veja a seção 7.</small></div>
+            <div><i>${SWITCH_ICO}</i><b>TROCAR</b><small>Troca a carta da frente por uma do banco.</small></div>
+          </div>
+        </section>
+
+        <section class="wr-sec">
+          <h4><span class="wr-n">4</span> DANO</h4>
+          <div class="wr-ill wr-formula">
+            <span class="wr-term">⚔️<small>do atacante</small></span><span class="wr-op">−</span>
+            <span class="wr-term">🛡️<small>do alvo</small></span><span class="wr-op">=</span>
+            <span class="wr-term hit">💗<small>perdida</small></span>
+          </div>
+          <div class="wr-examples">
+            <div><b>8 − 3 = 5</b> de dano</div>
+            <div>Alvo protegeu? <b>5 − ${RULES.protect} = 3</b></div>
+          </div>
+          <ul class="wr-list">
+            <li>O golpe tira pelo menos <b>${RULES.minDamage}</b>. Só a 🛡️ Proteger consegue zerar o dano.</li>
+            <li>Se as duas cartas atacam, <b>as duas apanham</b>: os golpes são simultâneos.</li>
+          </ul>
+        </section>
+
+        <section class="wr-sec">
+          <h4><span class="wr-n">5</span> BANCO E TROCA</h4>
+          <p>No banco a carta recupera <b>+${RULES.benchHeal} 💗 por turno</b>, até a vida máxima.</p>
+          <p>Se você troca enquanto o rival ataca:</p>
+          <div class="wr-cases">
+            <div class="wr-case">
+              <span class="wr-case-tag ok">NORMAL</span>
+              <div class="wr-flow">${wrCard('front', 'A')}<span class="wr-arrow">⇄</span>${wrCard('front in', 'B')}<span class="wr-hit">⚔️💥B</span></div>
+              <small>A troca acontece primeiro. <b>Quem entra</b> toma o golpe.</small>
+            </div>
+            <div class="wr-case">
+              <span class="wr-case-tag bad">GOLPE FORTE</span>
+              <div class="wr-flow"><span class="wr-hit">⚔️💥A</span>${wrCard('front', 'A')}<span class="wr-arrow">⇄</span>${wrCard('front in', 'B')}</div>
+              <small>Se o ataque for <b>≥ a vida máxima</b> de quem sai, <b>quem sai</b> toma o golpe antes de trocar.</small>
+            </div>
+          </div>
+        </section>
+
+        <section class="wr-sec">
+          <h4><span class="wr-n">6</span> ESTUDAR E ITENS</h4>
+          <p>Cada jogador tem <b>${RULES.studies} estudos para a partida inteira</b>, somando as ${RULES.teamSize} cartas. Use quando quiser.</p>
+          <p>Cada 📔 Estudar mostra de 1 a ${RULES.maxOffers} itens. Você escolhe <b>1 item</b> e <b>qual carta do time</b> fica com ele.</p>
+          <div class="wr-ill wr-bands">${offerBands}</div>
+          <ul class="wr-list">
+            <li>Quanto mais 📔, <b>mais opções</b> e <b>itens mais raros</b>.</li>
+            <li>O item dá atributos <b>para sempre</b>. Alguns também têm efeitos especiais.</li>
+          </ul>
+        </section>
+
+        <section class="wr-sec">
+          <h4><span class="wr-n">7</span> ESPECIAL ✨</h4>
+          <p>Cada carta tem um medidor <b>⚡ de ${RULES.meterMax}</b>. Ele não zera quando a carta vai para o banco.</p>
+          <div class="wr-ill wr-meter-ill">
+            <span class="wr-gain"><b>+${RULES.meterHurt}⚡</b>tomou dano</span>
+            <span class="wr-gain"><b>+${RULES.meterHit}⚡</b>acertou um ataque</span>
+            <span class="wr-gain"><b>+${RULES.meterBlock}⚡</b>bloqueou com 🛡️</span>
+          </div>
+          <p>Com o medidor cheio, o botão <b>✨ ESPECIAL</b> acende. O especial vem da <b>classe</b> da carta (seção 8).</p>
+        </section>
+
+        <section class="wr-sec">
+          <h4><span class="wr-n">8</span> CLASSES</h4>
+          <p>Antes da partida, cada carta recebe uma <b>classe</b> (sem repetir no time). Ela aparece como um <b>broche</b> na carta, ao lado da kakera, e dá:</p>
+          <div class="wr-ill wr-meter-ill">
+            <span class="wr-gain"><b>PASSIVA</b>vale a partida inteira</span>
+            <span class="wr-gain"><b>✨</b>especial com ⚡ cheio</span>
+            <span class="wr-gain"><b>FRAQUEZA</b>um custo pequeno</span>
+          </div>
+          <div class="wr-classes">
+            ${CLASS_KEYS.map(k => { const C = CLASSES[k]; return `<div style="--c:${C.color}"><b>${C.ico} ${C.name.toUpperCase()}</b><span>${C.passive}</span><span>✨ <b>${C.special}</b>: ${C.specialDesc}</span><span class="weak">Fraqueza: ${C.weak}</span></div>`; }).join('')}
+          </div>
+        </section>
+
+        <section class="wr-sec">
+          <h4><span class="wr-n">9</span> EVENTOS DE ARENA</h4>
+          <p>De vez em quando surge um evento <b>aleatório</b>. Ele é <b>anunciado 1 turno antes</b>, dura <b>${RULES.eventTurns} turnos</b> e vale para os dois lados.</p>
+          <div class="wr-acts">
+            ${Object.values(EVENTS).map(ev => `<div><i>${ev.ico}</i><b>${ev.name.toUpperCase()}</b><small>${ev.desc}.</small></div>`).join('')}
+          </div>
+        </section>
+
+        <section class="wr-sec">
+          <h4><span class="wr-n">10</span> NOCAUTE E FIM</h4>
+          <ul class="wr-list">
+            <li>No começo, cada um escolhe <b>quem começa na frente</b>.</li>
+            <li>Carta com <b>0 💗</b> é nocauteada. Se for a da frente, o dono escolhe quem entra.</li>
+          </ul>
+          <div class="wr-ends">
+            <div><i>🏆</i><b>VITÓRIA</b><small>O rival ficou sem cartas de pé.</small></div>
+            <div><i>🤝</i><b>EMPATE</b><small>Os dois times caem juntos, ou a luta chega ao turno ${RULES.maxTurns}.</small></div>
+          </div>
+        </section>
+
+        <p class="wr-foot">Atributos iniciais, pontos do $sk e número de opções do 📔 são <b>provisórios</b>: a wiki do Mudae não explica esses números, então eles podem mudar.</p>
+      </div>
+    </div>
+  </div>`;
+
+  function openRules() {
+    $.rules.hidden = false;
+    $.rules.querySelector('.wa-rules-body').scrollTop = 0;
+    document.getElementById('waRulesClose').focus();
+  }
+  const closeRules = () => { $.rules.hidden = true; };
 
   const pickerHosts = new Map();
   let pickerObserver = null;
@@ -895,13 +1288,14 @@
     $.pickerEmpty.hidden = shown > 0;
   }
 
-  const teamReady = () => setup.slots.length === RULES.teamSize && setup.slots.every(s => findChar(s.id) && skillTotal(s.skills) === RULES.points);
+  const classesOk = () => setup.slots.every(s => validClass(s.cls)) && new Set(setup.slots.map(s => s.cls)).size === setup.slots.length;
+  const teamReady = () => setup.slots.length === RULES.teamSize && classesOk() && setup.slots.every(s => findChar(s.id) && skillTotal(s.skills) === RULES.points);
 
   async function saveTeamSkills() {
     for (const s of setup.slots) {
       const idx = state.characters.findIndex(ch => String(ch.id) === String(s.id));
       if (idx === -1) continue;
-      const updated = { ...state.characters[idx], arenaSkills: { ...s.skills } };
+      const updated = { ...state.characters[idx], arenaSkills: { ...s.skills }, arenaClass: s.cls };
       state.characters[idx] = updated;
       try { await Database.updateCharacter(updated); } catch (err) { console.error('Erro ao salvar os pontos do $sk:', err); }
     }
@@ -913,22 +1307,32 @@
   const view = { hosts: { host: [], guest: [] }, active: { host: 0, guest: 0 } };
   const rowOf = s => (s === B.me ? $.me : $.opp);
 
+  /* metade do tabuleiro: carta da frente no centro, informações ao lado e o banco
+     (rival: banco em cima; você: banco embaixo, com o botão ⇅ TROCAR ao lado) */
   function rowHTML(s) {
     const mine = s === B.me;
     const tag = mine ? 'VOCÊ' : B.mode === 'online' ? 'RIVAL ONLINE' : `BOT · ${DIFFICULTIES[B.difficulty].label.toUpperCase()}`;
-    return `
-      <div class="wa-card-slot"></div>
-      <div class="wa-info">
-        <div class="wa-name"><span class="wa-name-txt"></span> <span class="wa-tag ${mine ? 'me' : 'opp'}">${tag}</span> <span class="wa-team-count"></span></div>
-        <div class="wa-lp"><span class="wa-lp-label">💗</span><div class="wa-lp-bar"><i></i></div><b class="wa-lp-val"></b></div>
-        <div class="wa-stats"></div>
-        <div class="wa-flags"></div>
-        <div class="wa-items"></div>
-      </div>
-      <div class="wa-bench"></div>`;
+    const front = `
+      <div class="wa-front">
+        <div class="wa-cls-side"></div>
+        <div class="wa-card-slot"></div>
+        <div class="wa-info">
+          <div class="wa-name"><span class="wa-tag ${mine ? 'me' : 'opp'}">${tag}</span> <span class="wa-name-txt"></span></div>
+          <div class="wa-lp"><b class="wa-lp-val"></b><div class="wa-lp-bar"><i></i></div></div>
+          <div class="wa-stats"></div>
+          <div class="wa-flags"></div>
+          <div class="wa-items"></div>
+        </div>
+      </div>`;
+    const bench = mine
+      ? `<div class="wa-bench-row"><div class="wa-bench"></div>
+           <button type="button" class="wa-switch-btn" data-act="switch" title="Trocar a carta da frente por uma do banco"><span>${SWITCH_ICO}</span><b>TROCAR</b></button></div>`
+      : '<div class="wa-bench-row"><div class="wa-bench"></div></div>';
+    return mine ? front + bench : bench + front;
   }
 
   function mountBoard() {
+    clsOpen.host = clsOpen.guest = false;
     $.opp.innerHTML = rowHTML(other(B.me));
     $.me.innerHTML = rowHTML(B.me);
     $.log.innerHTML = '';
@@ -941,7 +1345,7 @@
       view.hosts[s] = B.teams[s].cards.map(f => {
         const wrap = document.createElement('div');
         wrap.className = 'wa-cardwrap';
-        wrap.appendChild(cardHost(f.char));
+        wrap.appendChild(cardHost(f.char, f.cls));
         checkPhoto(f, wrap, s === B.me);
         return wrap;
       });
@@ -967,16 +1371,40 @@
     if (slot.firstChild !== view.hosts[s][act]) { slot.innerHTML = ''; slot.appendChild(view.hosts[s][act]); }
     row.classList.toggle('ko', f.ko);
     row.querySelector('.wa-name-txt').textContent = f.name;
-    row.querySelector('.wa-team-count').textContent = `· time ${alive(T).length}/${T.cards.length}`;
     const pct = Math.max(0, Math.min(100, (f.hp / f.hpMax) * 100));
-    const bar = row.querySelector('.wa-lp-bar i');
+    const bar = row.querySelector('.wa-info .wa-lp-bar i');   // a da carta da frente (o banco também tem barrinhas)
     bar.style.width = pct + '%';
     bar.dataset.level = lpLevel(pct);
-    row.querySelector('.wa-lp-val').textContent = `${f.hp} / ${f.hpMax}`;
+    row.querySelector('.wa-lp-val').innerHTML = `${f.hp}<small>/${f.hpMax}</small>`;
     const dyn = f.fx.dynamax ? ' <span class="wa-dyn">DYNAMAX ×1,5</span>' : '';
+    const C = clsOf(f);
     row.querySelector('.wa-stats').innerHTML =
-      `<span title="Ataque">⚔️ <b>${f.atk}</b></span><span title="Defesa">🛡️ <b>${f.def}</b></span><span title="Estudo">📔 <b>${f.study}</b></span><span title="Força do lewd">🍓 <b>${f.lewdPower}</b></span>${dyn}`;
-    const flags = Object.entries(FLAG_LABELS).filter(([k]) => f.fx[k]).map(([, t]) => `<span>${t}</span>`);
+      `<span title="Ataque">⚔️ <b>${f.atk}</b></span><span title="Defesa">🛡️ <b>${f.def}</b></span><span title="Estudo">📔 <b>${f.study}</b></span><span title="Força do lewd">🍓 <b>${f.lewdPower}</b></span>${dyn}` +
+      (C ? `<span class="wa-meter${f.meter >= RULES.meterMax ? ' full' : ''}" title="${esc(`${C.special}: ${C.specialDesc}`)}">⚡ ${Array.from({ length: RULES.meterMax }, (_, i) => `<i${i < f.meter ? ' class="on"' : ''}></i>`).join('')} <small>${C.special}</small></span>` : '');
+    // quadro da classe, do outro lado da carta
+    const side = row.querySelector('.wa-cls-side');
+    side.hidden = !C;
+    if (C) {
+      // fechado: só ícone e nome; clicando, abre passiva, especial e fraqueza
+      side.style.setProperty('--c', C.color);
+      const open = clsOpen[s];
+      const ready = f.meter >= RULES.meterMax;
+      const active = f.cls === 'berserker' && f.hp < f.hpMax * 0.5;
+      side.classList.toggle('open', open);
+      side.innerHTML = `
+        <button type="button" class="wa-cls-head" data-cls-toggle="${s}" title="${open ? 'Fechar' : 'Ver o que a classe faz'}" aria-expanded="${open}">
+          <span class="wa-cls-ico">${C.ico}</span><b>${C.name.toUpperCase()}</b><i>${open ? '✕' : 'ⓘ'}</i>
+        </button>
+        ${open ? `
+        <div class="wa-cls-line"><span>PASSIVA${active ? ' · ATIVA' : ''}</span>${C.passive}</div>
+        <div class="wa-cls-line sp${ready ? ' ready' : ''}"><span>✨ ${C.special}${ready ? ' · PRONTO' : ` · ⚡ ${f.meter}/${RULES.meterMax}`}</span>${C.specialDesc}</div>
+        <div class="wa-cls-line weak"><span>FRAQUEZA</span>${C.weak}</div>` : ''}`;
+    }
+    const flags = [];
+    if (f.oath > 0) flags.push(`<span>🛡️ Juramento · dano pela metade (${f.oath} turno${f.oath > 1 ? 's' : ''})</span>`);
+    if (f.show > 0) flags.push(`<span>🎤 Show ao Vivo · +2⚔️ (${f.show} turno${f.show > 1 ? 's' : ''})</span>`);
+    if (f.noProtect === B.turn + 1) flags.push('<span>🪓 Fúria · sem 🛡️ neste turno</span>');
+    flags.push(...Object.entries(FLAG_LABELS).filter(([k]) => f.fx[k]).map(([, t]) => `<span>${t}</span>`));
     if (f.fx.future) flags.push(`<span>🔮 +${f.fx.future}📔 no próximo item</span>`);
     row.querySelector('.wa-flags').innerHTML = flags.join('');
     row.querySelector('.wa-items').innerHTML = itemsHTML(f);
@@ -990,14 +1418,11 @@
       el.className = `wa-bench-card${c.ko ? ' ko' : ''}${canPick ? ' pickable' : ''}`;
       el.dataset.idx = i;
       const p = Math.max(0, Math.min(100, (c.hp / c.hpMax) * 100));
+      el.title = c.ko ? `${c.name} · nocauteada` : `${c.name} · ${c.hp}/${c.hpMax}💗 · ⚔️${c.atk} 🛡️${c.def} 📔${c.study} · ⚡${c.meter}/${RULES.meterMax}${c.items.length ? ` · ${c.items.join(', ')}` : ''}`;
       el.appendChild(view.hosts[s][i]);
       el.insertAdjacentHTML('beforeend', `
-        <div class="wa-bench-info">
-          <b>${esc(c.name)}</b>
-          <div class="wa-lp-bar mini"><i style="width:${p}%" data-level="${lpLevel(p)}"></i></div>
-          <span>${c.ko ? 'NOCAUTEADA' : `${c.hp}/${c.hpMax}💗 · ⚔️${c.atk} 🛡️${c.def} 📔${c.study}`}</span>
-          ${c.items.length ? `<span class="wa-bench-items" title="${esc(c.items.join(', '))}">📦 ${c.items.length} ${c.items.length > 1 ? 'itens' : 'item'}</span>` : ''}
-        </div>`);
+        <div class="wa-lp-bar mini"><i style="width:${p}%" data-level="${lpLevel(p)}"></i></div>
+        <small>${c.ko ? 'NOCAUTEADA' : `${c.hp}/${c.hpMax}`}</small>`);
       bench.appendChild(el);
     });
   }
@@ -1017,9 +1442,91 @@
     $.turn.textContent = `TURNO ${B.turn + 1}`;
     const T = B.teams[B.me];
     const canSwitch = alive(T).some(c => c.idx !== T.active);
-    $.actions.querySelector('[data-act="switch"]').disabled = !canSwitch;
+    const swap = $.field.querySelector('[data-act="switch"]');
+    swap.disabled = !canSwitch;
+    swap.querySelector('b').textContent = switchMode ? 'CANCELAR' : 'TROCAR';
+    $.field.classList.toggle('switching', switchMode);
+    const O = B.teams[other(B.me)];
+    $.studiesOpp.textContent = `📔 Rival: ${O.studies}/${RULES.studies} · time ${alive(O).length}/${O.cards.length}`;
+    $.studiesMe.textContent = `📔 Você: ${T.studies}/${RULES.studies} · time ${alive(T).length}/${T.cards.length}`;
+    const allowed = availableActions(B, B.me);
+    for (const k of Object.keys(ACTIONS)) $.actions.querySelector(`[data-act="${k}"]`).disabled = !allowed.includes(k);
+    const study = $.actions.querySelector('[data-act="study"] small');
+    if (eventIs(front(B, B.me), 'rain')) study.textContent = 'Grátis (Chuva de Kakera)';
+    else study.textContent = T.studies > 0 ? `Restam ${T.studies} de ${RULES.studies}` : 'Acabaram os estudos';
+    const f = front(B, B.me), C = clsOf(f);
+    $.actions.querySelector('[data-act="protect"] small').textContent = `−${protectValue(f)} de dano recebido`;
+    const spName = C ? C.special : 'Sem classe';
+    let spHint = f.meter >= RULES.meterMax ? spName : `⚡ ${f.meter}/${RULES.meterMax} · ${spName}`;
+    if (f.cls === 'cleric' && f.revived) spHint = 'Ressurreição já usada';
+    else if (f.cls === 'cleric' && f.meter >= RULES.meterMax && !canRevive(B, B.me, f)) spHint = 'Ninguém para reviver';
+    $.actions.querySelector('[data-act="special"] small').textContent = spHint;
+    $.actions.querySelector('[data-act="special"]').title = C ? `${C.special}: ${C.specialDesc}` : '';
+    renderEvent();
     $.actions.classList.toggle('switching', switchMode);
   }
+
+  /* faixa do evento de arena, no meio do tabuleiro */
+  function renderEvent() {
+    const A = B.arena;
+    let html = '';
+    if (A.event) {
+      const ev = EVENTS[A.event.key];
+      html = `<b>${ev.ico} ${ev.name.toUpperCase()}</b><span>${ev.desc} · ${A.event.left} ${A.event.left > 1 ? 'turnos' : 'turno'}</span>`;
+    } else if (A.next) {
+      const ev = EVENTS[A.next];
+      html = `<b>⚠️ PRÓXIMO TURNO</b><span>${ev.ico} ${ev.name}: ${ev.desc}</span>`;
+    }
+    $.event.innerHTML = html;
+    $.event.hidden = !html;
+    $.event.classList.toggle('soon', !A.event && !!A.next);
+    arenaTheme(A.event ? A.event.key : '');
+    /* TESTE desativado: barra de eventos (ver TEST_BAR_HTML)
+    $.liveEventBox.hidden = B.mode !== 'bot';
+    const cur = A.event ? A.event.key : '';
+    $.liveEventBox.querySelectorAll('[data-live-event]').forEach(b => b.classList.toggle('active', b.dataset.liveEvent === cur));
+    */
+  }
+
+  /* A arena muda com o evento: cor do tabuleiro (CSS por data-event) + partículas */
+  const FX_PARTS = { moon: 14, festival: 26, rain: 30, romance: 14, storm: 24, silence: 3 };
+  function arenaTheme(key) {
+    if ($.field.dataset.event === key) return;
+    $.field.dataset.event = key;
+    const n = FX_PARTS[key] || 0;
+    const rnd = (a, b) => (a + Math.random() * (b - a)).toFixed(2);
+    $.arenaFx.innerHTML = (key === 'moon' ? '<span class="fx-moon"></span>' : '') + (key === 'storm' ? '<span class="fx-flash"></span>' : '') +
+      Array.from({ length: n }, () =>
+        `<i style="--x:${rnd(0, 100)}%;--y:${rnd(0, 100)}%;--d:${rnd(-8, 0)}s;--t:${rnd(3, 8)}s;--s:${rnd(0.6, 1.4)};--h:${Math.floor(Math.random() * 360)}"></i>`).join('');
+  }
+
+  /* ---------- TESTE desativado: trocar o evento no meio da partida (só offline) ----------
+     Para reativar, descomente os 4 trechos marcados com "TESTE desativado":
+     1. este bloco;
+     2. no SECTION_HTML, troque o comentário do topo do .wa-board por ${TEST_BAR_HTML};
+     3. o final de renderEvent();
+     4. a entrada liveEventBox em $ e o clique da barra, no init().
+     O CSS (.wa-test-bar, .wa-test-chip) continua no waifuarena-battle.css.
+
+  const TEST_BAR_HTML = `
+      <div class="wa-test-bar" id="waLiveEventBox" hidden>
+        <span class="wa-test-bar-label">EVENTO <span class="arena-beta">TESTE</span></span>
+        <button type="button" class="wa-test-chip" data-live-event="">🎲 Nenhum</button>
+        ${Object.entries(EVENTS).map(([k, ev]) => `<button type="button" class="wa-test-chip" data-live-event="${k}" title="${ev.desc}">${ev.ico} ${ev.name}</button>`).join('')}
+      </div>`;
+
+  // troca o evento na hora (quando a partida espera a sua ação); o escolhido vira o único que sai
+  function setLiveEvent(key) {
+    if (!B || B.over || B.mode !== 'bot') return;
+    const A = B.arena;
+    A.forced = EVENTS[key] ? key : null;
+    A.next = null;
+    A.event = A.forced ? { key, left: RULES.eventTurns } : null;
+    if (A.event) addLog(`${EVENTS[key].ico} <b>EVENTO (teste): ${EVENTS[key].name}</b> — ${EVENTS[key].desc}.`, 'combo');
+    else addLog('Evento removido (teste). Os eventos voltam a ser aleatórios.', 'turn');
+    renderBoard();
+  }
+  */
 
   function addLog(html, kind = '', s = null) {
     const li = document.createElement('li');
@@ -1054,11 +1561,17 @@
   /* ---------- Pacotes (o que os dois veem) ---------- */
   function ingestState(st) {
     if (!st) return;
+    if (st.arena) {
+      const ev = st.arena.event;
+      B.arena.event = ev && EVENTS[ev.key] ? { key: ev.key, left: Number(ev.left) || 0 } : null;
+      B.arena.next = EVENTS[st.arena.next] ? st.arena.next : null;
+    }
     for (const s of SIDES) {
       if (!st[s]) continue;
       const T = B.teams[s];
       T.active = Number(st[s].active) || 0;
-      st[s].cards.forEach((d, i) => { if (T.cards[i]) Object.assign(T.cards[i], d, { name: T.cards[i].name, side: s, idx: i }); });
+      if (st[s].studies !== undefined) T.studies = Math.max(0, Number(st[s].studies) || 0);
+      st[s].cards.forEach((d, i) => { if (T.cards[i]) Object.assign(T.cards[i], d, { name: T.cards[i].name, side: s, idx: i, cls: validClass(d.cls) ? d.cls : null }); });
     }
   }
 
@@ -1083,6 +1596,7 @@
       if (ev.e === 'atk') animAttack(ev);
       if (ev.e === 'sw') { await sleep(350); view.active[ev.side] = ev.to; renderSide(ev.side); }
       if (ev.e === 'ko') { view.hosts[ev.side][ev.idx].classList.add('ko-flash'); }
+      if (ev.e === 'revive') { view.hosts[ev.side][ev.idx].classList.remove('ko-flash'); }
     }
     if (pkg.turn !== undefined) B.turn = pkg.turn;
     ingestState(pkg.state);
@@ -1191,10 +1705,11 @@
     const T = B.teams[s];
     const okIdx = i => Number.isInteger(i) && T.cards[i] && !T.cards[i].ko;
     if (req.kind === 'action') {
-      if (ACTIONS[v]) return v;
+      const allowed = availableActions(B, s);
+      if (allowed.includes(v)) return v;
       const m = /^switch:(\d)$/.exec(String(v));
       if (m && okIdx(Number(m[1])) && Number(m[1]) !== T.active) return v;
-      return 'protect';
+      return allowed.includes('protect') ? 'protect' : 'lewd';
     }
     if (req.kind === 'lead' || req.kind === 'replace') return okIdx(Number(v)) ? Number(v) : alive(T)[0].idx;
     if (req.kind === 'item') {
@@ -1223,8 +1738,7 @@
     if (!live()) return;
     SIDES.forEach((s, k) => { D.teams[s].active = validInput({ kind: 'lead' }, leads[k], s); });
     events.length = 0;
-    D.log(`${front(D, 'host').name} e ${front(D, 'guest').name} entram na frente!`, 'turn');
-    await publish({ events: events.splice(0) });
+    D.log(`${front(D, 'host').name} e ${front(D, 'guest').name} entram na frente!`, 'turn');    await publish({ events: events.splice(0) });
 
     while (live()) {
       const acts = await Promise.all(SIDES.map(s => decide(s, { kind: 'action' })));
@@ -1248,6 +1762,7 @@
       }
 
       benchHeal(D);
+      arenaTick(D);
       result = checkKOs(D);
       await publish({ events: events.splice(0) });
       if (result) { D.over = true; return publish({ events: [], result }); }
@@ -1274,11 +1789,13 @@
     const hpBot = mode === 'bot' ? DIFFICULTIES[diff].hp : 1;
     const D = {
       mode, role: me === 'host' ? 'host' : 'guest', me, difficulty: diff, guestPeer, turn: 0, over: false, events: [],
+      arena: { event: null, next: null, forced: null },
       teams: {
-        host: { active: 0, cards: hostTeam.map((m, i) => makeFighter(m.char, m.skills, 'host', i)) },
-        guest: { active: 0, cards: guestTeam.map((m, i) => makeFighter(m.char, m.skills, 'guest', i, hpBot)) },
+        host: { active: 0, studies: RULES.studies, cards: hostTeam.map((m, i) => makeFighter(m.char, m.skills, 'host', i, 1, m.cls)) },
+        guest: { active: 0, studies: RULES.studies, cards: guestTeam.map((m, i) => makeFighter(m.char, m.skills, 'guest', i, hpBot, m.cls)) },
       },
     };
+    for (const s of SIDES) for (const f of D.teams[s].cards) f.arena = D.arena;
     const sideOf = f => (f ? f.side : null);
     D.ev = e => D.events.push(e);
     D.log = (html, kind, f) => D.events.push({ e: 'log', html, kind, side: sideOf(f) });
@@ -1295,12 +1812,13 @@
     let k = 0;
     while (team.length < RULES.teamSize && mine.length) { const c = mine[k++ % mine.length]; team.push({ ...c, name: `Sombra de ${c.name}` }); }
     const keys = SKILLS.map(([key]) => key);
-    const PRESETS = [[2, 1, 0, 2, 0], [1, 1, 1, 1, 1], [2, 0, 1, 1, 1], [1, 2, 0, 2, 0], [3, 0, 0, 2, 0], [1, 1, 2, 1, 0]];
-    return team.map(c => {
+    const PRESETS = [[2, 1, 2, 0], [2, 1, 1, 1], [3, 0, 1, 1], [1, 2, 2, 0], [3, 0, 2, 0], [2, 2, 1, 0]]; // yandere, tsundere, dandere, deredere
+    const classes = CLASS_KEYS.slice().sort(() => Math.random() - 0.5);   // uma classe diferente por carta
+    return team.map((c, i) => {
       let skills;
       if (difficulty === 'easy') { skills = Object.fromEntries(keys.map(x => [x, 0])); for (let i = 0; i < RULES.points; i++) skills[pick(keys)]++; }
       else { const p = pick(PRESETS); skills = Object.fromEntries(keys.map((x, i) => [x, p[i]])); }
-      return { char: c, skills };
+      return { char: c, skills, cls: classes[i % classes.length] };
     });
   }
 
@@ -1343,7 +1861,7 @@
   async function startBattle() {
     if (!teamReady()) return;
     await saveTeamSkills();
-    const myTeam = setup.slots.map(s => ({ char: findChar(s.id), skills: { ...s.skills } }));
+    const myTeam = setup.slots.map(s => ({ char: findChar(s.id), skills: { ...s.skills }, cls: s.cls }));
     if (mode === 'online') return readyOnline(myTeam);
     B = newDuel({ mode: 'bot', me: 'host', hostTeam: myTeam, guestTeam: botTeam(setup.slots.map(s => String(s.id))), diff: difficulty });
     enterBoard(`<b>Duelo!</b> Seu time contra o time do bot (${DIFFICULTIES[difficulty].label}). Nocauteie as ${RULES.teamSize} cartas do rival para vencer.`);
@@ -1381,8 +1899,8 @@
   }
   function cleanTeam(team) {
     if (!Array.isArray(team) || team.length !== RULES.teamSize) return null;
-    const out = team.map(m => ({ char: cleanPayload(m && m.char), skills: cleanSkills(m && m.skills) }));
-    return out.every(m => m.char && m.skills) ? out : null;
+    const out = team.map(m => ({ char: cleanPayload(m && m.char), skills: cleanSkills(m && m.skills), cls: m && validClass(m.cls) ? m.cls : null }));
+    return out.every(m => m.char && m.skills && m.cls) && new Set(out.map(m => m.cls)).size === out.length ? out : null;
   }
 
   function inRoom() {
@@ -1403,9 +1921,11 @@
 
   function onlineStatus() {
     if (!$) return;
+    // no online a batalha só aparece com a sala aberta (ou para mostrar o fim do duelo)
+    const net = NET();
+    $.battle.hidden = mode === 'online' && !(net && net.role()) && !(B && B.mode === 'online');
     $.online.hidden = mode !== 'online';
     if (mode !== 'online') return refreshStart();
-    const net = NET();
     let text;
     if (!net || !net.role()) text = 'Crie ou entre numa sala no painel <b>SALA</b>, acima, e chame outro jogador.';
     else if (net.players().length < 2) text = 'Sala aberta. Aguardando outro jogador entrar…';
@@ -1417,16 +1937,31 @@
     refreshStart();
   }
 
+  /* o modo é escolhido no hub da arena (waifuarena.js) */
   function setMode(m) {
+    if (!$ || (m !== 'bot' && m !== 'online')) return;
     mode = m;
-    $.mode.querySelectorAll('[data-mode]').forEach(b => b.classList.toggle('active', b.dataset.mode === m));
     $.diffField.hidden = m !== 'bot';
     if (m === 'bot' && waiting) cancelReady();
+    if (!B) fillCharacters();
     onlineStatus();
   }
 
+  const inDuel = () => !!(B && !B.over);
+
+  /* saída para o hub: abandona o duelo em andamento e volta para a preparação */
+  function exitArena() {
+    if (!$) return;
+    if (inDuel()) {
+      if (B.mode === 'online') quitOnline();
+      else endBattle('lose');
+    }
+    if (waiting) cancelReady();
+    showSetup();
+  }
+
   function readyOnline(team) {
-    lastReady = team.map(m => ({ char: cardPayload(m.char), skills: m.skills }));
+    lastReady = team.map(m => ({ char: cardPayload(m.char), skills: m.skills, cls: m.cls }));
     sendReady();
   }
 
@@ -1464,7 +1999,7 @@
     lobby.host = lobby.guest = null;
     waiting = false;
     rival = { ready: false, name: '' };
-    B = newDuel({ mode: 'online', me: 'host', hostTeam: h.team.map(m => ({ char: cleanPayload(m.char), skills: m.skills })), guestTeam: g.team, guestPeer: g.peer });
+    B = newDuel({ mode: 'online', me: 'host', hostTeam: h.team.map(m => ({ char: cleanPayload(m.char), skills: m.skills, cls: m.cls })), guestTeam: g.team, guestPeer: g.peer });
     net.sendTo(g.peer, {
       t: 'duel-start',
       teams: { host: B.teams.host.cards.map(f => f.char), guest: B.teams.guest.cards.map(f => f.char) },
@@ -1586,13 +2121,16 @@
       setup: byId('waSetup'), swap: byId('waSwap'), diff: byId('waDiff'), diffDesc: byId('waDiffDesc'), skills: byId('waSkills'),
       points: byId('waPoints'), preview: byId('waPreview'), start: byId('waStart'), empty: byId('waEmpty'),
       team: byId('waTeam'), slotN: byId('waSlotN'), skillOf: byId('waSkillOf'),
+      classes: byId('waClasses'), classDetail: byId('waClassDetail'), classOf: byId('waClassOf'),
       board: byId('waBoard'), opp: byId('waOpp'), me: byId('waMe'), turn: byId('waTurn'), pickOpp: byId('waPickOpp'), pickMe: byId('waPickMe'),
+      event: byId('waEvent'), field: byId('waField'), arenaFx: byId('waArenaFx'),
+      studiesOpp: byId('waStudiesOpp'), studiesMe: byId('waStudiesMe'),
+      // liveEventBox: byId('waLiveEventBox'), // TESTE desativado (ver TEST_BAR_HTML)
       wait: byId('waWait'), actions: byId('waActions'), overlay: byId('waOverlay'), end: byId('waEnd'), log: byId('waLog'), quit: byId('waQuit'),
-      mode: byId('waMode'), online: byId('waOnline'), diffField: byId('waDiffField'),
+      battle: byId('waBattle'), online: byId('waOnline'), diffField: byId('waDiffField'),
     };
 
     // preparação
-    $.mode.addEventListener('click', ev => { const b = ev.target.closest('[data-mode]'); if (b) setMode(b.dataset.mode); });
     $.diff.addEventListener('click', ev => {
       const btn = ev.target.closest('[data-diff]');
       if (!btn) return;
@@ -1626,12 +2164,29 @@
     });
     document.addEventListener('keydown', ev => { if (ev.key === 'Escape' && !$.picker.hidden) closePicker(); });
 
+    // janela de regras
+    document.body.insertAdjacentHTML('beforeend', RULES_MODAL_HTML);
+    $.rules = byId('waRules');
+    byId('waRulesClose').addEventListener('click', closeRules);
+    $.rules.addEventListener('click', ev => { if (ev.target === $.rules) closeRules(); });
+    document.addEventListener('click', ev => { if (ev.target.closest('[data-wa-rules]')) openRules(); });
+    document.addEventListener('keydown', ev => { if (ev.key === 'Escape' && !$.rules.hidden) closeRules(); });
+
     // Enter/Espaço nas cartas que funcionam como botão (slots, janela de escolha, opções do duelo)
     document.addEventListener('keydown', ev => {
       if ((ev.key === 'Enter' || ev.key === ' ') && ev.target instanceof HTMLElement && ev.target.matches('#waBattle [data-pick][role="button"], #waPicker [data-pick][role="button"]')) {
         ev.preventDefault();
         ev.target.click();
       }
+    });
+    $.classes.addEventListener('click', ev => {
+      const b = ev.target.closest('[data-cls]');
+      const cur = setup.slots[setup.current];
+      if (!b || b.disabled || !cur) return;
+      if (waiting) cancelReady();
+      cur.cls = b.dataset.cls;
+      renderSetup();
+      onlineStatus();
     });
     $.skills.addEventListener('click', ev => {
       const btn = ev.target.closest('[data-step]');
@@ -1646,9 +2201,24 @@
       onlineStatus();
     });
     $.start.addEventListener('click', startBattle);
+    /* TESTE desativado: barra de eventos (ver TEST_BAR_HTML)
+    $.liveEventBox.addEventListener('click', ev => {
+      const b = ev.target.closest('[data-live-event]');
+      if (b) setLiveEvent(b.dataset.liveEvent);
+    });
+    */
 
     // tabuleiro
-    $.actions.addEventListener('click', ev => {
+    // botão da classe ao lado da carta: abre/fecha a descrição
+    $.field.addEventListener('click', ev => {
+      const t = ev.target.closest('[data-cls-toggle]');
+      if (!t || !B) return;
+      const s = t.dataset.clsToggle;
+      clsOpen[s] = !clsOpen[s];
+      renderSide(s);
+    });
+    // ações da mão e o ⇅ TROCAR (que fica ao lado do banco, fora da mão)
+    $.field.addEventListener('click', ev => {
       const btn = ev.target.closest('[data-act]');
       if (!btn || btn.disabled || !pendingMine || pendingMine.req.kind !== 'action' || busy) return;
       if (btn.dataset.act === 'switch') { switchMode = !switchMode; renderBoard(); return; }
@@ -1700,5 +2270,5 @@
   else init();
 
   // exposto para testes
-  window.WaifuArenaBattle = { RULES, ITEMS, makeFighter, resolveTurn, checkKOs, benchHeal, botDecide, newDuel, applyItemChoice, front };
+  window.WaifuArenaBattle = { setMode, inDuel, exit: exitArena, RULES, ITEMS, EVENTS, CLASSES, arenaTick, availableActions, makeFighter, resolveTurn, checkKOs, benchHeal, botDecide, newDuel, applyItemChoice, front };
 })();

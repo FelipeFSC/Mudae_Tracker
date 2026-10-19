@@ -635,7 +635,9 @@ body {
 @keyframes fade { from { opacity: 0; } }
 .v-stage { position: absolute; inset: 0; perspective: 1600px; display: grid; place-items: center; touch-action: none; cursor: grab; }
 .v-stage.dragging { cursor: grabbing; }
-.v-card { width: min(400px, 80vw, calc(68vh * 5 / 8)); aspect-ratio: 5 / 8; position: relative; transform-style: preserve-3d; }
+/* o zoom muda a largura (--vz) em vez de usar scale(): a carta é redesenhada
+   no tamanho final e a foto fica nítida, em vez de esticar o bitmap 1× */
+.v-card { --vz: 1; width: calc(min(400px, 80vw, calc(68vh * 5 / 8)) * var(--vz)); aspect-ratio: 5 / 8; position: relative; transform-style: preserve-3d; }
 .v-rot { position: absolute; inset: 0; transform-style: preserve-3d; will-change: transform; }
 .face { position: absolute; inset: 0; backface-visibility: hidden; -webkit-backface-visibility: hidden; border-radius: 4.6cqw; container-type: inline-size; }
 .face.front { transform: translateZ(1.6px); }
@@ -1395,3 +1397,10 @@ body[data-page="card-editor"] .hero p { margin: 0; max-width: none; font-size: 1
   pointer-events: none; user-select: none;
 }
 .art-img:has(> .art-photo) { background-image: none !important; }
+
+/* broche (ex.: classe na Waifu Arena): fica colado à esquerda da kakera */
+.brooch { flex: none; margin-left: auto; display: flex; align-items: center; justify-content: center; width: 8.4cqw; height: 8.4cqw; border-radius: 50%;
+  background: radial-gradient(circle at 35% 30%, color-mix(in srgb, var(--bc) 35%, #fff), var(--bc) 55%, color-mix(in srgb, var(--bc) 60%, #000));
+  box-shadow: 0 0 0 .35cqw rgba(255,255,255,.55), 0 0 0 .7cqw color-mix(in srgb, var(--bc) 70%, #000), 0 0 2.4cqw color-mix(in srgb, var(--bc) 70%, transparent), 0 .4cqw 1cqw rgba(0,0,0,.5); }
+.brooch span { font-size: 4.8cqw; line-height: 1; filter: drop-shadow(0 .2cqw .3cqw rgba(0,0,0,.6)); }
+.brooch + .tl-kak { margin-left: 1.2cqw; }

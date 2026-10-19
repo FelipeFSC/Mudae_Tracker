@@ -731,25 +731,6 @@
     width: 58px;
 }
 
-.wa-bench-info {
-    min-width: 0;
-    display: flex;
-    flex-direction: column;
-    gap: 3px;
-    font-size: 10px;
-    color: var(--muted);
-}
-
-.wa-bench-info b {
-    color: var(--text);
-    font-size: 11.5px;
-    white-space: nowrap;
-    overflow: hidden;
-    text-overflow: ellipsis;
-}
-
-.wa-bench-items { color: var(--cyan); cursor: help; }
-
 .wa-lp-bar.mini { height: 6px; flex: none; }
 
 .wa-bench-card.ko { opacity: .45; filter: grayscale(1); }
@@ -764,12 +745,6 @@
 .wa-bench-card.pickable:hover { transform: translateX(-3px); background: rgba(34, 211, 238, 0.1); }
 
 @keyframes wa-pulse { 50% { box-shadow: 0 0 22px -2px var(--cyan); } }
-
-.wa-team-count {
-    font-size: 10.5px;
-    font-weight: 700;
-    color: var(--muted);
-}
 
 .wa-cardwrap { position: relative; }
 .wa-cardwrap.ko-flash { animation: wa-ko .8s ease; }
@@ -998,7 +973,11 @@
     flex-direction: column;
     gap: 14px;
     width: min(1100px, 100%);
-    max-height: 100%;
+    /* altura da tela menos o padding do .wa-picker (3vh em cima e embaixo);
+       "100%" não limitava nada, porque a linha do grid cresce com o conteúdo */
+    max-height: 94vh;
+    max-height: 94dvh;
+    min-height: 0;
     padding: 20px 22px;
     border-radius: 14px;
     background: var(--bg-panel);
@@ -1166,4 +1145,873 @@
 
 .wa-offers {
     grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+}
+
+/* ============================================================
+   Janela de REGRAS (botão REGRAS no título da arena)
+   ============================================================ */
+.wa-rules {
+    position: fixed;
+    inset: 0;
+    z-index: 2147482500;
+    display: grid;
+    place-items: center;
+    padding: 3vh 3vw;
+    background: rgba(4, 6, 12, 0.78);
+    backdrop-filter: blur(4px);
+    animation: wa-fade .2s ease;
+}
+
+.wa-rules[hidden] { display: none; }
+
+.wa-rules-box {
+    display: flex;
+    flex-direction: column;
+    width: min(760px, 100%);
+    max-height: 94vh;
+    max-height: 94dvh;
+    min-height: 0;
+    border-radius: 14px;
+    background: var(--bg-panel);
+    border: 1px solid rgba(245, 197, 24, 0.4);
+    box-shadow: 0 0 40px -10px var(--yellow);
+}
+
+.wa-rules-head {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 16px 20px;
+    border-bottom: 1px solid var(--border);
+}
+
+.wa-rules-head h3 {
+    margin: 0;
+    color: var(--yellow);
+    font-size: 15px;
+    letter-spacing: 1px;
+}
+
+.wa-rules-body {
+    overflow-y: auto;
+    padding: 6px 20px 18px;
+    font-size: 13px;
+    line-height: 1.5;
+}
+
+.wr-sec {
+    padding: 16px 0;
+    border-bottom: 1px dashed var(--border);
+}
+
+.wr-sec h4 {
+    display: flex;
+    align-items: center;
+    gap: 9px;
+    margin: 0 0 8px;
+    color: var(--text);
+    font: 800 12px var(--mono);
+    letter-spacing: 1.2px;
+}
+
+.wr-n {
+    display: inline-grid;
+    place-items: center;
+    width: 22px;
+    height: 22px;
+    border-radius: 50%;
+    color: #111;
+    background: var(--yellow);
+    font-size: 11px;
+}
+
+.wr-sec p { margin: 0 0 8px; color: var(--muted); }
+.wr-sec b { color: var(--text); }
+
+.wr-list {
+    margin: 8px 0 0;
+    padding-left: 18px;
+    color: var(--muted);
+}
+
+.wr-list li { margin: 3px 0; }
+
+/* caixa das ilustrações */
+.wr-ill {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    flex-wrap: wrap;
+    gap: 10px;
+    margin: 10px 0;
+    padding: 14px;
+    border-radius: 10px;
+    border: 1px solid var(--border);
+    background: var(--bg-panel-2);
+}
+
+.wr-vs { color: var(--muted); font: 800 11px var(--mono); }
+.wr-arrow { color: var(--yellow); font-size: 18px; }
+
+/* mini cartas */
+.wr-card {
+    display: inline-grid;
+    place-items: center;
+    width: 38px;
+    height: 52px;
+    border-radius: 6px;
+    border: 1px solid var(--border);
+    background: linear-gradient(160deg, rgba(255, 255, 255, 0.06), rgba(255, 255, 255, 0.015));
+    font: 800 8px var(--mono);
+    color: var(--muted);
+}
+
+.wr-card.bench { width: 30px; height: 41px; opacity: 0.55; }
+.wr-card.front { width: 46px; height: 62px; color: var(--pink); border-color: var(--pink); box-shadow: 0 0 12px -4px var(--pink); font-size: 12px; }
+.wr-card.front.in { color: var(--cyan); border-color: var(--cyan); box-shadow: 0 0 12px -4px var(--cyan); }
+
+.wr-field { flex-direction: column; gap: 6px; }
+.wr-row { display: flex; align-items: flex-end; gap: 6px; }
+.wr-row .wr-card.front { font-size: 7px; }
+.wr-who { width: 42px; color: var(--muted); font: 700 9px var(--mono); letter-spacing: 1px; align-self: center; }
+
+/* atributos */
+.wr-stats {
+    display: grid;
+    grid-template-columns: repeat(4, 1fr);
+    gap: 8px;
+    margin: 8px 0 12px;
+}
+
+.wr-stats span {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    padding: 8px 4px;
+    border-radius: 8px;
+    border: 1px solid var(--border);
+    background: var(--bg-panel-2);
+    color: var(--muted);
+    font-size: 11px;
+}
+
+.wr-stats i { font-style: normal; font-size: 18px; }
+.wr-stats b { font: 800 18px var(--mono); }
+
+.wr-table {
+    display: grid;
+    border-radius: 8px;
+    border: 1px solid var(--border);
+    overflow: hidden;
+}
+
+.wr-table div {
+    display: flex;
+    justify-content: space-between;
+    gap: 12px;
+    padding: 7px 12px;
+    font-size: 12px;
+}
+
+.wr-table div:nth-child(odd) { background: var(--bg-panel-2); }
+.wr-table span { color: var(--muted); }
+
+/* revelação simultânea */
+.wr-pick {
+    display: inline-grid;
+    place-items: center;
+    width: 38px;
+    height: 38px;
+    border-radius: 50%;
+    border: 1px dashed var(--border);
+    color: var(--muted);
+    font-size: 17px;
+    font-weight: 800;
+}
+
+.wr-pick.on { border: 1px solid var(--yellow); box-shadow: 0 0 10px -3px var(--yellow); }
+
+/* ações e fim de jogo */
+.wr-acts,
+.wr-ends {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(130px, 1fr));
+    gap: 8px;
+}
+
+.wr-acts div,
+.wr-ends div {
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+    padding: 10px;
+    border-radius: 8px;
+    border: 1px solid var(--border);
+    background: var(--bg-panel-2);
+}
+
+.wr-acts i,
+.wr-ends i { font-style: normal; font-size: 20px; }
+.wr-acts b,
+.wr-ends b { font: 800 11px var(--mono); letter-spacing: 0.8px; }
+.wr-acts small,
+.wr-ends small { color: var(--muted); font-size: 11.5px; line-height: 1.35; }
+
+/* fórmula do dano */
+.wr-formula { gap: 8px; }
+
+.wr-term {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    min-width: 74px;
+    padding: 8px 10px;
+    border-radius: 8px;
+    border: 1px solid var(--border);
+    font-size: 22px;
+}
+
+.wr-term small { color: var(--muted); font-size: 10px; }
+.wr-term.hit { border-color: rgba(255, 92, 122, 0.5); background: rgba(255, 92, 122, 0.07); }
+.wr-op { color: var(--yellow); font: 800 20px var(--mono); }
+
+.wr-examples {
+    display: flex;
+    flex-wrap: wrap;
+    justify-content: center;
+    gap: 8px 22px;
+    color: var(--muted);
+    font-size: 12px;
+}
+
+.wr-examples b { font-family: var(--mono); }
+
+/* troca × ataque */
+.wr-cases {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 10px;
+}
+
+.wr-case {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 8px;
+    padding: 12px;
+    border-radius: 10px;
+    border: 1px solid var(--border);
+    background: var(--bg-panel-2);
+    text-align: center;
+}
+
+.wr-case small { color: var(--muted); font-size: 11.5px; line-height: 1.4; }
+.wr-case-tag { padding: 2px 8px; border-radius: 5px; font: 800 9px var(--mono); letter-spacing: 1px; }
+.wr-case-tag.ok { color: var(--green); border: 1px solid rgba(52, 211, 153, 0.45); }
+.wr-case-tag.bad { color: #ff8fa3; border: 1px solid rgba(255, 92, 122, 0.45); }
+.wr-flow { display: flex; align-items: center; gap: 6px; }
+.wr-hit { font: 800 11px var(--mono); color: #ff8fa3; }
+
+/* opções do estudo */
+.wr-bands { gap: 8px; }
+
+.wr-band {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 3px;
+    min-width: 96px;
+    padding: 8px 10px;
+    border-radius: 8px;
+    border: 1px solid var(--border);
+}
+
+.wr-band span { font: 700 11px var(--mono); color: var(--muted); }
+.wr-band b { font-size: 16px; letter-spacing: 2px; }
+.wr-band small { color: var(--muted); font-size: 10.5px; }
+
+.wr-foot {
+    margin: 14px 0 0;
+    color: var(--muted);
+    font-size: 11px;
+    opacity: 0.8;
+}
+
+@media (max-width: 600px) {
+    .wr-stats { grid-template-columns: repeat(2, 1fr); }
+    .wr-cases { grid-template-columns: 1fr; }
+}
+
+/* ============================================================
+   Eventos de arena e medidor de especial (⚡)
+   ============================================================ */
+
+/* 6 ações (4 reações + especial + trocar) */
+.wa-actions { grid-template-columns: repeat(6, minmax(0, 1fr)); }
+.wa-act-special { --c: #c084fc; }
+.wa-act-special:not(:disabled) { box-shadow: 0 0 16px -4px var(--c); animation: wa-special-glow 1.6s ease-in-out infinite; }
+@keyframes wa-special-glow { 50% { box-shadow: 0 0 24px -2px var(--c); } }
+
+@media (max-width: 760px) {
+    .wa-actions { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+}
+
+/* faixa do evento, junto do turno */
+.wa-mid { flex-wrap: wrap; }
+
+.wa-event {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 1px;
+    padding: 5px 12px;
+    border-radius: 8px;
+    border: 1px solid rgba(192, 132, 252, 0.5);
+    background: rgba(192, 132, 252, 0.1);
+    box-shadow: 0 0 14px -6px #c084fc;
+    text-align: center;
+}
+
+.wa-event[hidden] { display: none; }
+.wa-event b { color: #d8b4fe; font-size: 11px; letter-spacing: 1px; }
+.wa-event span { color: var(--muted); font-size: 10.5px; }
+.wa-event.soon { border-style: dashed; border-color: rgba(245, 197, 24, 0.5); background: rgba(245, 197, 24, 0.06); box-shadow: none; }
+.wa-event.soon b { color: var(--yellow); }
+
+/* medidor ⚡ na carta da frente */
+.wa-stats > .wa-meter {
+    display: inline-flex;
+    align-items: center;
+    gap: 3px;
+}
+
+.wa-meter i {
+    display: inline-block;
+    width: 9px;
+    height: 9px;
+    border-radius: 2px;
+    border: 1px solid rgba(192, 132, 252, 0.5);
+}
+
+.wa-meter i.on { background: #c084fc; box-shadow: 0 0 6px -1px #c084fc; }
+.wa-meter small { margin-left: 4px; color: var(--muted); font-size: 10.5px; }
+.wa-stats > .wa-meter.full { border-color: #c084fc; box-shadow: 0 0 12px -4px #c084fc; }
+.wa-meter.full small { color: #d8b4fe; }
+
+
+/* regras: ganho de ⚡ */
+.wr-gain { display: flex; flex-direction: column; align-items: center; min-width: 110px; padding: 8px 10px; border-radius: 8px; border: 1px solid rgba(192, 132, 252, 0.4); color: var(--muted); font-size: 11px; }
+.wr-gain b { color: #d8b4fe; font: 800 16px var(--mono); }
+
+
+/* ============================================================
+   Arena temática: o evento ativo muda o tabuleiro
+   ============================================================ */
+.wa-field { transition: border-color .6s ease, box-shadow .6s ease, background .6s ease; }
+.wa-field > .wa-row,
+.wa-field > .wa-mid,
+.wa-field > .wa-actions { position: relative; z-index: 1; }
+
+.wa-arena-fx {
+    position: absolute;
+    inset: 0;
+    z-index: 0;
+    overflow: hidden;
+    pointer-events: none;
+}
+
+.wa-arena-fx i { position: absolute; display: block; }
+
+/* 🌕 Lua Cheia: noite azul, lua e estrelas */
+.wa-field[data-event="moon"] {
+    border-color: rgba(147, 197, 253, 0.5);
+    background:
+        radial-gradient(ellipse at 85% 10%, rgba(191, 219, 254, 0.18), transparent 45%),
+        linear-gradient(180deg, #0b1230, #070b1d 60%, #0a1028);
+    box-shadow: inset 0 0 60px rgba(0, 0, 0, 0.6), 0 0 30px -10px #93c5fd;
+}
+.fx-moon {
+    position: absolute;
+    top: 14px;
+    right: 22px;
+    width: 64px;
+    height: 64px;
+    border-radius: 50%;
+    background: radial-gradient(circle at 38% 38%, #fefce8, #e5e7eb 55%, #cbd5e1);
+    box-shadow: 0 0 40px 8px rgba(254, 252, 232, 0.35);
+    opacity: .85;
+}
+.wa-field[data-event="moon"] .wa-arena-fx i {
+    left: var(--x); top: var(--y);
+    width: calc(3px * var(--s)); height: calc(3px * var(--s));
+    border-radius: 50%;
+    background: #fff;
+    animation: fx-twinkle var(--t) ease-in-out var(--d) infinite;
+}
+@keyframes fx-twinkle { 0%, 100% { opacity: .15; } 50% { opacity: .9; } }
+
+/* 🏰 Muralha: pedra e tons de bronze */
+.wa-field[data-event="wall"] {
+    border-color: rgba(214, 211, 209, 0.45);
+    background:
+        repeating-linear-gradient(0deg, rgba(0, 0, 0, 0.35) 0 2px, transparent 2px 34px),
+        repeating-linear-gradient(90deg, rgba(0, 0, 0, 0.3) 0 2px, transparent 2px 68px),
+        linear-gradient(180deg, #2a2522, #1b1816 60%, #241f1c);
+    box-shadow: inset 0 0 70px rgba(0, 0, 0, 0.75), 0 0 30px -10px #d6d3d1;
+}
+
+/* 🎪 Festival: confete caindo */
+.wa-field[data-event="festival"] {
+    border-color: rgba(251, 146, 60, 0.55);
+    background:
+        radial-gradient(ellipse at 50% 0%, rgba(251, 146, 60, 0.2), transparent 55%),
+        linear-gradient(180deg, #24120f, #140c14 60%, #1b0f1c);
+    box-shadow: inset 0 0 60px rgba(0, 0, 0, 0.55), 0 0 30px -10px #fb923c;
+}
+.wa-field[data-event="festival"] .wa-arena-fx i {
+    left: var(--x); top: -12px;
+    width: calc(7px * var(--s)); height: calc(11px * var(--s));
+    border-radius: 2px;
+    background: hsl(var(--h), 90%, 62%);
+    animation: fx-confetti var(--t) linear var(--d) infinite;
+}
+@keyframes fx-confetti {
+    from { transform: translateY(0) rotate(0deg); opacity: .9; }
+    to { transform: translateY(720px) rotate(540deg); opacity: .5; }
+}
+
+/* 🌧️ Chuva de Kakera: cristais caindo */
+.wa-field[data-event="rain"] {
+    border-color: rgba(34, 211, 238, 0.5);
+    background:
+        radial-gradient(ellipse at 50% 50%, rgba(34, 211, 238, 0.12), transparent 60%),
+        linear-gradient(180deg, #071a24, #08111d 60%, #0a1626);
+    box-shadow: inset 0 0 60px rgba(0, 0, 0, 0.55), 0 0 30px -10px var(--cyan);
+}
+.wa-field[data-event="rain"] .wa-arena-fx i {
+    left: var(--x); top: -14px;
+    width: calc(8px * var(--s)); height: calc(8px * var(--s));
+    transform: rotate(45deg);
+    background: linear-gradient(135deg, hsl(calc(170 + var(--h) / 4), 90%, 70%), hsl(calc(260 + var(--h) / 6), 80%, 60%));
+    box-shadow: 0 0 8px rgba(34, 211, 238, 0.6);
+    animation: fx-kakera calc(var(--t) * 0.7) linear var(--d) infinite;
+}
+@keyframes fx-kakera {
+    from { transform: translateY(0) rotate(45deg); opacity: .9; }
+    to { transform: translateY(720px) rotate(405deg); opacity: .3; }
+}
+
+/* 💕 Noite Romântica: corações subindo */
+.wa-field[data-event="romance"] {
+    border-color: rgba(236, 72, 153, 0.55);
+    background:
+        radial-gradient(ellipse at 50% 100%, rgba(236, 72, 153, 0.22), transparent 60%),
+        linear-gradient(180deg, #1f0a1a, #160818 60%, #200a1e);
+    box-shadow: inset 0 0 60px rgba(0, 0, 0, 0.55), 0 0 30px -10px var(--pink);
+}
+.wa-field[data-event="romance"] .wa-arena-fx i {
+    left: var(--x); bottom: -20px;
+    font-style: normal;
+    font-size: calc(16px * var(--s));
+    color: rgba(244, 114, 182, 0.75);
+    animation: fx-heart var(--t) ease-in var(--d) infinite;
+}
+.wa-field[data-event="romance"] .wa-arena-fx i::before { content: "♥"; }
+@keyframes fx-heart {
+    from { transform: translateY(0) scale(.8); opacity: 0; }
+    15% { opacity: .85; }
+    to { transform: translateY(-720px) scale(1.2); opacity: 0; }
+}
+
+/* 🤐 Silêncio: cinza e névoa */
+.wa-field[data-event="silence"] {
+    border-color: rgba(148, 163, 184, 0.4);
+    background: linear-gradient(180deg, #15171c, #101216 60%, #14161b);
+    box-shadow: inset 0 0 80px rgba(0, 0, 0, 0.8), 0 0 24px -12px #94a3b8;
+}
+.wa-field[data-event="silence"] .wa-arena-fx i {
+    left: calc(var(--x) - 30%); top: calc(var(--y) - 20%);
+    width: 70%; height: 50%;
+    border-radius: 50%;
+    background: radial-gradient(ellipse, rgba(203, 213, 225, 0.09), transparent 70%);
+    animation: fx-fog calc(var(--t) * 3) ease-in-out var(--d) infinite alternate;
+}
+@keyframes fx-fog { to { transform: translateX(25%); } }
+
+/* ⚡ Tempestade: escuro, chuva e relâmpagos */
+.wa-field[data-event="storm"] {
+    border-color: rgba(192, 132, 252, 0.6);
+    background:
+        radial-gradient(ellipse at 30% 0%, rgba(192, 132, 252, 0.16), transparent 50%),
+        linear-gradient(180deg, #0c0a18, #07060e 60%, #0b0916);
+    box-shadow: inset 0 0 70px rgba(0, 0, 0, 0.7), 0 0 30px -8px #c084fc;
+}
+.wa-field[data-event="storm"] .wa-arena-fx i {
+    left: var(--x); top: -40px;
+    width: 1px; height: calc(34px * var(--s));
+    background: linear-gradient(transparent, rgba(196, 181, 253, 0.6));
+    animation: fx-storm-rain calc(var(--t) * 0.18) linear var(--d) infinite;
+}
+@keyframes fx-storm-rain {
+    from { transform: translate(0, 0) rotate(12deg); }
+    to { transform: translate(-150px, 760px) rotate(12deg); }
+}
+.fx-flash {
+    position: absolute;
+    inset: 0;
+    background: rgba(233, 213, 255, 0.5);
+    opacity: 0;
+    animation: fx-flash 6s linear infinite;
+}
+@keyframes fx-flash {
+    0%, 88%, 92%, 100% { opacity: 0; }
+    89%, 91% { opacity: .55; }
+    90% { opacity: .1; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+    .wa-arena-fx i, .fx-flash { animation: none !important; }
+    .fx-flash { display: none; }
+}
+
+/* barra de teste: trocar o evento com um clique (só offline) */
+.wa-test-bar {
+    grid-column: 1 / -1;
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 6px;
+    padding: 8px 10px;
+    border-radius: 10px;
+    border: 1px dashed rgba(245, 197, 24, 0.45);
+    background: rgba(245, 197, 24, 0.04);
+}
+.wa-test-bar[hidden] { display: none; }
+.wa-test-bar-label { display: flex; align-items: center; gap: 6px; margin-right: 4px; color: var(--muted); font-size: 10px; font-weight: 800; letter-spacing: 1px; }
+.wa-test-bar-label .arena-beta { font-size: 8.5px; padding: 1px 5px; }
+.wa-test-chip {
+    padding: 5px 10px;
+    border-radius: 999px;
+    border: 1px solid var(--border);
+    background: var(--bg-panel-2);
+    color: var(--text);
+    font: 11px var(--mono);
+    cursor: pointer;
+    transition: border-color .15s ease, background .15s ease;
+}
+.wa-test-chip:hover { border-color: rgba(192, 132, 252, 0.6); }
+.wa-test-chip.active { border-color: #c084fc; background: rgba(192, 132, 252, 0.18); color: #e9d5ff; }
+
+/* lua no espaço livre à direita da faixa do meio */
+.fx-moon { top: calc(50% - 98px); right: 40px; width: 64px; height: 64px; }
+
+/* ao rolar até o duelo, não esconder o topo embaixo do cabeçalho fixo */
+.wa-board { scroll-margin-top: 90px; }
+
+/* ============================================================
+   Classes: escolha na montagem do time
+   ============================================================ */
+.wa-classes { display: grid; grid-template-columns: repeat(5, minmax(0, 1fr)); gap: 6px; }
+
+.wa-cls {
+    position: relative;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 2px;
+    padding: 8px 4px 7px;
+    border-radius: 9px;
+    border: 1px solid var(--border);
+    background: var(--bg-panel-2);
+    color: var(--text);
+    text-align: center;
+    cursor: pointer;
+    transition: border-color .15s ease, box-shadow .15s ease, background .15s ease, transform .15s ease;
+}
+.wa-cls i { font-style: normal; font-size: 20px; line-height: 1.15; }
+.wa-cls b { font: 800 9.5px var(--mono); letter-spacing: .5px; }
+.wa-cls small { color: var(--muted); font-size: 9px; line-height: 1.2; }
+.wa-cls:not(:disabled):hover { transform: translateY(-2px); border-color: var(--c); }
+.wa-cls.sel { border-color: var(--c); background: color-mix(in srgb, var(--c) 15%, var(--bg-panel-2)); box-shadow: 0 0 16px -6px var(--c); }
+.wa-cls.sel b { color: var(--c); }
+.wa-cls:disabled { cursor: not-allowed; }
+.wa-cls.taken { opacity: .35; }
+.wa-cls.taken::after { content: "NO TIME"; position: absolute; top: 3px; right: 4px; color: var(--muted); font: 800 7px var(--mono); }
+.wa-cls.soon { opacity: .4; border-style: dashed; }
+.wa-cls.soon small { color: var(--yellow); font-weight: 800; letter-spacing: .5px; }
+
+@media (max-width: 600px) {
+    .wa-classes { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+}
+
+.wa-cls-detail {
+    margin-top: 10px;
+    padding: 10px 12px;
+    border-radius: 10px;
+    border: 1px solid var(--c);
+    background: color-mix(in srgb, var(--c) 7%, var(--bg-panel-2));
+}
+.wa-cls-detail h4 { margin: 0 0 6px; color: var(--c); font: 800 12px var(--mono); letter-spacing: 1px; }
+.wa-cls-row { display: grid; grid-template-columns: 86px 1fr; gap: 8px; padding: 4px 0; border-top: 1px dashed var(--border); color: var(--text); font-size: 11.5px; line-height: 1.4; }
+.wa-cls-row span { color: var(--muted); font: 800 9.5px var(--mono); letter-spacing: .8px; padding-top: 2px; }
+.wa-cls-row.weak { color: #ff9fb2; }
+.wa-cls-empty { margin: 0; color: var(--muted); font-size: 11.5px; }
+
+/* selo da classe no slot do time */
+.wa-slot-cls { display: inline-block; margin-top: 3px; padding: 1px 6px; border-radius: 5px; border: 1px solid color-mix(in srgb, var(--c) 55%, transparent); color: var(--c); font: 800 9px var(--mono); letter-spacing: .4px; white-space: nowrap; }
+.wa-slot-cls.none { --c: #ff8fa3; border-style: dashed; }
+
+/* resumo "Na luta" */
+.wa-preview-weak { color: #ff8fa3; font-size: 11px; }
+.wa-preview-special { margin-top: 6px; color: var(--muted); font-size: 11.5px; }
+.wa-preview-special b { color: var(--c, var(--yellow)); }
+.wa-preview-special.none b { color: #ff8fa3; }
+
+
+/* regras: lista das classes */
+.wr-classes { display: grid; grid-template-columns: repeat(auto-fit, minmax(210px, 1fr)); gap: 8px; margin-top: 8px; }
+.wr-classes div { display: flex; flex-direction: column; gap: 3px; padding: 10px; border-radius: 8px; border: 1px solid color-mix(in srgb, var(--c) 45%, var(--border)); background: var(--bg-panel-2); font-size: 11.5px; color: var(--muted); line-height: 1.35; }
+.wr-classes div > b { color: var(--c); font: 800 11px var(--mono); letter-spacing: .6px; }
+.wr-classes .weak { color: #ff9fb2; }
+
+/* ============================================================
+   TABULEIRO EM PERSPECTIVA 3D
+   Rival em cima (longe), você embaixo (perto), a mão de ações reta na frente.
+   Sobrescreve o tabuleiro antigo (.wa-row) com seletores mais específicos.
+   O evento ativo troca as cores do chão (variáveis em #waField[data-event]).
+   ============================================================ */
+#waField {
+    --floor-a: #1b0d33; --floor-b: #0d1430; --grid: rgba(34, 211, 238, .14); --edge: rgba(34, 211, 238, .45); --sky: rgba(168, 85, 247, .35);
+    padding: 16px 16px 14px;
+    border-radius: 18px;
+    border: 1px solid rgba(168, 85, 247, .35);
+    background: radial-gradient(ellipse at 50% 0%, var(--sky), transparent 55%), linear-gradient(180deg, #0b0718, #05040d);
+    box-shadow: 0 0 30px -12px var(--purple);
+    transition: background .6s ease, border-color .6s ease;
+}
+#waField > .wa-arena-fx { z-index: 3; }
+#waField > .wa-event { position: relative; z-index: 4; width: fit-content; margin: 0 auto; }
+
+/* chão inclinado: a caixa guarda a altura de antes da inclinação, a margem negativa tira o vazio de cima */
+.wa-scene { position: relative; z-index: 2; perspective: 1150px; perspective-origin: 50% 0%; margin-top: -100px; }
+.wa-floor {
+    --card: 118px; --bench: 62px;
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+    width: min(640px, 100%);
+    margin: 0 auto;
+    padding: 18px 22px 22px;
+    border-radius: 22px;
+    transform: rotateX(38deg);
+    transform-origin: 50% 100%;
+    background:
+        linear-gradient(var(--grid) 1px, transparent 1px) 0 0 / 40px 40px,
+        linear-gradient(90deg, var(--grid) 1px, transparent 1px) 0 0 / 40px 40px,
+        linear-gradient(180deg, var(--floor-a), var(--floor-b));
+    box-shadow: 0 0 0 2px var(--edge), 0 0 60px -10px var(--edge), inset 0 0 80px rgba(0, 0, 0, .6);
+    transition: background .6s ease, box-shadow .6s ease;
+}
+.wa-floor .wa-half { display: flex; flex-direction: column; align-items: center; gap: 10px; }
+
+/* carta da frente sempre no centro; as informações ficam ao lado, sem empurrar a carta */
+.wa-floor .wa-front { position: relative; display: flex; justify-content: center; width: 100%; }
+.wa-floor .wa-card-slot { width: var(--card); }
+.wa-floor .wa-card-slot .mce-host { width: 100%; }
+.wa-floor .wa-half.ko .wa-card-slot { filter: grayscale(1) brightness(.5); }
+.wa-floor .wa-info {
+    position: absolute;
+    top: 50%;
+    width: 190px;
+    gap: 5px;
+    padding: 0;
+    border: 0;
+    background: none;
+    backdrop-filter: none;
+    transform: translateY(-50%);
+}
+.wa-floor .wa-me .wa-info { left: calc(50% + var(--card) / 2 + 16px); }
+.wa-floor .wa-opp .wa-info { right: calc(50% + var(--card) / 2 + 16px); align-items: flex-end; text-align: right; }
+.wa-floor .wa-name { display: flex; align-items: center; gap: 6px; font-size: 12px; }
+.wa-floor .wa-opp .wa-name { flex-direction: row-reverse; }
+.wa-floor .wa-tag { margin: 0; font-size: 8.5px; padding: 1px 6px; }
+.wa-floor .wa-name-txt { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.wa-floor .wa-lp { display: flex; flex-direction: column; gap: 4px; width: 100%; }
+.wa-floor .wa-opp .wa-lp { align-items: flex-end; }
+.wa-floor .wa-lp-val { font-size: 28px; font-weight: 900; line-height: 1; color: var(--text); }
+.wa-floor .wa-lp-val small { font-size: 12px; font-weight: 600; color: var(--muted); }
+.wa-floor .wa-info .wa-lp-bar { width: 100%; height: 8px; }
+.wa-floor .wa-opp .wa-info .wa-lp-bar { transform: scaleX(-1); }
+.wa-floor .wa-stats { gap: 4px; }
+.wa-floor .wa-opp .wa-stats, .wa-floor .wa-opp .wa-flags, .wa-floor .wa-opp .wa-items { justify-content: flex-end; }
+.wa-floor .wa-stats > span { padding: 2px 6px; font-size: 10.5px; }
+.wa-floor .wa-flags span { font-size: 9.5px; padding: 1px 6px; }
+.wa-floor .wa-items { display: flex; flex-wrap: wrap; gap: 3px; max-height: 40px; overflow: hidden; font-size: 9.5px; }
+.wa-floor .wa-items > * { font-size: 9.5px; }
+
+/* banco: só as cartas que existem, centralizadas */
+.wa-floor .wa-bench-row { position: relative; display: flex; justify-content: center; width: 100%; }
+.wa-floor .wa-bench { flex-direction: row; justify-content: center; gap: 16px; width: auto; }
+.wa-floor .wa-bench-card { flex-direction: column; align-items: center; gap: 3px; width: var(--bench); padding: 0; border: 0; border-radius: 8px; background: none; }
+.wa-floor .wa-bench-card .wa-cardwrap { width: 100%; }
+/* mais perto da "câmera", o banco é menos achatado pela perspectiva: o achatamento deixa a proporção igual à da frente */
+.wa-floor .wa-bench-card .wa-cardwrap > .mce-host { transform: scaleY(.84); transform-origin: top; margin-bottom: calc(var(--bench) * -0.256); }
+.wa-floor .wa-bench-card .wa-lp-bar.mini { width: 90%; }
+.wa-floor .wa-bench-card small { color: var(--muted); font-size: 10px; }
+.wa-floor .wa-bench-card.ko { opacity: 1; filter: grayscale(1) brightness(.45); }
+.wa-floor .wa-bench-card.pickable { border: 0; box-shadow: none; background: none; animation: wa3-pick 1s ease-in-out infinite; }
+.wa-floor .wa-bench-card.pickable:hover { transform: none; background: none; }
+.wa-floor .wa-bench-card.pickable .wa-cardwrap::after {
+    content: "⇅"; position: absolute; inset: 0; z-index: 2; display: grid; place-items: center; border-radius: 6px; pointer-events: none;
+    color: #fff; font-size: 24px; font-weight: 900; text-shadow: 0 2px 6px #000;
+    background: rgba(245, 197, 24, .18); box-shadow: 0 0 0 2px var(--yellow), 0 0 18px var(--yellow);
+}
+@keyframes wa3-pick { 50% { transform: translateY(-6px); } }
+
+/* ⇅ TROCAR, ao lado do seu banco */
+.wa-switch-btn {
+    position: absolute; top: 50%; left: calc(50% + var(--bench) + 26px); transform: translateY(-60%);
+    display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 2px; width: 68px; height: 68px; border-radius: 50%;
+    border: 2px solid #a78bfa; background: radial-gradient(circle at 35% 30%, rgba(167, 139, 250, .35), rgba(13, 17, 32, .9)); color: #ddd6fe;
+    font-family: var(--mono); cursor: pointer; box-shadow: 0 0 18px -6px #a78bfa; transition: transform .15s ease, box-shadow .15s ease, opacity .2s ease;
+}
+.wa-switch-btn span { font-size: 22px; line-height: 1; }
+.wa-switch-btn b { font-size: 7.5px; letter-spacing: .5px; }
+.wa-switch-btn:not(:disabled):hover { transform: translateY(-60%) scale(1.08); box-shadow: 0 0 24px -4px #a78bfa; }
+.wa-switch-btn:disabled { opacity: .3; cursor: not-allowed; }
+#waField.switching .wa-switch-btn { border-color: var(--yellow); color: var(--yellow); box-shadow: 0 0 22px -4px var(--yellow); animation: wa3-pulse 1.2s ease-in-out infinite; }
+#waField:has(.wa-actions.locked) .wa-switch-btn { opacity: .4; pointer-events: none; }
+@keyframes wa3-pulse { 50% { box-shadow: 0 0 30px -2px var(--yellow); } }
+
+/* linha do meio: turno e revelação */
+.wa-floor .wa-mid { position: relative; justify-content: center; gap: 0; margin: 0; padding: 8px 0; border-top: 2px solid rgba(236, 47, 156, .5); border-bottom: 2px solid rgba(34, 211, 238, .5); }
+.wa-floor .wa-turn { position: absolute; left: 8px; font-size: 11px; }
+
+/* animações: você avança para cima, o rival para baixo */
+.wa-floor .wa-me .wa-card-slot.lunge { animation: wa-lunge-up .45s ease; }
+.wa-floor .wa-opp .wa-card-slot.lunge { animation: wa-lunge-down .45s ease; }
+
+/* HUD e mão de ações (reta, fora da perspectiva) */
+.wa-hud { position: relative; z-index: 4; display: flex; justify-content: space-between; align-items: center; gap: 10px; margin: 8px 4px 0; color: var(--muted); font-size: 11px; }
+.wa-hud .wa-wait { min-width: 0; text-align: center; }
+#waField > .wa-actions { position: relative; z-index: 4; display: flex; justify-content: center; gap: 8px; margin-top: 8px; }
+#waField > .wa-actions .wa-act { width: 96px; height: 108px; padding: 6px 4px; justify-content: center; border-radius: 10px; }
+#waField > .wa-actions .wa-act:nth-child(1) { transform: rotate(-6deg) translateY(8px); }
+#waField > .wa-actions .wa-act:nth-child(2) { transform: rotate(-3deg) translateY(2px); }
+#waField > .wa-actions .wa-act:nth-child(4) { transform: rotate(3deg) translateY(2px); }
+#waField > .wa-actions .wa-act:nth-child(5) { transform: rotate(6deg) translateY(8px); }
+#waField > .wa-actions .wa-act:not(:disabled):hover { transform: translateY(-14px) scale(1.06); z-index: 2; }
+#waField.switching > .wa-actions .wa-act { opacity: .35; pointer-events: none; }
+
+/* ---------- arenas por evento: cores do chão (as partículas são as de .wa-arena-fx, acima) ---------- */
+#waField[data-event="moon"]     { --floor-a: #0b1538; --floor-b: #070d24; --grid: rgba(191, 219, 254, .13); --edge: rgba(191, 219, 254, .5); --sky: rgba(147, 197, 253, .3);  border-color: rgba(147, 197, 253, .45); }
+#waField[data-event="wall"]     { --floor-a: #2a2522; --floor-b: #1b1816; --grid: rgba(214, 211, 209, .16); --edge: rgba(214, 211, 209, .45); --sky: rgba(168, 162, 158, .25); border-color: rgba(214, 211, 209, .4); }
+#waField[data-event="festival"] { --floor-a: #3a1408; --floor-b: #24101e; --grid: rgba(253, 186, 116, .16); --edge: rgba(251, 146, 60, .6);  --sky: rgba(251, 146, 60, .35);  border-color: rgba(251, 146, 60, .5); }
+#waField[data-event="rain"]     { --floor-a: #062433; --floor-b: #07142a; --grid: rgba(34, 211, 238, .22);  --edge: rgba(34, 211, 238, .65);  --sky: rgba(34, 211, 238, .3);   border-color: rgba(34, 211, 238, .5); }
+#waField[data-event="romance"]  { --floor-a: #2a0a24; --floor-b: #1a0820; --grid: rgba(244, 114, 182, .18); --edge: rgba(236, 72, 153, .6);  --sky: rgba(236, 72, 153, .35);  border-color: rgba(236, 72, 153, .5); }
+#waField[data-event="silence"]  { --floor-a: #16181d; --floor-b: #0f1115; --grid: rgba(148, 163, 184, .1);  --edge: rgba(148, 163, 184, .35); --sky: rgba(148, 163, 184, .15); border-color: rgba(148, 163, 184, .35); }
+#waField[data-event="storm"]    { --floor-a: #120a26; --floor-b: #08061a; --grid: rgba(196, 181, 253, .14); --edge: rgba(192, 132, 252, .7);  --sky: rgba(124, 58, 237, .3);   border-color: rgba(192, 132, 252, .55); }
+#waField[data-event="wall"] .wa-floor { background:
+    repeating-linear-gradient(0deg, rgba(0, 0, 0, .35) 0 2px, transparent 2px 34px),
+    repeating-linear-gradient(90deg, rgba(0, 0, 0, .3) 0 2px, transparent 2px 68px),
+    linear-gradient(180deg, var(--floor-a), var(--floor-b)); }
+/* lua no céu, fora do chão; partículas caem pela altura toda */
+#waField .fx-moon { top: 46px; right: 7%; width: 84px; height: 84px; }
+@keyframes fx-confetti { from { transform: translateY(0) rotate(0deg); opacity: .9; } to { transform: translateY(1000px) rotate(560deg); opacity: .5; } }
+@keyframes fx-kakera { from { transform: translateY(0) rotate(45deg); opacity: .9; } to { transform: translateY(1000px) rotate(405deg); opacity: .3; } }
+@keyframes fx-heart { from { transform: translateY(0) scale(.8); opacity: 0; } 15% { opacity: .85; } to { transform: translateY(-1000px) scale(1.2); opacity: 0; } }
+#waField[data-event="moon"] .wa-arena-fx i { top: calc(var(--y) * .45); }
+
+/* ---------- telas menores ---------- */
+@media (max-width: 640px) {
+    .wa-floor { --card: 104px; --bench: 56px; padding: 16px 8px 20px; }
+    .wa-floor .wa-info { width: 112px; }
+    .wa-floor .wa-lp-val { font-size: 20px; }
+    .wa-floor .wa-stats, .wa-floor .wa-items { display: none; }
+    .wa-switch-btn { width: 54px; height: 54px; left: calc(50% + var(--bench) + 14px); }
+    #waField > .wa-actions .wa-act { width: 62px; height: 88px; }
+    #waField > .wa-actions .wa-act small { display: none; }
+}
+
+/* ---------- 3D: barra de vida da carta da frente, quadro da classe e letras maiores ---------- */
+/* a barra antiga tinha flex: 1; dentro da coluna da vida isso zerava a altura */
+.wa-floor .wa-info .wa-lp-bar { flex: none; height: 12px; }
+.wa-floor .wa-me .wa-lp-val { text-align: left; }
+.wa-floor .wa-opp .wa-lp-val { text-align: right; }
+.wa-floor .wa-info { width: 200px; gap: 6px; }
+.wa-floor .wa-name { font-size: 13px; }
+.wa-floor .wa-lp-val { font-size: 30px; }
+.wa-floor .wa-stats > span { padding: 3px 7px; font-size: 12px; }
+.wa-floor .wa-flags span { font-size: 11px; padding: 2px 7px; }
+.wa-floor .wa-items, .wa-floor .wa-items > * { font-size: 10.5px; }
+.wa-floor .wa-items { max-height: 46px; }
+
+/* quadro da classe: você à esquerda da carta, o rival à direita */
+.wa-floor .wa-cls-side {
+    position: absolute;
+    top: 50%;
+    width: 200px;
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+    padding: 10px 12px;
+    border-radius: 12px;
+    border: 1px solid color-mix(in srgb, var(--c) 60%, transparent);
+    background: linear-gradient(160deg, color-mix(in srgb, var(--c) 14%, rgba(8, 10, 18, .85)), rgba(8, 10, 18, .85));
+    box-shadow: 0 0 18px -8px var(--c);
+    transform: translateY(-50%);
+}
+.wa-floor .wa-cls-side[hidden] { display: none; }
+.wa-floor .wa-me .wa-cls-side { right: calc(50% + var(--card) / 2 + 16px); }
+.wa-floor .wa-opp .wa-cls-side { left: calc(50% + var(--card) / 2 + 16px); }
+.wa-cls-head { display: flex; align-items: center; gap: 8px; }
+.wa-cls-head b { color: var(--c); font: 800 13px var(--mono); letter-spacing: 1px; }
+.wa-cls-ico { display: grid; place-items: center; width: 26px; height: 26px; border-radius: 50%; font-size: 14px;
+    background: radial-gradient(circle at 35% 30%, color-mix(in srgb, var(--c) 35%, #fff), var(--c) 55%, color-mix(in srgb, var(--c) 60%, #000));
+    box-shadow: 0 0 0 1.5px rgba(255, 255, 255, .5); }
+.wa-cls-line { display: flex; flex-direction: column; gap: 1px; color: var(--text); font-size: 11.5px; line-height: 1.35; }
+.wa-cls-line span { color: var(--muted); font: 800 9.5px var(--mono); letter-spacing: .8px; }
+.wa-cls-line.sp span { color: #c084fc; }
+.wa-cls-line.sp.ready span { color: #e9d5ff; text-shadow: 0 0 8px #c084fc; }
+.wa-cls-line.weak { color: #ff9fb2; }
+
+@media (max-width: 640px) {
+    .wa-floor .wa-cls-side { display: none; }
+}
+
+/* classe ao lado da carta: fechada mostra só ícone e nome; clicando, abre a descrição */
+.wa-floor .wa-cls-side:not(.open) { width: auto; padding: 0; border: 0; background: none; box-shadow: none; }
+.wa-floor .wa-cls-head {
+    display: flex; align-items: center; gap: 8px; width: 100%; padding: 6px 12px 6px 6px; border-radius: 999px; cursor: pointer;
+    border: 1px solid color-mix(in srgb, var(--c) 60%, transparent);
+    background: linear-gradient(160deg, color-mix(in srgb, var(--c) 16%, rgba(8, 10, 18, .9)), rgba(8, 10, 18, .9));
+    box-shadow: 0 0 16px -8px var(--c); color: var(--text); font-family: var(--mono); transition: box-shadow .15s ease, transform .15s ease;
+}
+.wa-floor .wa-cls-head:hover { box-shadow: 0 0 20px -4px var(--c); transform: translateY(-2px); }
+.wa-floor .wa-cls-head i { margin-left: auto; padding-left: 6px; color: var(--muted); font-style: normal; font-size: 12px; }
+.wa-floor .wa-cls-side.open .wa-cls-head { padding: 0; border: 0; border-radius: 0; background: none; box-shadow: none; transform: none; }
+.wa-floor .wa-cls-side.open { animation: wa3-open .18s ease; }
+@keyframes wa3-open { from { opacity: 0; transform: translateY(-50%) scale(.94); } }
+
+/* vida da carta da frente: o seu número alinhado à esquerda, como o do rival à direita (o .wa-lp antigo centralizava) */
+.wa-floor .wa-me .wa-lp { align-items: flex-start; }
+
+/* ---------- 3D no celular: nada vaza do chão e a mão de ações cabe na tela ---------- */
+@media (max-width: 640px) {
+    #waField { padding: 12px 8px 12px; }
+    /* o bloco da vida ocupa só o espaço livre ao lado da carta */
+    .wa-floor .wa-info { width: calc(50% - var(--card) / 2 - 20px); }
+    .wa-floor .wa-lp-val { font-size: 18px; }
+    .wa-floor .wa-name { font-size: 10.5px; }
+    .wa-floor .wa-tag { display: none; }
+    .wa-floor .wa-flags { display: none; }
+    .wa-hud { font-size: 9.5px; white-space: nowrap; }
+    #waField > .wa-actions { gap: 4px; }
+    #waField > .wa-actions .wa-act { width: 58px; height: 80px; padding: 4px 2px; }
+    #waField > .wa-actions .wa-act b { font-size: 8.5px; letter-spacing: 0; }
+    #waField > .wa-actions .wa-act-ico { font-size: 18px; }
+    #waField > .wa-actions .wa-act:nth-child(1) { transform: rotate(-4deg) translateY(5px); }
+    #waField > .wa-actions .wa-act:nth-child(2) { transform: rotate(-2deg) translateY(1px); }
+    #waField > .wa-actions .wa-act:nth-child(4) { transform: rotate(2deg) translateY(1px); }
+    #waField > .wa-actions .wa-act:nth-child(5) { transform: rotate(4deg) translateY(5px); }
 }

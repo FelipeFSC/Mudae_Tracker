@@ -28,12 +28,38 @@
   /* ---------- Tela ---------- */
   const VIEW_HTML = `
   <section id="view-arena" class="view arena-view" aria-label="Waifu Arena">
-    <div class="page-head">
-      <h1 class="pink-title"><span class="page-icon">⚔</span> WAIFU ARENA <span class="arena-beta">EM TESTE</span></h1>
-      <p class="subtitle">Isto ainda <b>não é o jogo final</b>: é um protótipo da batalha, contra o bot ou online numa sala.</p>
+    <div id="arenaHub" class="arena-hub">
+      <div class="arena-hub-inner">
+        <div class="arena-hub-heading">
+          <span class="arena-hub-kicker">MUDAE · WAIFU ARENA</span>
+          <h1 class="pink-title"><span class="page-icon">⚔</span> WAIFU ARENA <button type="button" class="arena-beta arena-rules-btn" data-wa-rules>REGRAS</button></h1>
+          <p class="subtitle">Isto ainda <b>não é o jogo final</b>: é um protótipo da batalha. Escolha como quer jogar.</p>
+        </div>
+        <div class="arena-mode-picker" role="group" aria-label="Escolher modo de jogo">
+          <button type="button" class="arena-mode-card" data-arena-open="bot">
+            <span class="arena-mode-command">OFFLINE</span>
+            <span class="arena-mode-name">Contra o bot</span>
+            <span class="arena-mode-enter">JOGAR →</span>
+          </button>
+          <button type="button" class="arena-mode-card" data-arena-open="online">
+            <span class="arena-mode-command">ONLINE</span>
+            <span class="arena-mode-name">Sala com outro jogador</span>
+            <span class="arena-mode-enter">ABRIR SALA →</span>
+          </button>
+        </div>
+      </div>
     </div>
 
-    <div class="arena-grid">
+    <div id="arenaPlay" class="arena-play" hidden>
+    <div class="page-head split">
+      <div>
+        <h1 class="pink-title"><span class="page-icon">⚔</span> WAIFU ARENA <span class="arena-play-mode" id="arenaPlayTitle"></span> <button type="button" class="arena-beta arena-rules-btn" data-wa-rules>REGRAS</button></h1>
+        <p class="subtitle" id="arenaPlaySub"></p>
+      </div>
+      <button type="button" class="pill purple" id="arenaBack">← MODOS</button>
+    </div>
+
+    <div class="arena-grid" id="arenaOnlinePanel">
       <div class="panel">
         <div class="panel-title"><span class="bar pink"></span> SALA</div>
 
@@ -73,6 +99,7 @@
           <li class="arena-empty">Ninguém na sala ainda.</li>
         </ul>
       </div>
+    </div>
     </div>
   </section>`;
 
@@ -335,6 +362,34 @@
     setTimeout(() => { $.copy.textContent = 'COPIAR'; }, 1500);
   }
 
+  /* ---------- Hub e telas ----------
+     A batalha (waifuarena-battle.js) fica dentro de #arenaPlay, logo
+     abaixo do painel da sala; aqui só se escolhe o modo dela. */
+  const SCREENS = {
+    bot: { title: 'OFFLINE', sub: 'Duelo contra o bot. Escolha a dificuldade e monte seu time.' },
+    online: { title: 'ONLINE', sub: 'Crie uma sala ou entre com o código de outro jogador. A batalha aparece quando a sala estiver aberta.' },
+  };
+
+  function openScreen(mode) {
+    const s = SCREENS[mode];
+    if (!s) return;
+    document.getElementById('arenaPlayTitle').textContent = `· ${s.title}`;
+    document.getElementById('arenaPlaySub').textContent = s.sub;
+    document.getElementById('arenaOnlinePanel').hidden = mode !== 'online';
+    $.hub.hidden = true;
+    $.play.hidden = false;
+    if (window.WaifuArenaBattle) window.WaifuArenaBattle.setMode(mode);
+  }
+
+  function backToHub() {
+    const battle = window.WaifuArenaBattle;
+    if (battle && battle.inDuel() && !confirm('Voltar agora abandona o duelo em andamento. Continuar?')) return;
+    if (battle) battle.exit();
+    if (S.role) leaveRoom();
+    $.play.hidden = true;
+    $.hub.hidden = false;
+  }
+
   /* ---------- Montagem ---------- */
   function init() {
     const app = document.getElementById('app');
@@ -357,6 +412,15 @@
     $.join.addEventListener('click', joinRoom);
     $.leave.addEventListener('click', () => leaveRoom());
     $.copy.addEventListener('click', copyCode);
+
+    // hub (OFFLINE / ONLINE) → tela de jogo
+    $.hub = byId('arenaHub');
+    $.play = byId('arenaPlay');
+    $.hub.addEventListener('click', ev => {
+      const card = ev.target.closest('[data-arena-open]');
+      if (card) openScreen(card.dataset.arenaOpen);
+    });
+    byId('arenaBack').addEventListener('click', backToHub);
 
     // fecha a conexão direitinho ao sair da página
     window.addEventListener('beforeunload', () => leaveRoom(true));

@@ -27,7 +27,7 @@ const MudaeCardEffects = (() => {
   /* ============================================================
      1. NÚCLEO
      ============================================================ */
-  const CSS_HREF = 'card-effects.css?v=2';
+  const CSS_HREF = 'card-effects.css?v=3';
   const KAKERA_DIR = 'kakerasImg';
   const BACK_IMG = 'Mudae.png';
 
@@ -229,9 +229,12 @@ const MudaeCardEffects = (() => {
   function cardInnerHTML(s) {
     const tier = getTier(s.kakera);
     const op = s.op === 'none' ? '' : `<div class="op-badge op-${s.op === 'max' ? 'max' : 'some'}" title="${s.op === 'max' ? 'Todos os perks do $op no máximo' : 'Tem perks do $op'}"><span>◈</span></div>`;
+    // broche opcional à esquerda da kakera (ex.: classe na Waifu Arena): { ico, color, title }
+    const b = s.brooch;
+    const brooch = b && b.ico ? `<div class="brooch" style="--bc:${HEX.test(b.color) ? b.color : '#a78bfa'}" title="${esc(b.title || '')}"><span>${esc(b.ico)}</span></div>` : '';
     return `<div class="card-inner">
     <div class="frame"><div class="content"><div class="fx frame-fx"></div>
-      <div class="top">${op}<div class="tl-kak" title="${tier.label} · ${tier.pt}"><img src="${kakeraIcon(tier)}" alt=""><span class="kak-val">${fmtNum(s.kakera)}</span></div></div>
+      <div class="top">${op}${brooch}<div class="tl-kak" title="${tier.label} · ${tier.pt}"><img src="${kakeraIcon(tier)}" alt=""><span class="kak-val">${fmtNum(s.kakera)}</span></div></div>
       <div class="art"><div class="art-img">${s.img ? `<img class="art-photo" src="${esc(s.img)}" referrerpolicy="no-referrer" alt="" draggable="false">` : ''}</div><div class="fx art-fx"></div></div>
       <div class="tl-sign">
         <div class="tl-id"><span class="tl-name">${esc(s.name)}</span><span class="tl-series">${esc(s.series)}</span></div>
@@ -345,7 +348,7 @@ const MudaeCardEffects = (() => {
     document.body.appendChild(host);
 
     const $ = sel => root.querySelector(sel);
-    const viewer = $('#viewer'), stage = $('#vstage'), rot = $('#vrot'), floor = $('#vfloor'), autoBtn = $('[data-act="auto"]');
+    const viewer = $('#viewer'), stage = $('#vstage'), card = $('.v-card'), rot = $('#vrot'), floor = $('#vfloor'), autoBtn = $('[data-act="auto"]');
 
     const front = document.createElement('div');
     const e = paintCard(front, s);
@@ -365,7 +368,7 @@ const MudaeCardEffects = (() => {
     const prevOverflow = document.body.style.overflow;
     document.body.style.overflow = 'hidden';
 
-    const V = { rx: 10, ry: -200, vx: 0, vy: 0, hx: 0, hy: 0, thx: 0, thy: 0, zoom: 1, flip: 0, auto: false, drag: null, raf: 0 };
+    const V = { rx: 10, ry: -200, vx: 0, vy: 0, hx: 0, hy: 0, thx: 0, thy: 0, zoom: 1, zoomApplied: 1, flip: 0, auto: false, drag: null, raf: 0 };
 
     function loop() {
       if (!V.drag) {
@@ -382,7 +385,9 @@ const MudaeCardEffects = (() => {
       V.hx += (V.thx - V.hx) * .08;
       V.hy += (V.thy - V.hy) * .08;
       const RX = V.rx + V.hx, RY = V.ry + V.hy;
-      rot.style.transform = `scale(${V.zoom}) rotateX(${RX}deg) rotateY(${RY}deg)`;
+      // zoom pela largura (não scale), para a carta ser redesenhada nítida
+      if (V.zoom !== V.zoomApplied) { card.style.setProperty('--vz', V.zoom); V.zoomApplied = V.zoom; }
+      rot.style.transform = `rotateX(${RX}deg) rotateY(${RY}deg)`;
       // A luz é fixa: conforme a carta gira, o reflexo "anda" pela superfície
       const sy = Math.sin(RY * Math.PI / 180), sx = Math.sin(RX * Math.PI / 180);
       const facingFront = Math.cos(RY * Math.PI / 180) * Math.cos(RX * Math.PI / 180) >= 0;
