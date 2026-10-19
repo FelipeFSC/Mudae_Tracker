@@ -70,6 +70,27 @@
     storm:    { ico: '⚡', name: 'Tempestade',       desc: 'O medidor ⚡ carrega em dobro' },
   };
 
+  /* Ícones dos eventos: SVG de traço no mesmo estilo das classes (cor por evento).
+     O emoji em EVENTS[k].ico continua no histórico, que só aceita texto. */
+  const EVENT_COLOR = { moon: '#bfdbfe', wall: '#d6d3d1', festival: '#fb923c', rain: '#22d3ee', romance: '#f472b6', silence: '#94a3b8', storm: '#c084fc' };
+  const EVENT_SVG = {
+    // lua cheia com crateras e uma estrela
+    moon:     '<circle cx="11" cy="13" r="7.5" class="f"/><circle cx="8.5" cy="11" r="1.4" class="k"/><circle cx="13" cy="15.5" r="1.1" class="k"/><circle cx="13.5" cy="10" r=".8" class="k"/><path d="M19.5 2.5l.5 1.2 1.2.5-1.2.5-.5 1.2-.5-1.2-1.2-.5 1.2-.5z" class="f"/>',
+    // muralha com ameias e tijolos
+    wall:     '<path d="M3 21V8h3v2.5h2.5V8h2.5v2.5h2V8h2.5v2.5H18V8h3v13z" class="f"/><path d="M3 14.5h18M8 14.5V21M16 14.5V21M12 10.5v4" class="t"/>',
+    // tenda de festival com bandeirinha
+    festival: '<path d="M4 20c2-3.5 5-8 8-12 3 4 6 8.5 8 12z" class="f"/><path d="M12 8V3l4 1.5-4 1.5M10 20c.5-2.5 1-4 2-5.5 1 1.5 1.5 3 2 5.5M2 20h20"/>',
+    // nuvem com cristais de kakera caindo
+    rain:     '<path d="M7 13a3.8 3.8 0 0 1-.5-7.6 5.3 5.3 0 0 1 10.2 1.3A3.2 3.2 0 0 1 17 13z" class="f"/><path d="M7 16.2l1.1 1.4L7 19l-1.1-1.4zM12 17.6l1.1 1.4-1.1 1.4-1.1-1.4zM17 16.2l1.1 1.4L17 19l-1.1-1.4z" class="f"/>',
+    // dois corações
+    romance:  '<path d="M9 20c-5-3.5-6.5-6.2-6.5-8.4a3.3 3.3 0 0 1 6.5-1.1 3.3 3.3 0 0 1 6.5 1.1C15.5 13.8 14 16.5 9 20z" class="f"/><path d="M18 11c-2.6-1.8-3.8-3.3-3.8-4.8a1.9 1.9 0 0 1 3.8-.6 1.9 1.9 0 0 1 3.8.6c0 1.5-1.2 3-3.8 4.8z" class="f"/>',
+    // balão de fala cortado
+    silence:  '<path d="M4 5h16v10H10l-4 4v-4H4z" class="f"/><path d="M3 3l18 18"/>',
+    // raio
+    storm:    '<path d="M13.5 2L5 13.5h6L9.5 22 19 9.5h-6.5z" class="f"/>',
+  };
+  const evIcon = k => (EVENT_SVG[k] ? `<svg class="wa-cls-svg wa-ev-svg" viewBox="0 0 24 24" style="color:${EVENT_COLOR[k]}" aria-hidden="true">${EVENT_SVG[k]}</svg>` : '');
+
   /* ============================================================
      CLASSES (escolhidas antes da partida; uma por carta, sem repetir no time)
      Cada classe: passiva (a partida inteira), ✨ especial (usa o medidor ⚡) e fraqueza.
@@ -91,12 +112,48 @@
     idol:        { ico: '🎤', name: 'Idol',       color: '#f472b6', short: 'Fortalece o time',
                    passive: 'O 🍓 tira +1 a mais', weak: '−1⚔️', atk: -1, lewd: 1,
                    special: 'Show ao Vivo', specialDesc: 'O time inteiro (banco também) ganha +2⚔️ por 3 turnos' },
-    necromancer: { ico: '💀', name: 'Necromante', color: '#a78bfa', short: 'Fica forte com as quedas', soon: true },
-    mage:        { ico: '📖', name: 'Mago',       color: '#22d3ee', short: 'Estuda melhor', soon: true },
-    rogue:       { ico: '🎭', name: 'Ladino',     color: '#fbbf24', short: 'Rouba itens', soon: true },
-    archer:      { ico: '🏹', name: 'Arqueira',   color: '#86efac', short: 'Pune quem troca', soon: true },
-    witch:       { ico: '🧙‍♀️', name: 'Bruxa',      color: '#c084fc', short: 'Veneno e maldição', soon: true },
+    necromancer: { ico: '💀', name: 'Necromante', color: '#a78bfa', short: 'Fica forte com as quedas',
+                   passive: '+2⚔️ para sempre a cada aliada nocauteada', weak: '−3💗', hp: -3,
+                   special: 'Erguer Servo', specialDesc: 'Um esqueleto de 12💗 toma os próximos golpes no lugar dela (some em 3 turnos)' },
+    mage:        { ico: '📖', name: 'Mago',       color: '#22d3ee', short: 'Estuda melhor',
+                   passive: 'Cada 📔 mostra +1 opção de item', weak: '−1🛡️', def: -1,
+                   special: 'Grimório', specialDesc: 'Escolha 1 entre 3 itens raros, sem gastar estudo (1× por partida)' },
+    rogue:       { ico: '🎭', name: 'Ladino',     color: '#fbbf24', short: 'Rouba itens',
+                   passive: 'Cada 🍓 tem 20% de chance de roubar um item do rival', weak: '−2💗', hp: -2,
+                   special: 'Furto', specialDesc: 'Rouba o item mais valioso da carta da frente do rival' },
+    archer:      { ico: '🏹', name: 'Arqueira',   color: '#86efac', short: 'Pune quem troca',
+                   passive: 'Se o rival trocar, o ⚔️ dela acerta quem está saindo', weak: '−1🛡️', def: -1,
+                   special: 'Tiro Certeiro', specialDesc: 'Acerta a carta do banco do rival com menos vida, que não cura neste turno' },
+    witch:       { ico: '🧙‍♀️', name: 'Bruxa',      color: '#c084fc', short: 'Veneno e maldição',
+                   passive: 'O ⚔️ envenena: −1💗 por turno durante 2 turnos', weak: '−2💗', hp: -2,
+                   special: 'Maldição', specialDesc: 'A carta da frente do rival perde 3💗 por turno durante 4 turnos, mesmo no banco, e não cura' },
   };
+  /* Ícones das classes: SVG de traço (24×24, cor = currentColor). O emoji em CLASSES[k].ico
+     continua para textos simples (títulos de dica, histórico). */
+  const CLASS_SVG = {
+    // machado de duas lâminas
+    berserker:   '<g transform="rotate(30 12 12)"><path d="M11 22V3"/><path d="M11 4.5c4.5-.5 8.5 2 8.5 6.5 0 1.8-.8 3.3-2 4-1.5-1.5-3.6-2.2-6.5-2.2z" class="f"/></g>',
+    // escudo com cruz
+    paladin:     '<path d="M12 3l7 3v5c0 5-3.5 8.5-7 10-3.5-1.5-7-5-7-10V6z" class="f"/><path d="M12 8v8M8.5 11.5h7" class="k"/>',
+    // coração com cruz (cura)
+    cleric:      '<path d="M12 20C5 15 3 11.5 3 8.5a4.5 4.5 0 0 1 9-2.5 4.5 4.5 0 0 1 9 2.5c0 3-2 6.5-9 11.5z" class="f"/><path d="M12 9.5v5M9.5 12h5" class="k"/>',
+    // adaga
+    assassin:    '<g transform="rotate(45 12 12)"><path d="M12 2l2.5 3v9h-5V5z" class="f"/><path d="M7 14h10M12 14v5"/><circle cx="12" cy="20.5" r="1.5"/></g>',
+    // microfone com brilho
+    idol:        '<rect x="9" y="3" width="6" height="10" rx="3" class="f"/><path d="M6 11a6 6 0 0 0 12 0M12 17v4M9 21h6"/><path d="M19.5 3.5l.6 1.4 1.4.6-1.4.6-.6 1.4-.6-1.4-1.4-.6 1.4-.6z" class="f"/>',
+    // caveira
+    necromancer: '<path d="M12 3C7.5 3 5 6 5 10c0 2.5 1.2 4 2.5 5v3h9v-3c1.3-1 2.5-2.5 2.5-5 0-4-2.5-7-7-7z" class="f"/><circle cx="9.5" cy="10.5" r="1.6" class="k"/><circle cx="14.5" cy="10.5" r="1.6" class="k"/><path d="M10 18v2.5M12 18v2.5M14 18v2.5"/>',
+    // cajado com orbe
+    mage:        '<path d="M5 21l8.6-10.4"/><circle cx="15.5" cy="8.5" r="3" class="f"/><path d="M20.5 2.5l.5 1.2 1.2.5-1.2.5-.5 1.2-.5-1.2-1.2-.5 1.2-.5zM4 6l.4 1 1 .4-1 .4L4 8.8l-.4-1-1-.4 1-.4z" class="f"/>',
+    // máscara de ladrão
+    rogue:       '<path d="M3 10c0-2 2-2.5 4.5-2.5 2 0 3 1.5 4.5 1.5s2.5-1.5 4.5-1.5C19 7.5 21 8 21 10c0 3-2 5.5-5 5.5-2 0-3-1.5-4-1.5s-2 1.5-4 1.5c-3 0-5-2.5-5-5.5z" class="f"/><ellipse cx="8" cy="11.2" rx="1.9" ry="1.2" class="k"/><ellipse cx="16" cy="11.2" rx="1.9" ry="1.2" class="k"/>',
+    // arco e flecha
+    archer:      '<path d="M8 3c7 3 7 15 0 18"/><path d="M8 3v18" class="t"/><path d="M3 12h16M16 9l3.5 3-3.5 3"/>',
+    // chapéu de bruxa
+    witch:       '<path d="M7 17Q11 11 12 4.5Q13 3 15.5 4.2Q13.6 5 13.4 6.8Q14 12 17 17z" class="f"/><path d="M3 18.5c3-2 15-2 18 0M8.4 14.5h7.2"/>',
+  };
+  const clsIcon = k => (CLASS_SVG[k] ? `<svg class="wa-cls-svg" viewBox="0 0 24 24" aria-hidden="true">${CLASS_SVG[k]}</svg>` : '');
+
   const CLASS_KEYS = Object.keys(CLASSES).filter(k => !CLASSES[k].soon);
   const validClass = k => CLASS_KEYS.includes(k);
   const clsOf = f => CLASSES[f.cls] || null;
@@ -301,6 +358,12 @@
       show: 0,          // Show ao Vivo: turnos com +2⚔️
       noProtect: 0,     // Fúria: turno em que não pode usar 🛡️
       revived: false,   // Ressurreição já usada (1× por partida)
+      grimUsed: false,  // Grimório já usado (1× por partida)
+      servant: 0,       // Erguer Servo: vida do esqueleto que absorve os golpes
+      servantTurns: 0,
+      poison: 0,        // veneno da Bruxa: turnos restantes (−1💗 por turno)
+      curse: 0,         // Maldição: turnos restantes (−3💗 por turno, sem cura)
+      noHeal: 0,        // Tiro Certeiro: turno em que não cura no banco
       fx: { horn: false, future: 0, freeItem: 0, bandage: false, doll: false, lewdHp: 0, lewdDouble: false, dynamax: 0, clone: false,
             figleaf: false, lewdItem: false, doubleStudy: false, saitama: false, sharingan: false, stalker: false, succubus: false,
             tentacle: false, lewdStudy: 0, tanuki: false, bento: 0, microwave: false },
@@ -308,6 +371,7 @@
     for (const [skill, [stat, per]] of Object.entries(RULES.perPoint)) f[stat] += s[skill] * per;
     // fraquezas da classe
     f.atk = Math.max(0, f.atk + (C.atk || 0));
+    f.def = Math.max(0, f.def + (C.def || 0));
     f.hp = Math.max(1, f.hp + (C.hp || 0));
     f.hp = Math.max(1, Math.round(f.hp * hpMult));
     f.hpMax = f.hp;
@@ -340,11 +404,33 @@
   function makeOffer(f) {
     const level = f.study + f.fx.future;
     f.fx.future = 0;
-    const count = eventIs(f, 'rain') ? RULES.maxOffers : Math.max(1, Math.min(RULES.maxOffers, 1 + Math.floor(level / RULES.offerEvery)));
+    const base = eventIs(f, 'rain') ? RULES.maxOffers : Math.max(1, Math.min(RULES.maxOffers, 1 + Math.floor(level / RULES.offerEvery)));
+    const count = base + (f.cls === 'mage' ? 1 : 0);   // passiva do Mago
     const names = [];
     while (names.length < count) names.push(rollItem(level, names).name);
     return names;
   }
+
+  /* Grimório (Mago): 3 itens sorteados só entre os raros */
+  function rareOffer() {
+    const names = [];
+    while (names.length < 3) names.push(rollItem(40, names).name);
+    return names;
+  }
+
+  /* Ladino: o item sai do rival (perde os atributos dele) e vai inteiro para o ladrão */
+  function stealItem(B, thief, victim, name) {
+    const i = victim.items.indexOf(name);
+    const it = ITEM_BY_NAME[name];
+    if (i === -1 || !it) return false;
+    victim.items.splice(i, 1);
+    victim.atk = Math.max(0, victim.atk - it.atk); victim.def = Math.max(0, victim.def - it.def); victim.study = Math.max(0, victim.study - it.study);
+    if (it.hp) { victim.hpMax = Math.max(1, victim.hpMax - it.hp); victim.hp = Math.min(victim.hp, victim.hpMax); }
+    B.log(`🎭 ${thief.name} roubou <b>${name}</b> de ${victim.name}!`, 'combo', thief);
+    giveItem(B, thief, it);
+    return true;
+  }
+  const bestItem = f => f.items.filter(n => ITEM_BY_NAME[n]).sort((a, b) => ITEM_BY_NAME[b].value - ITEM_BY_NAME[a].value)[0];
 
   const statIco = st => ({ atk: '⚔️', def: '🛡️', study: '📔', hp: '💗' }[st]);
 
@@ -448,6 +534,7 @@
     B.pop(tgt, `🍓 −${hpLoss}`, 'lewd');
     B.log(`${boosted ? src.name : `A succubus de ${src.name}`} usou 🍓 em ${tgt.name}: −${tgt.fx.figleaf ? 0 : malus}🛡️ −${malus + (boosted ? src.fx.lewdStudy : 0)}📔 −${hpLoss}💗`, 'lewd', tgt);
     if (boosted && src.fx.lewdItem && chance(0.25)) giveItem(B, src, rollItem(src.study));
+    if (boosted && src.cls === 'rogue' && tgt.items.length && chance(0.2)) stealItem(B, src, tgt, pick(tgt.items.filter(n => ITEM_BY_NAME[n])) || tgt.items[0]);
   }
 
   /* Ataque bruto de src contra tgt (com os bônus de "próximo ataque") e defesa de tgt */
@@ -491,7 +578,13 @@
     return Object.keys(ACTIONS).filter(a => {
       if (a === 'protect') return !eventIs(f, 'silence') && f.noProtect !== B.turn + 1;
       if (a === 'study') return T.studies > 0 || eventIs(f, 'rain');
-      if (a === 'special') return !!f.cls && f.meter >= RULES.meterMax && (f.cls !== 'cleric' || canRevive(B, s, f));
+      if (a === 'special') {
+        if (!f.cls || f.meter < RULES.meterMax) return false;
+        if (f.cls === 'cleric') return canRevive(B, s, f);
+        if (f.cls === 'mage') return !f.grimUsed;
+        if (f.cls === 'rogue') return !!bestItem(front(B, other(s)));
+        return true;
+      }
       return true;
     });
   }
@@ -529,9 +622,13 @@
         B.log(`O time de ${f.name} ganhou +2⚔️ por 3 turnos.`, 'fx', f);
       }
       if (f.cls === 'paladin') B.log(`${f.name} fez um Juramento: dano pela metade por 2 turnos.`, 'fx', f);
+      if (f.cls === 'necromancer') {                               // Erguer Servo: este turno + 3
+        f.servant = 12; f.servantTurns = 4;
+        B.log(`💀 Um esqueleto de 12💗 protege ${f.name}.`, 'fx', f);
+      }
     }
-    // Fúria (Berserker) e Emboscada (Assassino) também atacam
-    const attacking = s => acts[s] === 'attack' || sp[s] === 'berserker' || sp[s] === 'assassin';
+    // Fúria (Berserker), Emboscada (Assassino) e Tiro Certeiro (Arqueira) também atacam
+    const attacking = s => acts[s] === 'attack' || sp[s] === 'berserker' || sp[s] === 'assassin' || sp[s] === 'archer';
     const switchTo = s => (String(acts[s]).startsWith('switch:') ? Number(String(acts[s]).split(':')[1]) : null);
     const atkMult = s => (sp[s] === 'berserker' ? 2 : sp[s] === 'assassin' && switchTo(other(s)) === null ? 1.5 : 1);
     const startFront = { host: front(B, 'host'), guest: front(B, 'guest') };
@@ -542,9 +639,10 @@
       if (switchTo(s) === null) continue;
       const to = switchTo(s);
       const me = front(B, s), foe = front(B, other(s));
-      if (attacking(other(s)) && rawAttack(foe, me, atkMult(other(s))) >= me.hpMax) {
+      const archerHit = attacking(other(s)) && foe.cls === 'archer' && sp[other(s)] !== 'archer';
+      if (attacking(other(s)) && (archerHit || rawAttack(foe, me, atkMult(other(s))) >= me.hpMax)) {
         late[s] = to;
-        B.log(`${me.name} tentou sair, mas o ataque de ${foe.name} chega antes!`, 'fx', me);
+        B.log(archerHit ? `🏹 A flecha de ${foe.name} acerta ${me.name} antes da troca!` : `${me.name} tentou sair, mas o ataque de ${foe.name} chega antes!`, 'fx', me);
       } else {
         doSwitch(B, s, to);
       }
@@ -565,10 +663,22 @@
       const ko = B.teams[s].cards.filter(c => c.ko).sort((x, y) => y.hpMax - x.hpMax)[0];
       if (!ko) continue;
       f.revived = true;
-      Object.assign(ko, { ko: false, hp: Math.max(1, Math.round(ko.hpMax * 0.4)), meter: 0, oath: 0, show: 0 });
+      Object.assign(ko, { ko: false, hp: Math.max(1, Math.round(ko.hpMax * 0.4)), meter: 0, oath: 0, show: 0, poison: 0, curse: 0, servant: 0, servantTurns: 0 });
       B.ev({ e: 'revive', side: s, idx: ko.idx });
       B.pop(ko, `+${ko.hp}💗`, 'heal');
       B.log(`<b>${ko.name} foi ressuscitada</b> por ${f.name} com ${ko.hp}💗!`, 'combo', ko);
+    }
+    for (const s of SIDES) {
+      const f = front(B, s), foe = front(B, other(s));
+      if (sp[s] === 'witch') {
+        foe.curse = 4;
+        B.pop(foe, '🕯️', 'lewd');
+        B.log(`🕯️ ${foe.name} foi amaldiçoada: −3💗 por turno durante 4 turnos, sem cura.`, 'fx', foe);
+      }
+      if (sp[s] === 'rogue') {
+        const name = bestItem(foe);
+        if (name) stealItem(B, f, foe, name); else B.log(`${foe.name} não tinha nada para roubar.`, 'fx', foe);
+      }
     }
     for (const s of SIDES) if (front(B, s).fx.succubus) doLewd(B, front(B, s), front(B, other(s)), 1, false);
 
@@ -583,6 +693,12 @@
       const total = offers[s].reduce((t, o) => t + o.length, 0);
       B.log(`${f.name} estudou e encontrou ${total} ${total > 1 ? 'opções' : 'opção'} de item.`, 'item', f);
     }
+    for (const s of SIDES) {
+      if (sp[s] !== 'mage') continue;
+      front(B, s).grimUsed = true;
+      offers[s].push(rareOffer());
+      B.log(`📖 ${front(B, s).name} abriu o Grimório: 3 itens raros para escolher.`, 'item', front(B, s));
+    }
 
     // 5. ataques (calculados antes de aplicar: são simultâneos)
     const hits = [];
@@ -591,16 +707,30 @@
       const src = front(B, s), foe = other(s);
       // Emboscada com troca do rival: acerta quem saiu e quem entrou
       const to = switchTo(foe);
-      const targets = sp[s] === 'assassin' && to !== null
+      let targets = sp[s] === 'assassin' && to !== null
         ? [startFront[foe], B.teams[foe].cards[to]].filter((c, i, l) => c && !c.ko && l.indexOf(c) === i)
         : [front(B, foe)];
+      if (sp[s] === 'archer') {
+        // Tiro Certeiro: a carta do banco do rival com menos vida (sem banco, acerta a da frente)
+        const bench = B.teams[foe].cards.filter(c => !c.ko && c !== front(B, foe)).sort((x, y) => x.hp - y.hp);
+        targets = [bench[0] || front(B, foe)];
+        targets[0].noHeal = B.turn;
+      }
       const special = sp[s] ? CLASSES[sp[s]].special : null;
       const bonuses = [special, src.fx.tanuki && 'Wild Tanuki', src.fx.horn && 'Ogro', src.fx.sharingan && 'Sharingan', src.fx.clone && 'Clone'].filter(Boolean);
       for (const tgt of targets) hits.push([src, tgt, previewDamage(src, tgt, tgt.protecting, atkMult(s)), bonuses]);
       src.fx.tanuki = src.fx.horn = src.fx.sharingan = src.fx.clone = false;
     }
-    for (const [src, tgt, dmg, bonuses] of hits) {
+    for (const [src, tgt, raw, bonuses] of hits) {
+      let dmg = raw;
+      if (tgt.servant > 0 && dmg > 0) {
+        const absorbed = Math.min(tgt.servant, dmg);
+        tgt.servant -= absorbed; dmg -= absorbed;
+        B.log(`💀 O esqueleto de ${tgt.name} absorveu ${absorbed}💗${tgt.servant ? ` (restam ${tgt.servant})` : ' e se desfez'}.`, 'fx', tgt);
+        if (!tgt.servant) tgt.servantTurns = 0;
+      }
       tgt.hp -= dmg;
+      if (src.cls === 'witch' && dmg > 0) tgt.poison = Math.max(tgt.poison, 2);   // passiva da Bruxa
       if (src.fx.tentacle) tgt.def = Math.max(0, tgt.def - 1);
       B.ev({ e: 'atk', side: src.side, idx: src.idx, tside: tgt.side, tidx: tgt.idx, dmg });
       B.log(`${src.name} atacou ${tgt.name}: <b>−${dmg}💗</b>${bonuses.length ? ` (${bonuses.join(', ')})` : ''}${tgt.protecting ? ' · protegido' : ''}`, 'attack', tgt);
@@ -634,6 +764,12 @@
           f.ko = true;
           B.ev({ e: 'ko', side: s, idx: f.idx });
           B.log(`<b>${f.name} foi nocauteada!</b>`, 'end', f);
+          for (const n of B.teams[s].cards) {
+            if (n === f || n.ko || n.cls !== 'necromancer') continue;
+            n.atk += 2;
+            B.pop(n, '💀 +2⚔️', 'combo');
+            B.log(`💀 ${n.name} absorveu a queda de ${f.name}: +2⚔️.`, 'combo', n);
+          }
         }
       }
     }
@@ -650,13 +786,26 @@
     for (const s of SIDES) {
       const T = B.teams[s];
       T.cards.forEach((f, i) => {
-        if (i === T.active || f.ko || f.hp >= f.hpMax) return;
+        if (i === T.active || f.ko || f.hp >= f.hpMax || f.curse > 0 || (f.noHeal && f.noHeal === B.turn)) return;
         // Clérigo no banco: o banco cura +8 (o Festival, +10, vale se for maior)
         const cleric = T.cards.some((c, j) => j !== T.active && !c.ko && c.cls === 'cleric') ? 8 : 0;
         const n = Math.min(Math.max((eventOf(f) || {}).benchHeal || RULES.benchHeal, cleric), f.hpMax - f.hp);
         f.hp += n;
         B.pop(f, `+${n}💗`, 'heal');
       });
+    }
+  }
+
+  /* Fim do turno: veneno e Maldição tiram vida (até no banco) e o esqueleto do Necromante expira */
+  function statusTick(B) {
+    for (const s of SIDES) {
+      for (const f of B.teams[s].cards) {
+        if (f.ko) continue;
+        if (f.poison > 0) { f.hp -= 1; f.poison--; B.pop(f, '☠️ −1', 'lewd'); B.log(`☠️ ${f.name} sofreu o veneno: −1💗`, 'fx', f); }
+        if (f.curse > 0) { f.hp -= 3; f.curse--; B.pop(f, '🕯️ −3', 'lewd'); B.log(`🕯️ A Maldição tirou 3💗 de ${f.name}${f.curse ? '' : ' e acabou'}.`, 'fx', f); }
+        if (f.servantTurns > 0 && --f.servantTurns === 0 && f.servant > 0) { f.servant = 0; B.log(`💀 O esqueleto de ${f.name} se desfez.`, 'fx', f); }
+        clamp0(f);
+      }
     }
   }
 
@@ -748,7 +897,8 @@
 
   /* ---------- Serialização (online) ---------- */
   const ser = f => ({ name: f.name, atk: f.atk, def: f.def, study: f.study, hp: f.hp, hpMax: f.hpMax, lewdPower: f.lewdPower, items: [...f.items], fx: { ...f.fx }, ko: f.ko,
-    meter: f.meter, cls: f.cls, oath: f.oath, show: f.show, noProtect: f.noProtect, revived: f.revived });
+    meter: f.meter, cls: f.cls, oath: f.oath, show: f.show, noProtect: f.noProtect, revived: f.revived,
+    grimUsed: f.grimUsed, servant: f.servant, servantTurns: f.servantTurns, poison: f.poison, curse: f.curse, noHeal: f.noHeal });
   const serState = B => ({
     ...Object.fromEntries(SIDES.map(s => [s, { active: B.teams[s].active, studies: B.teams[s].studies, cards: B.teams[s].cards.map(ser) }])),
     arena: { event: B.arena.event ? { ...B.arena.event } : null, next: B.arena.next },
@@ -789,7 +939,7 @@
             <div class="wa-classes" id="waClasses">
               ${Object.entries(CLASSES).map(([k, C]) => `
                 <button type="button" class="wa-cls${C.soon ? ' soon' : ''}" data-cls="${k}" style="--c:${C.color}" ${C.soon ? 'disabled' : ''}>
-                  <i>${C.ico}</i><b>${C.name.toUpperCase()}</b><small>${C.soon ? 'EM BREVE' : C.short}</small>
+                  <i>${clsIcon(k)}</i><b>${C.name.toUpperCase()}</b><small>${C.soon ? 'EM BREVE' : C.short}</small>
                 </button>`).join('')}
             </div>
             <div class="wa-cls-detail" id="waClassDetail"></div>
@@ -887,7 +1037,7 @@
   // broche da classe, à esquerda da kakera
   const classBrooch = cls => {
     const C = CLASSES[cls];
-    return C ? { ico: C.ico, color: C.color, title: `${C.name} · ${C.passive} · ✨ ${C.special}` } : null;
+    return C ? { ico: C.ico, svg: clsIcon(cls), color: C.color, title: `${C.name} · ${C.passive} · ✨ ${C.special}` } : null;
   };
 
   function cardData(c, cls = null) {
@@ -992,7 +1142,7 @@
       el.setAttribute('aria-label', `Slot ${i + 1}: ${c ? c.name : 'vazio'}`);
       el.innerHTML = `<span class="wa-slot-n">${i + 1}</span><div class="wa-slot-card">${c ? '' : '<span class="wa-slot-empty">+</span>'}</div>
         <small>${s ? `${pts}/${RULES.points} pontos` : 'vazio'}</small>
-        ${s ? (C ? `<span class="wa-slot-cls" style="--c:${C.color}">${C.ico} ${C.name.toUpperCase()}</span>` : '<span class="wa-slot-cls none">SEM CLASSE</span>') : ''}`;
+        ${s ? (C ? `<span class="wa-slot-cls" style="--c:${C.color}">${clsIcon(s.cls)} ${C.name.toUpperCase()}</span>` : '<span class="wa-slot-cls none">SEM CLASSE</span>') : ''}`;
       if (c) el.querySelector('.wa-slot-card').appendChild(setupHost(c, s.cls));
       $.team.appendChild(el);
     }
@@ -1028,7 +1178,7 @@
     const C = cur && CLASSES[cur.cls];
     $.classDetail.style.setProperty('--c', C ? C.color : 'var(--border)');
     $.classDetail.innerHTML = C
-      ? `<h4>${C.ico} ${C.name.toUpperCase()}</h4>
+      ? `<h4>${clsIcon(cur.cls)} ${C.name.toUpperCase()}</h4>
          <div class="wa-cls-row"><span>PASSIVA</span>${C.passive}</div>
          <div class="wa-cls-row"><span>✨ ESPECIAL</span><div><b>${C.special}</b>: ${C.specialDesc}</div></div>
          <div class="wa-cls-row weak"><span>FRAQUEZA</span>${C.weak}</div>`
@@ -1085,7 +1235,7 @@
         <section class="wr-sec">
           <h4><span class="wr-n">1</span> OBJETIVO</h4>
           <p>Cada jogador tem <b>${RULES.teamSize} cartas</b>. Uma luta na <b>frente</b> e as outras esperam no <b>banco</b>.
-          Vence quem nocautear as ${RULES.teamSize} cartas do rival.</p>
+          Vence quem nocautear as ${RULES.teamSize} cartas do rival. No tabuleiro, o rival fica em cima e você embaixo.</p>
           <div class="wr-ill wr-field">
             ${wrRow('RIVAL', 'FRENTE')}
             <span class="wr-vs">VS</span>
@@ -1106,6 +1256,7 @@
           <div class="wr-table">
             ${SKILLS.map(([, label, eff]) => `<div><span>${label}</span><b>${eff}</b></div>`).join('')}
           </div>
+          <p class="wr-note">A <b>classe</b> da carta também mexe nesses números (fraqueza, seção 8).</p>
         </section>
 
         <section class="wr-sec">
@@ -1122,7 +1273,7 @@
             <div><i>📔</i><b>ESTUDAR</b><small>Ganha um item. Só ${RULES.studies} por partida.</small></div>
             <div><i>🍓</i><b>LEWD</b><small>O rival perde ${RULES.lewd} 🛡️, ${RULES.lewd} 📔 e ${RULES.lewd} 💗.</small></div>
             <div><i>✨</i><b>ESPECIAL</b><small>Com o medidor ⚡ cheio. Veja a seção 7.</small></div>
-            <div><i>${SWITCH_ICO}</i><b>TROCAR</b><small>Troca a carta da frente por uma do banco.</small></div>
+            <div><i>${SWITCH_ICO}</i><b>TROCAR</b><small>Botão ⇅ ao lado do seu banco: escolha a carta que entra.</small></div>
           </div>
         </section>
 
@@ -1140,13 +1291,15 @@
           <ul class="wr-list">
             <li>O golpe tira pelo menos <b>${RULES.minDamage}</b>. Só a 🛡️ Proteger consegue zerar o dano.</li>
             <li>Se as duas cartas atacam, <b>as duas apanham</b>: os golpes são simultâneos.</li>
+            <li>🛡️ Proteger reduz <b>${RULES.protect}</b>, mas muda com a classe e o evento: <b>Paladino 3</b>, <b>Berserker 1</b>, <b>Muralha 5</b>.</li>
+            <li>O <b>Assassino</b> ignora 2🛡️ do alvo, e o <b>Juramento</b> do Paladino corta o dano recebido pela metade.</li>
           </ul>
         </section>
 
         <section class="wr-sec">
           <h4><span class="wr-n">5</span> BANCO E TROCA</h4>
-          <p>No banco a carta recupera <b>+${RULES.benchHeal} 💗 por turno</b>, até a vida máxima.</p>
-          <p>Se você troca enquanto o rival ataca:</p>
+          <p>No banco a carta recupera <b>+${RULES.benchHeal} 💗 por turno</b>, até a vida máxima (<b>+8</b> com um Clérigo no banco, <b>+10</b> no Festival).</p>
+          <p>Para trocar, clique em <b>⇅ TROCAR</b> ao lado do seu banco: as cartas do banco ficam douradas e você escolhe quem entra. Se você troca enquanto o rival ataca:</p>
           <div class="wr-cases">
             <div class="wr-case">
               <span class="wr-case-tag ok">NORMAL</span>
@@ -1169,6 +1322,7 @@
           <ul class="wr-list">
             <li>Quanto mais 📔, <b>mais opções</b> e <b>itens mais raros</b>.</li>
             <li>O item dá atributos <b>para sempre</b>. Alguns também têm efeitos especiais.</li>
+            <li>Na <b>Chuva de Kakera</b>, o 📔 mostra ${RULES.maxOffers} opções e <b>não gasta</b> estudo, mesmo com os ${RULES.studies} já usados.</li>
           </ul>
         </section>
 
@@ -1180,7 +1334,7 @@
             <span class="wr-gain"><b>+${RULES.meterHit}⚡</b>acertou um ataque</span>
             <span class="wr-gain"><b>+${RULES.meterBlock}⚡</b>bloqueou com 🛡️</span>
           </div>
-          <p>Com o medidor cheio, o botão <b>✨ ESPECIAL</b> acende. O especial vem da <b>classe</b> da carta (seção 8).</p>
+          <p>Com o medidor cheio, o botão <b>✨ ESPECIAL</b> acende. O especial vem da <b>classe</b> da carta (seção 8). Na <b>Tempestade</b>, o medidor carrega em dobro.</p>
         </section>
 
         <section class="wr-sec">
@@ -1192,15 +1346,17 @@
             <span class="wr-gain"><b>FRAQUEZA</b>um custo pequeno</span>
           </div>
           <div class="wr-classes">
-            ${CLASS_KEYS.map(k => { const C = CLASSES[k]; return `<div style="--c:${C.color}"><b>${C.ico} ${C.name.toUpperCase()}</b><span>${C.passive}</span><span>✨ <b>${C.special}</b>: ${C.specialDesc}</span><span class="weak">Fraqueza: ${C.weak}</span></div>`; }).join('')}
+            ${CLASS_KEYS.map(k => { const C = CLASSES[k]; return `<div style="--c:${C.color}"><b>${clsIcon(k)} ${C.name.toUpperCase()}</b><span>${C.passive}</span><span>✨ <b>${C.special}</b>: ${C.specialDesc}</span><span class="weak">Fraqueza: ${C.weak}</span></div>`; }).join('')}
           </div>
+          <p class="wr-note">Na partida, clique no <b>nome da classe</b> ao lado da carta para ver o que ela faz.
+          ${Object.values(CLASSES).some(C => C.soon) ? `Em breve: ${Object.entries(CLASSES).filter(([, C]) => C.soon).map(([k, C]) => `<span class="wr-soon" style="--c:${C.color}">${clsIcon(k)} ${C.name}</span>`).join(' ')}` : ''}</p>
         </section>
 
         <section class="wr-sec">
           <h4><span class="wr-n">9</span> EVENTOS DE ARENA</h4>
-          <p>De vez em quando surge um evento <b>aleatório</b>. Ele é <b>anunciado 1 turno antes</b>, dura <b>${RULES.eventTurns} turnos</b> e vale para os dois lados.</p>
+          <p>De vez em quando surge um evento <b>aleatório</b>. Ele é <b>anunciado 1 turno antes</b>, dura <b>${RULES.eventTurns} turnos</b> e vale para os dois lados. A <b>arena muda de visual</b> com o evento.</p>
           <div class="wr-acts">
-            ${Object.values(EVENTS).map(ev => `<div><i>${ev.ico}</i><b>${ev.name.toUpperCase()}</b><small>${ev.desc}.</small></div>`).join('')}
+            ${Object.entries(EVENTS).map(([k, ev]) => `<div><i>${evIcon(k)}</i><b>${ev.name.toUpperCase()}</b><small>${ev.desc}.</small></div>`).join('')}
           </div>
         </section>
 
@@ -1214,6 +1370,16 @@
             <div><i>🏆</i><b>VITÓRIA</b><small>O rival ficou sem cartas de pé.</small></div>
             <div><i>🤝</i><b>EMPATE</b><small>Os dois times caem juntos, ou a luta chega ao turno ${RULES.maxTurns}.</small></div>
           </div>
+        </section>
+
+        <section class="wr-sec">
+          <h4><span class="wr-n">11</span> DICAS DA TELA</h4>
+          <ul class="wr-list">
+            <li>Clique em <b>qualquer carta</b> (sua ou do rival) para vê-la em 3D.</li>
+            <li>Passe o mouse numa carta do banco para ver vida, atributos e itens.</li>
+            <li>O <b>histórico</b>, à direita, conta tudo o que aconteceu em cada turno.</li>
+            <li><b>Esc</b> fecha as janelas.</li>
+          </ul>
         </section>
 
         <p class="wr-foot">Atributos iniciais, pontos do $sk e número de opções do 📔 são <b>provisórios</b>: a wiki do Mudae não explica esses números, então eles podem mudar.</p>
@@ -1393,7 +1559,7 @@
       side.classList.toggle('open', open);
       side.innerHTML = `
         <button type="button" class="wa-cls-head" data-cls-toggle="${s}" title="${open ? 'Fechar' : 'Ver o que a classe faz'}" aria-expanded="${open}">
-          <span class="wa-cls-ico">${C.ico}</span><b>${C.name.toUpperCase()}</b><i>${open ? '✕' : 'ⓘ'}</i>
+          <span class="wa-cls-ico">${clsIcon(f.cls)}</span><b>${C.name.toUpperCase()}</b><i>${open ? '✕' : 'ⓘ'}</i>
         </button>
         ${open ? `
         <div class="wa-cls-line"><span>PASSIVA${active ? ' · ATIVA' : ''}</span>${C.passive}</div>
@@ -1404,6 +1570,9 @@
     if (f.oath > 0) flags.push(`<span>🛡️ Juramento · dano pela metade (${f.oath} turno${f.oath > 1 ? 's' : ''})</span>`);
     if (f.show > 0) flags.push(`<span>🎤 Show ao Vivo · +2⚔️ (${f.show} turno${f.show > 1 ? 's' : ''})</span>`);
     if (f.noProtect === B.turn + 1) flags.push('<span>🪓 Fúria · sem 🛡️ neste turno</span>');
+    if (f.servant > 0) flags.push(`<span>💀 Esqueleto · ${f.servant}💗 (${f.servantTurns} turno${f.servantTurns > 1 ? 's' : ''})</span>`);
+    if (f.poison > 0) flags.push(`<span class="wa-flag-bad">☠️ Veneno · −1💗 (${f.poison} turno${f.poison > 1 ? 's' : ''})</span>`);
+    if (f.curse > 0) flags.push(`<span class="wa-flag-bad">🕯️ Maldição · −3💗 e sem cura (${f.curse} turno${f.curse > 1 ? 's' : ''})</span>`);
     flags.push(...Object.entries(FLAG_LABELS).filter(([k]) => f.fx[k]).map(([, t]) => `<span>${t}</span>`));
     if (f.fx.future) flags.push(`<span>🔮 +${f.fx.future}📔 no próximo item</span>`);
     row.querySelector('.wa-flags').innerHTML = flags.join('');
@@ -1460,6 +1629,8 @@
     let spHint = f.meter >= RULES.meterMax ? spName : `⚡ ${f.meter}/${RULES.meterMax} · ${spName}`;
     if (f.cls === 'cleric' && f.revived) spHint = 'Ressurreição já usada';
     else if (f.cls === 'cleric' && f.meter >= RULES.meterMax && !canRevive(B, B.me, f)) spHint = 'Ninguém para reviver';
+    else if (f.cls === 'mage' && f.grimUsed) spHint = 'Grimório já usado';
+    else if (f.cls === 'rogue' && f.meter >= RULES.meterMax && !bestItem(front(B, other(B.me)))) spHint = 'Rival sem itens';
     $.actions.querySelector('[data-act="special"] small').textContent = spHint;
     $.actions.querySelector('[data-act="special"]').title = C ? `${C.special}: ${C.specialDesc}` : '';
     renderEvent();
@@ -1472,10 +1643,10 @@
     let html = '';
     if (A.event) {
       const ev = EVENTS[A.event.key];
-      html = `<b>${ev.ico} ${ev.name.toUpperCase()}</b><span>${ev.desc} · ${A.event.left} ${A.event.left > 1 ? 'turnos' : 'turno'}</span>`;
+      html = `<b>${evIcon(A.event.key)} ${ev.name.toUpperCase()}</b><span>${ev.desc} · ${A.event.left} ${A.event.left > 1 ? 'turnos' : 'turno'}</span>`;
     } else if (A.next) {
       const ev = EVENTS[A.next];
-      html = `<b>⚠️ PRÓXIMO TURNO</b><span>${ev.ico} ${ev.name}: ${ev.desc}</span>`;
+      html = `<b>⚠️ PRÓXIMO TURNO</b><span>${evIcon(A.next)} ${ev.name}: ${ev.desc}</span>`;
     }
     $.event.innerHTML = html;
     $.event.hidden = !html;
@@ -1550,7 +1721,9 @@
 
   function animAttack(ev) {
     const src = rowOf(ev.side).querySelector('.wa-card-slot');
-    const tgt = rowOf(ev.tside).querySelector('.wa-card-slot');
+    // o alvo pode ser uma carta do banco (Tiro Certeiro, Emboscada)
+    const w = view.hosts[ev.tside] && view.hosts[ev.tside][ev.tidx];
+    const tgt = (w && w.closest('.wa-card-slot, .wa-bench-card')) || rowOf(ev.tside).querySelector('.wa-card-slot');
     src.classList.remove('lunge'); void src.offsetWidth; src.classList.add('lunge');
     setTimeout(() => {
       tgt.classList.remove('hit'); void tgt.offsetWidth; tgt.classList.add('hit');
@@ -1762,6 +1935,7 @@
       }
 
       benchHeal(D);
+      statusTick(D);
       arenaTick(D);
       result = checkKOs(D);
       await publish({ events: events.splice(0) });
@@ -2270,5 +2444,5 @@
   else init();
 
   // exposto para testes
-  window.WaifuArenaBattle = { setMode, inDuel, exit: exitArena, RULES, ITEMS, EVENTS, CLASSES, arenaTick, availableActions, makeFighter, resolveTurn, checkKOs, benchHeal, botDecide, newDuel, applyItemChoice, front };
+  window.WaifuArenaBattle = { setMode, inDuel, exit: exitArena, RULES, ITEMS, EVENTS, CLASSES, arenaTick, statusTick, availableActions, makeFighter, resolveTurn, checkKOs, benchHeal, botDecide, newDuel, applyItemChoice, front };
 })();

@@ -27,7 +27,7 @@ const MudaeCardEffects = (() => {
   /* ============================================================
      1. NÚCLEO
      ============================================================ */
-  const CSS_HREF = 'card-effects.css?v=3';
+  const CSS_HREF = 'card-effects.css?v=4';
   const KAKERA_DIR = 'kakerasImg';
   const BACK_IMG = 'Mudae.png';
 
@@ -231,7 +231,8 @@ const MudaeCardEffects = (() => {
     const op = s.op === 'none' ? '' : `<div class="op-badge op-${s.op === 'max' ? 'max' : 'some'}" title="${s.op === 'max' ? 'Todos os perks do $op no máximo' : 'Tem perks do $op'}"><span>◈</span></div>`;
     // broche opcional à esquerda da kakera (ex.: classe na Waifu Arena): { ico, color, title }
     const b = s.brooch;
-    const brooch = b && b.ico ? `<div class="brooch" style="--bc:${HEX.test(b.color) ? b.color : '#a78bfa'}" title="${esc(b.title || '')}"><span>${esc(b.ico)}</span></div>` : '';
+    // b.svg (opcional) é um ícone SVG montado pelo próprio código da arena, nunca texto de usuário
+    const brooch = b && (b.svg || b.ico) ? `<div class="brooch" style="--bc:${HEX.test(b.color) ? b.color : '#a78bfa'}" title="${esc(b.title || '')}">${b.svg ? b.svg : `<span>${esc(b.ico)}</span>`}</div>` : '';
     return `<div class="card-inner">
     <div class="frame"><div class="content"><div class="fx frame-fx"></div>
       <div class="top">${op}${brooch}<div class="tl-kak" title="${tier.label} · ${tier.pt}"><img src="${kakeraIcon(tier)}" alt=""><span class="kak-val">${fmtNum(s.kakera)}</span></div></div>

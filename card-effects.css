@@ -1404,3 +1404,8 @@ body[data-page="card-editor"] .hero p { margin: 0; max-width: none; font-size: 1
   box-shadow: 0 0 0 .35cqw rgba(255,255,255,.55), 0 0 0 .7cqw color-mix(in srgb, var(--bc) 70%, #000), 0 0 2.4cqw color-mix(in srgb, var(--bc) 70%, transparent), 0 .4cqw 1cqw rgba(0,0,0,.5); }
 .brooch span { font-size: 4.8cqw; line-height: 1; filter: drop-shadow(0 .2cqw .3cqw rgba(0,0,0,.6)); }
 .brooch + .tl-kak { margin-left: 1.2cqw; }
+/* ícone SVG do broche (classes da Waifu Arena) */
+.brooch svg { width: 5.6cqw; height: 5.6cqw; fill: none; stroke: #fff; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; filter: drop-shadow(0 .2cqw .3cqw rgba(0,0,0,.55)); }
+.brooch svg .f { fill: rgba(255,255,255,.28); }
+.brooch svg circle.k, .brooch svg ellipse.k { fill: #fff; stroke: none; }
+.brooch svg .t { stroke-width: 1; opacity: .75; }

@@ -2015,3 +2015,38 @@
     #waField > .wa-actions .wa-act:nth-child(4) { transform: rotate(2deg) translateY(1px); }
     #waField > .wa-actions .wa-act:nth-child(5) { transform: rotate(4deg) translateY(5px); }
 }
+
+/* ---------- ícones SVG das classes ---------- */
+.wa-cls-svg { width: 1.25em; height: 1.25em; flex: none; vertical-align: -.25em; fill: none; stroke: currentColor; stroke-width: 1.9; stroke-linecap: round; stroke-linejoin: round; }
+.wa-cls-svg .f { fill: color-mix(in srgb, currentColor 22%, transparent); }
+.wa-cls-svg circle.k, .wa-cls-svg ellipse.k { fill: currentColor; stroke: none; }
+.wa-cls-svg .t { stroke-width: 1; opacity: .7; }
+
+/* grade de escolha: ícone grande na cor da classe */
+.wa-cls i { display: grid; place-items: center; width: 34px; height: 34px; margin-bottom: 2px; border-radius: 50%; color: var(--c);
+    background: color-mix(in srgb, var(--c) 10%, transparent); border: 1px solid color-mix(in srgb, var(--c) 35%, transparent); }
+.wa-cls i .wa-cls-svg { width: 20px; height: 20px; }
+.wa-cls.sel i { color: #fff; background: radial-gradient(circle at 35% 30%, color-mix(in srgb, var(--c) 45%, #fff), var(--c) 60%, color-mix(in srgb, var(--c) 60%, #000)); border-color: rgba(255, 255, 255, .5); box-shadow: 0 0 12px -2px var(--c); }
+.wa-cls.soon i { color: var(--muted); background: none; border-style: dashed; border-color: var(--border); }
+.wa-slot-cls .wa-cls-svg { width: 11px; height: 11px; vertical-align: -1px; }
+.wa-cls-detail h4 { display: flex; align-items: center; gap: 6px; }
+.wa-cls-detail h4 .wa-cls-svg { width: 16px; height: 16px; }
+.wr-classes div > b { display: flex; align-items: center; gap: 6px; }
+.wr-classes .wa-cls-svg { width: 15px; height: 15px; }
+/* botão da classe no tabuleiro: ícone branco na bolinha colorida */
+.wa-cls-ico { color: #fff; }
+.wa-cls-ico .wa-cls-svg { width: 15px; height: 15px; filter: drop-shadow(0 1px 1px rgba(0, 0, 0, .5)); }
+.wa-cls-ico .wa-cls-svg .f { fill: rgba(255, 255, 255, .28); }
+
+/* regras: notas curtas e classes que estão chegando */
+.wr-note { margin: 10px 0 0 !important; font-size: 12px; }
+.wr-soon { display: inline-flex; align-items: center; gap: 4px; margin: 2px 2px 0 0; padding: 1px 7px; border-radius: 999px; border: 1px dashed color-mix(in srgb, var(--c) 55%, transparent); color: var(--c); font-size: 11px; white-space: nowrap; }
+.wr-soon .wa-cls-svg { width: 12px; height: 12px; }
+
+/* ícones SVG dos eventos (faixa do tabuleiro e regras) */
+.wa-event .wa-ev-svg { width: 15px; height: 15px; vertical-align: -3px; }
+.wr-acts i .wa-ev-svg { width: 24px; height: 24px; }
+
+/* novas classes: carta do banco também treme quando é atingida; estados ruins em vermelho */
+.wa-bench-card.hit { animation: wa-hit .45s ease; }
+.wa-floor .wa-flags .wa-flag-bad { color: #ff9fb2; border-color: rgba(255, 92, 122, .45); }
