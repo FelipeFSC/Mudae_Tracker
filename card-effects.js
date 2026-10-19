@@ -27,7 +27,7 @@ const MudaeCardEffects = (() => {
   /* ============================================================
      1. NÚCLEO
      ============================================================ */
-  const CSS_HREF = 'card-effects.css?v=4';
+  const CSS_HREF = 'card-effects.css?v=10';
   const KAKERA_DIR = 'kakerasImg';
   const BACK_IMG = 'Mudae.png';
 
@@ -64,6 +64,44 @@ const MudaeCardEffects = (() => {
   ];
   const getTier = k => [...TIERS].reverse().find(t => k >= t.min) || TIERS[0];
   const kakeraIcon = t => `${KAKERA_DIR}/${t.n}.png`;
+
+  /* ---------- Temas de kakera: o degradê animado do Chaos/Rainbow para todas as raridades ----------
+     Valor 'k-<raridade>' em nameColor, seriesColor, kakColor e borderStyle.
+     Cada tema libera quando a carta alcança aquela raridade (no Arco-íris, todos). */
+  const THEME_STOPS = {
+    purple:  ['#a855f7', '#f0abfc', '#7c3aed', '#e9d5ff'],
+    light:   ['#ffffff', '#cbd5e1', '#f8fafc', '#94a3b8'],
+    blue:    ['#818cf8', '#c7d2fe', '#4f46e5', '#a5b4fc'],
+    teal:    ['#22d3ee', '#cffafe', '#0891b2', '#67e8f9'],
+    green:   ['#4ade80', '#dcfce7', '#16a34a', '#bef264'],
+    yellow:  ['#facc15', '#fef9c3', '#eab308', '#fde68a'],
+    orange:  ['#fb923c', '#ffedd5', '#ea580c', '#fdba74'],
+    red:     ['#f87171', '#fee2e2', '#dc2626', '#fda4af'],
+    dark:    ['#c4bcdb', '#8f88a8', '#f5f3ff', '#6b6385'],
+    chaos:   ['#a855f7', '#f0abfc', '#4ade80', '#d9f99d', '#7c3aed'],
+    rainbow: ['#ff9ad5', '#ffe98a', '#8affd9', '#8ac6ff', '#d29aff'],
+  };
+  const THEME_GLOW = {
+    chaos: 'drop-shadow(0 0 6px rgba(168,85,247,.55)) drop-shadow(0 0 10px rgba(74,222,128,.25))',
+    rainbow: 'drop-shadow(0 0 6px rgba(255,214,250,.45))',
+  };
+  const themeTier = v => typeof v === 'string' && v.startsWith('k-') ? TIERS.find(t => 'k-' + t.key === v) || null : null;
+  const themeStops = t => [...THEME_STOPS[t.key], THEME_STOPS[t.key][0]].join(', ');
+  const themeText = t => `linear-gradient(90deg, ${themeStops(t)})`;
+  const themeGlow = t => THEME_GLOW[t.key] || `drop-shadow(0 0 6px ${rgba(t.color, .5)})`;
+  /* Caos e Arco-íris sempre brilham; Roxa até Escura ficam no modelo antigo (cor lisa e moldura
+     da raridade) e só ganham o degradê animado com o "Modo arco-íris" (libera com 2.000 kakera) */
+  const SHINE_MIN = 2000;
+  const themeShines = (t, s) => t.key === 'chaos' || t.key === 'rainbow' || !!s.themeShine;
+  const themeBorder = (t, s) => t.key === 'chaos' || t.key === 'rainbow' ? t.border
+    : s.themeShine ? `linear-gradient(135deg, ${themeStops(t)})` : t.border || metalBorder(t.color);
+  /* Como pintar nome/série/kakera: 'custom' = cor lisa, 'theme' = degradê animado, '' = automático */
+  function paintOf(v, s) {
+    if (HEX.test(v)) return { mode: 'custom', color: v };
+    const th = themeTier(v);
+    if (!th) return { mode: '' };
+    return themeShines(th, s) ? { mode: 'theme', tier: th } : { mode: 'custom', color: th.text };
+  }
   function tierRange(t) {
     const next = TIERS[TIERS.indexOf(t) + 1];
     return next ? `${fmtNum(t.min)} – ${fmtNum(next.min - 1)}` : `${fmtNum(t.min)}+`;
@@ -82,20 +120,33 @@ const MudaeCardEffects = (() => {
 
   /* ---------- Opções ---------- */
   const FOILS = [['none', 'Nenhum'], ['stripes', 'Listras'], ['cosmos', 'Cosmos'], ['sheen', 'Brilho diagonal'], ['rainbow', 'Arco-íris'], ['gold', 'Ouro'],
-    ['cracked', 'Gelo rachado'], ['prism', 'Prisma'], ['radiant', 'Raios'], ['sunpillar', 'Vertical'], ['scales', 'Escamas'], ['silver', 'Prata']];
+    ['cracked', 'Gelo rachado'], ['prism', 'Prisma'], ['radiant', 'Raios'], ['sunpillar', 'Vertical'], ['scales', 'Escamas'], ['silver', 'Prata'],
+    ['pastel', 'Pastel'], ['ripple', 'Ondas'], ['diamond', 'Diamante']];
   const FILTERS = [['none', 'Normal'], ['bw', 'P&B'], ['sepia', 'Sépia'], ['gold', 'Dourado'], ['duotone', 'Duotone'], ['tint', 'Tingido'],
     ['cold', 'Frio'], ['vivid', 'Saturado'], ['soft', 'Suave'], ['film', 'Filme']];
   const TEXTURES = [['none', 'Nenhuma'], ['etched', 'Gravada'], ['stained', 'Vitral'], ['halftone', 'Retícula'], ['grain', 'Granulado'], ['scan', 'Scanlines']];
-  const ANIMS = [['none', 'Nenhuma'], ['sakura', 'Sakura'], ['flames', 'Chamas'], ['rain', 'Chuva'], ['neon', 'Moldura neon'], ['backlight', 'Contraluz'], ['stars', 'Estrelas'], ['glitch', 'Glitch']];
+  const ANIMS = [['none', 'Nenhuma'], ['sakura', 'Sakura'], ['flames', 'Chamas'], ['rain', 'Chuva'], ['neon', 'Moldura neon'], ['backlight', 'Contraluz'], ['stars', 'Estrelas'], ['glitch', 'Glitch'],
+    ['hearts', 'Corações'], ['leaves', 'Folhas de outono'], ['confetti', 'Confete']];
   const XFX = [['none', 'Nenhum'], ['senbon', 'Senbonzakura'], ['reiatsu', 'Reiatsu'], ['lightning', 'Relâmpago'], ['snow', 'Neve'], ['water', 'Subaquático'], ['aurora', 'Aurora'],
-    ['embers', 'Brasas'], ['fog', 'Névoa'], ['rays', 'Raios de luz'], ['heat', 'Distorção de calor'], ['sweep', 'Varredura de brilho'], ['fireflies', 'Vagalumes']];
-  const FONTS = [['cinzel', 'Clássica'], ['bangers', 'Mangá'], ['orbitron', 'Futurista'], ['pixel', 'Pixel'], ['system', 'Simples']];
+    ['embers', 'Brasas'], ['fog', 'Névoa'], ['rays', 'Raios de luz'], ['heat', 'Distorção de calor'], ['sweep', 'Varredura de brilho'], ['fireflies', 'Vagalumes'],
+    ['matrix', 'Código digital'], ['meteors', 'Chuva de meteoros'], ['shadow', 'Aura sombria'], ['hologram', 'Holograma'], ['crystals', 'Cristais'],
+    ['bloodmoon', 'Lua de sangue'], ['vortex', 'Vórtice'], ['electric', 'Elétrico']];
+  const FONTS = [['cinzel', 'Clássica'], ['bangers', 'Mangá'], ['orbitron', 'Futurista'], ['pixel', 'Pixel'], ['system', 'Simples'],
+    ['playfair', 'Elegante'], ['greatvibes', 'Cursiva'], ['gothic', 'Gótica'], ['russo', 'Impacto'], ['marker', 'Marcador'],
+    ['cute', 'Fofa'], ['horror', 'Terror'], ['retro', 'Retrô'], ['brush', 'Pincel']];
   const BORDER_STYLES = [['rarity', 'Cor da raridade'], ['metal', 'Metálica'], ['holo', 'Holográfica'], ['solid', 'Sólida'], ['rainbow', 'Arco-íris']];
   const PANELS = [['dark', 'Escuro'], ['light', 'Claro']];
   const OPS = [['none', 'Sem OP'], ['some', 'Com OP'], ['max', 'OP máximo']];
   const SWATCHES = [['#c9ced6', 'Prata'], ['#d4a83a', 'Ouro'], ['#f472b6', 'Rosa'], ['#8b5cf6', 'Roxo'], ['#38bdf8', 'Azul'], ['#34d399', 'Verde'], ['#e8542d', 'Vermelho'], ['#111111', 'Preto'], ['#f5f5f5', 'Branco']];
   const TINTS = [['#9b59b6', 'Roxo'], ['#ec2f9c', 'Rosa'], ['#3f8ee0', 'Azul'], ['#22d3ee', 'Ciano'], ['#f59e0b', 'Âmbar'], ['#e8542d', 'Vermelho']];
-  const NAME_COLORS = [['#ffffff', 'Branco'], ['#ffe9a8', 'Dourado'], ['#ff9df6', 'Rosa'], ['#7ff9ff', 'Ciano'], ['#3a2f25', 'Marrom']];
+  const NAME_COLORS = [['auto', 'Automática'], ['#ffffff', 'Branco'], ['#ffe9a8', 'Dourado'], ['#ff9df6', 'Rosa'], ['#7ff9ff', 'Ciano'], ['#3a2f25', 'Marrom']];
+  // 'auto' = cor de sempre (branca, marrom no rodapé claro, degradê no Chaos/Rainbow)
+  const SERIES_COLORS = [['auto', 'Automática'], ['#ffffff', 'Branco'], ['#ffe9a8', 'Dourado'], ['#ff9df6', 'Rosa'], ['#7ff9ff', 'Ciano'],
+    ['#a78bfa', 'Lilás'], ['#86efac', 'Verde'], ['#fca5a5', 'Vermelho'], ['#94a3b8', 'Cinza'], ['#3a2f25', 'Marrom']];
+  const KAK_COLORS = [['auto', 'Automática'], ['#ffffff', 'Branco'], ['#ffe9a8', 'Dourado'], ['#ff9df6', 'Rosa'], ['#7ff9ff', 'Ciano'], ['#86efac', 'Verde']];
+  const BADGE_COLORS = [['auto', 'Automática'], ['#f5c518', 'Ouro'], ['#c9ced6', 'Prata'], ['#cd7f32', 'Bronze'], ['#a78bfa', 'Roxo'],
+    ['#f472b6', 'Rosa'], ['#38bdf8', 'Azul'], ['#4ade80', 'Verde'], ['#e8542d', 'Vermelho'], ['#111111', 'Preto']];
+  const COLOR_KEYS = ['nameColor', 'seriesColor', 'kakColor', 'keyColor', 'opColor'];
   const ROLETAS = ['wa', 'wg', 'ha', 'hg'];
 
   /* Config visual padrão de toda carta */
@@ -103,8 +154,8 @@ const MudaeCardEffects = (() => {
     borderColor: '#c9ced6', borderStyle: 'rarity', bw: 2,
     foil: 'none', fxi: 1, glit: false, glare: 1,
     filter: 'none', tint: '#ec2f9c', soft: false, apy: 15, az: 1,
-    texture: 'none', anim: 'none', xfx: 'none',
-    font: 'cinzel', nameColor: '#ffffff', panel: 'dark',
+    texture: 'none', anim: 'none', xfx: 'none', xfi: 1,
+    font: 'cinzel', nameColor: 'auto', seriesColor: 'auto', kakColor: 'auto', keyColor: 'auto', opColor: 'auto', themeShine: false, panel: 'dark',
   };
   const VISUAL_KEYS = Object.keys(DEFAULT_VISUAL);
   const CHAR_KEYS = ['name', 'series', 'img', 'kakera', 'keys', 'op', 'roletas'];
@@ -133,6 +184,17 @@ const MudaeCardEffects = (() => {
     ['Noite boreal', { borderColor: '#34d399', borderStyle: 'holo', xfx: 'aurora', anim: 'stars' }],
     ['Floresta',  { borderColor: '#84cc16', borderStyle: 'metal', xfx: 'fireflies', texture: 'grain' }],
     ['Divino',    { borderColor: '#d4a83a', borderStyle: 'holo', foil: 'gold', glit: true, xfx: 'rays', nameColor: '#ffe9a8' }],
+    ['Romance',   { borderColor: '#f472b6', borderStyle: 'holo', foil: 'pastel', anim: 'hearts', nameColor: '#ff9df6', seriesColor: '#ffe9a8' }],
+    ['Outono',    { borderColor: '#b45309', borderStyle: 'metal', filter: 'film', anim: 'leaves', nameColor: '#ffe9a8', seriesColor: '#fdba74' }],
+    ['Festa',     { borderStyle: 'rainbow', foil: 'ripple', anim: 'confetti', font: 'bangers' }],
+    ['Matrix',    { borderColor: '#111111', borderStyle: 'solid', xfx: 'matrix', font: 'orbitron', nameColor: '#86efac', seriesColor: '#86efac' }],
+    ['Meteoros',  { borderColor: '#5b3fa8', borderStyle: 'holo', foil: 'cosmos', xfx: 'meteors' }],
+    ['Sombrio',   { borderColor: '#111111', borderStyle: 'metal', xfx: 'shadow', nameColor: '#e9d5ff', seriesColor: '#a78bfa' }],
+    ['Holograma', { borderColor: '#38bdf8', borderStyle: 'holo', xfx: 'hologram', font: 'orbitron', nameColor: '#7ff9ff', seriesColor: '#7ff9ff' }],
+    ['Cristal',   { borderColor: '#c4b5fd', borderStyle: 'holo', foil: 'diamond', glit: true, xfx: 'crystals' }],
+    ['Lua de sangue', { borderColor: '#7f1d1d', borderStyle: 'metal', xfx: 'bloodmoon', seriesColor: '#fca5a5' }],
+    ['Vórtice',   { borderColor: '#8b5cf6', borderStyle: 'holo', xfx: 'vortex', anim: 'stars' }],
+    ['Elétrico',  { borderColor: '#facc15', borderStyle: 'metal', xfx: 'electric', font: 'orbitron', nameColor: '#fde047', seriesColor: '#7ff9ff' }],
   ];
 
   /* ============================================================
@@ -141,10 +203,11 @@ const MudaeCardEffects = (() => {
      - Foil por kakera: Prata 400+, Ouro 600+, Gelo/Prisma/Raios 800+, todos (e glitter) 1000+
      - Ilustração: livre
      - Textura 3+ chaves, Animação 6+, Efeitos especiais 10+, Texto 1+
+     - Cor da chave só com 10+ chaves; cor do OP só com OP máximo (antes: cor do nível da chave e roxo padrão)
      O valor padrão de cada campo é sempre permitido.
      ============================================================ */
-  const KEY_REQ = { borderColor: 1, borderStyle: 1, texture: 3, anim: 6, xfx: 10, font: 1, nameColor: 1, panel: 1 };
-  const FOIL_MIN = { silver: 400, gold: 600, cracked: 800, prism: 800, radiant: 800 }; // os demais: 1000
+  const KEY_REQ = { borderColor: 1, borderStyle: 1, texture: 3, anim: 6, xfx: 10, font: 1, nameColor: 1, seriesColor: 1, kakColor: 1, keyColor: 10, opColor: 1, panel: 1 };
+  const FOIL_MIN = { silver: 400, pastel: 400, gold: 600, cracked: 800, prism: 800, radiant: 800, ripple: 800, diamond: 800 }; // os demais: 1000
   const foilMin = f => FOIL_MIN[f] ?? 1000;
   const GLIT_MIN = 1000;
   const chavesTxt = n => `${n} chave${n > 1 ? 's' : ''}`;
@@ -153,7 +216,12 @@ const MudaeCardEffects = (() => {
   function optionLock(k, v, s) {
     if (v === DEFAULT_VISUAL[k]) return null;
     if (k in KEY_REQ && s.keys < KEY_REQ[k]) return `Libera com ${chavesTxt(KEY_REQ[k])}`;
+    const th = themeTier(v);
+    if (th && s.kakera < th.min) return `Libera com ${fmtNum(th.min)} kakera (${th.pt})`;
     if (k === 'foil' && s.kakera < foilMin(v)) return `Libera com ${fmtNum(foilMin(v))} kakera`;
+    // OP só troca de cor quando está no máximo; antes disso fica o roxo padrão
+    if (k === 'opColor' && s.op !== 'max') return 'Libera com OP máximo';
+    if (k === 'themeShine' && s.kakera < SHINE_MIN) return `Libera com ${fmtNum(SHINE_MIN)} kakera`;
     if (k === 'glit' && s.kakera < GLIT_MIN) return `Libera com ${fmtNum(GLIT_MIN)} kakera`;
     return null;
   }
@@ -168,22 +236,25 @@ const MudaeCardEffects = (() => {
   /* Regra mostrada no título de cada seção do editor */
   const SECTION_RULES = {
     'Moldura':           { text: 'Cor e estilo com 1+ chave', ok: s => s.keys >= 1 },
-    'Foil holográfico':  { text: 'Prata 400+ · Ouro 600+ · Gelo, Prisma e Raios 800+ · todos 1.000+ ◈', ok: s => s.kakera >= 1000 },
+    'Foil holográfico':  { text: 'Prata e Pastel 400+ · Ouro 600+ · Gelo, Prisma, Raios, Ondas e Diamante 800+ · todos 1.000+ ◈', ok: s => s.kakera >= 1000 },
     'Textura':           { text: '3+ chaves',  ok: s => s.keys >= 3 },
     'Animação':          { text: '6+ chaves',  ok: s => s.keys >= 6 },
     'Efeitos especiais': { text: '10+ chaves', ok: s => s.keys >= 10 },
     'Texto':             { text: '1+ chave',   ok: s => s.keys >= 1 },
+    'Tema de kakera':    { text: 'Cada tema libera ao alcançar a raridade · Arco-íris (2.000+) libera todos e o modo arco-íris · Chave com 10+ chaves · OP só no máximo', ok: s => s.keys >= 1 && s.kakera >= 2000 },
   };
 
   /* ---------- Validação de config (colar config e dados vindos do banco) ---------- */
   const ENUMS = { borderStyle: BORDER_STYLES, foil: FOILS, filter: FILTERS, texture: TEXTURES, anim: ANIMS, xfx: XFX, font: FONTS, panel: PANELS };
-  const RANGES = { bw: [0, 6], fxi: [0, 1.5], glare: [0, 1.5], apy: [0, 100], az: [1, 1.8] };
+  const RANGES = { bw: [0, 6], fxi: [0, 1.5], xfi: [0, 1], glare: [0, 1.5], apy: [0, 100], az: [1, 1.8] };
   const HEX = /^#[0-9a-f]{6}$/i;
 
   function isValidField(k, v) {
     const d = DEFAULT_VISUAL[k];
+    if (k === 'borderStyle' && themeTier(v)) return true;
     if (ENUMS[k]) return ENUMS[k].some(([o]) => o === v);
     if (RANGES[k]) return typeof v === 'number' && Number.isFinite(v) && v >= RANGES[k][0] && v <= RANGES[k][1];
+    if (COLOR_KEYS.includes(k)) return v === 'auto' || !!themeTier(v) || (typeof v === 'string' && HEX.test(v));
     if (typeof d === 'boolean') return typeof v === 'boolean';
     if (HEX.test(d)) return typeof v === 'string' && HEX.test(v);
     return false;
@@ -198,6 +269,8 @@ const MudaeCardEffects = (() => {
       if (!VISUAL_KEYS.includes(k) || !isValidField(k, v)) { ignored.push(k); continue; }
       config[k] = v;
     }
+    // config antiga (sem kakColor): o branco era o padrão e deixava o degradê do Chaos/Rainbow aparecer
+    if (!('kakColor' in raw) && config.nameColor === '#ffffff') config.nameColor = 'auto';
     return { config, ignored, charSkipped };
   }
 
@@ -218,6 +291,8 @@ const MudaeCardEffects = (() => {
 
   function borderCSS(s) {
     const c = s.borderColor;
+    const th = themeTier(s.borderStyle);
+    if (th) return themeBorder(th, s);
     if (s.borderStyle === 'rarity') { const t = getTier(s.kakera); return t.border || metalBorder(t.color); }
     if (s.borderStyle === 'solid') return c;
     if (s.borderStyle === 'rainbow') return 'linear-gradient(135deg,#ff9ad5,#ffe28a,#9fffbd,#8fd9ff,#d39fff,#ff9ad5,#ffe28a)';
@@ -235,7 +310,7 @@ const MudaeCardEffects = (() => {
     const brooch = b && (b.svg || b.ico) ? `<div class="brooch" style="--bc:${HEX.test(b.color) ? b.color : '#a78bfa'}" title="${esc(b.title || '')}">${b.svg ? b.svg : `<span>${esc(b.ico)}</span>`}</div>` : '';
     return `<div class="card-inner">
     <div class="frame"><div class="content"><div class="fx frame-fx"></div>
-      <div class="top">${op}${brooch}<div class="tl-kak" title="${tier.label} · ${tier.pt}"><img src="${kakeraIcon(tier)}" alt=""><span class="kak-val">${fmtNum(s.kakera)}</span></div></div>
+      <div class="top">${op}${brooch}<div class="tl-kak" title="${tier.label} · ${tier.pt}"><img src="${kakeraIcon(themeTier(s.kakColor) || tier)}" alt=""><span class="kak-val">${fmtNum(s.kakera)}</span></div></div>
       <div class="art"><div class="art-img">${s.img ? `<img class="art-photo" src="${esc(s.img)}" referrerpolicy="no-referrer" alt="" draggable="false">` : ''}</div><div class="fx art-fx"></div></div>
       <div class="tl-sign">
         <div class="tl-id"><span class="tl-name">${esc(s.name)}</span><span class="tl-series">${esc(s.series)}</span></div>
@@ -247,19 +322,43 @@ const MudaeCardEffects = (() => {
   </div>`;
   }
 
+  /* Selos da chave e do OP: cor lisa vira um degradê de cima para baixo; tema brilhante usa o degradê animado */
+  const lum = hex => { const [r, g, b] = hexToRgb(hex); return (.299 * r + .587 * g + .114 * b) / 255; };
+  function badgePaint(v, s) {
+    const th = themeTier(v);
+    const shine = th && themeShines(th, s);
+    const c = HEX.test(v) ? v : th ? th.color : null;
+    if (!c) return { mode: '' };
+    if (shine) return { mode: 'theme', bg: themeText(th), fg: '#1b1029', glow: rgba(th.color, .6) };
+    return { mode: 'custom', bg: `linear-gradient(${mix(c, '#ffffff', .35)}, ${mix(c, '#000000', .35)})`, fg: lum(c) > .62 ? '#1b1029' : '#ffffff', glow: rgba(c, .5) };
+  }
+
+  /* cor escolhida no nome/série/kakera: hex = cor lisa, 'k-…' = tema, 'auto' = sem classe */
+  const paintClass = (prefix, v, s) => { const m = paintOf(v, s).mode; return m ? `${prefix}-${m}` : ''; };
+
   function cardClass(s) {
     return ['card', 'L-full', 'L-harem', 'ed-card', `t-${getTier(s.kakera).key}`,
       s.foil !== 'none' ? `fx-${s.foil} on-card` : '', s.glit ? 'glit' : '',
-      `af-${s.filter}`, `tx-${s.texture}`, `an-${s.anim}`, s.xfx !== 'none' ? `v-x-${s.xfx}` : '', `nf-${s.font}`, `bs-${s.borderStyle}`, `pn-${s.panel}`,
+      `af-${s.filter}`, `tx-${s.texture}`, `an-${s.anim}`, s.xfx !== 'none' ? `v-x-${s.xfx}` : '', `nf-${s.font}`, `bs-${s.borderStyle}`, `pn-${s.panel}`, themeTier(s.borderStyle) ? 'bs-theme' : '',
+      paintClass('nm', s.nameColor, s), paintClass('sc', s.seriesColor, s), paintClass('kk', s.kakColor, s),
+      ...[['kb', s.keyColor], ['ob', s.opColor]].map(([p, v]) => { const m = badgePaint(v, s).mode; return m ? `${p}-${m}` : ''; }),
       s.soft ? 'soft-edges' : '', s.bw <= .05 ? 'no-border' : '', s.img ? '' : 'no-img'].filter(Boolean).join(' ');
   }
 
   function cardStyle(s) {
     const tier = getTier(s.kakera);
-    const glow = s.borderStyle === 'rarity' ? rgba(tier.color, .45) : s.borderStyle === 'rainbow' ? 'rgba(255,170,240,.4)' : rgba(s.borderColor, .45);
+    const bt = themeTier(s.borderStyle), kt = themeTier(s.kakColor);
+    const glow = bt ? rgba(bt.color, .45) : s.borderStyle === 'rarity' ? rgba(tier.color, .45) : s.borderStyle === 'rainbow' ? 'rgba(255,170,240,.4)' : rgba(s.borderColor, .45);
     const img = s.img ? `url("${String(s.img).replace(/["\\\n]/g, '')}")` : 'none';
-    return `--rc:${tier.color};--rc-text:${tier.text};--border:${borderCSS(s)};--bw:${s.bw}cqw;--fxi:${s.fxi};--gl:${s.glare};--tint:${s.tint};--apy:${s.apy}%;--az:${s.az};--nc:${s.nameColor};--glow:${glow};--img:${img}`;
+    const rc = kt ? kt.color : HEX.test(s.kakColor) ? s.kakColor : tier.color;
+    const nm = paintOf(s.nameColor, s), sc = paintOf(s.seriesColor, s), kk = paintOf(s.kakColor, s);
+    const themes = [['nm', nm], ['sc', sc], ['kk', kk]]
+      .map(([p, x]) => x.mode === 'theme' ? `;--tg-${p}:${themeText(x.tier)};--tgl-${p}:${themeGlow(x.tier)}` : '').join('');
+    const badges = [['kb', s.keyColor], ['ob', s.opColor]]
+      .map(([p, v]) => { const b = badgePaint(v, s); return b.mode ? `;--${p}-bg:${b.bg};--${p}-fg:${b.fg};--${p}-glow:${b.glow}` : ''; }).join('');
+    return `--rc:${rc};--rc-text:${tier.text};--border:${borderCSS(s)};--bw:${s.bw}cqw;--fxi:${s.fxi};--xfi:${s.xfi};--gl:${s.glare};--tint:${s.tint};--apy:${s.apy}%;--az:${s.az};--nc:${nm.color || '#ffffff'};--sc:${sc.color || 'inherit'};--kc:${kk.color || '#ffffff'};--glow:${glow};--img:${img}${themes}${badges}`;
   }
+
 
   /* Desenha a carta em el, aplicando as regras de desbloqueio */
   function paintCard(el, s) {
@@ -596,7 +695,7 @@ const MudaeCardEffects = (() => {
       const overlay = document.createElement('div');
       overlay.className = 'mce-editor-overlay';
       overlay.innerHTML = `<div class="mce-editor-frame" role="dialog" aria-modal="true" aria-label="Efeitos da carta de ${esc(c.name)}">
-        <iframe src="card-effects.html?embed=1&v=1" title="Efeitos da carta"></iframe>
+        <iframe src="card-effects.html?embed=1&v=2" title="Efeitos da carta"></iframe>
       </div>`;
       overlay.addEventListener('click', ev => { if (ev.target === overlay) closeEditor(); });
       document.body.appendChild(overlay);
@@ -722,6 +821,16 @@ const MudaeCardEffects = (() => {
         { k: 'borderStyle', type: 'chips', label: 'Estilo', options: BORDER_STYLES },
         { k: 'bw', type: 'range', label: 'Espessura', min: 0, max: 6, step: .1, fmt: v => v <= .05 ? 'sem' : v.toFixed(1) },
       ] },
+      { title: 'Tema de kakera', fields: [
+        { k: 'themeShine', type: 'check', label: 'Modo arco-íris' },
+        { type: 'themeall', label: 'Tudo de uma vez' },
+        { k: 'borderStyle', type: 'themes', label: 'Moldura' },
+        { k: 'nameColor', type: 'themes', label: 'Nome' },
+        { k: 'seriesColor', type: 'themes', label: 'Série' },
+        { k: 'kakColor', type: 'themes', label: 'Kakera' },
+        { k: 'keyColor', type: 'themes', label: 'Chave' },
+        { k: 'opColor', type: 'themes', label: 'OP' },
+      ] },
       { title: 'Foil holográfico', fields: [
         { k: 'foil', type: 'chips', options: FOILS },
         { k: 'fxi', type: 'range', label: 'Intensidade', min: 0, max: 1.5, step: .05, fmt: v => Math.round(v * 100) + '%' },
@@ -737,15 +846,24 @@ const MudaeCardEffects = (() => {
       ] },
       { title: 'Textura', fields: [{ k: 'texture', type: 'chips', options: TEXTURES }] },
       { title: 'Animação', fields: [{ k: 'anim', type: 'chips', options: ANIMS }] },
-      { title: 'Efeitos especiais', fields: [{ k: 'xfx', type: 'chips', options: XFX }] },
+      { title: 'Efeitos especiais', fields: [
+        { k: 'xfx', type: 'chips', options: XFX },
+        { k: 'xfi', type: 'range', label: 'Intensidade', min: 0, max: 1, step: .05, fmt: v => Math.round(v * 100) + '%' },
+      ] },
       { title: 'Texto', fields: [
         { k: 'font', type: 'chips', label: 'Fonte do nome', options: FONTS },
         { k: 'nameColor', type: 'color', label: 'Cor do nome', swatches: NAME_COLORS },
+        { k: 'seriesColor', type: 'color', label: 'Cor da série', swatches: SERIES_COLORS },
+        { k: 'kakColor', type: 'color', label: 'Cor da kakera', swatches: KAK_COLORS },
+        { k: 'keyColor', type: 'color', label: 'Cor da chave', swatches: BADGE_COLORS },
+        { k: 'opColor', type: 'color', label: 'Cor do OP', swatches: BADGE_COLORS },
         { k: 'panel', type: 'chips', label: 'Rodapé', options: PANELS },
       ] },
     ];
 
     const panel = document.getElementById('panel');
+    const THEME_TARGETS = ['borderStyle', 'nameColor', 'seriesColor', 'kakColor', 'keyColor', 'opColor'];
+    const BADGE_TARGETS = ['keyColor', 'opColor'];
 
     function fieldHTML(f) {
       let ctl = '';
@@ -754,15 +872,37 @@ const MudaeCardEffects = (() => {
       if (f.type === 'check') ctl = `<div class="chips-row"><button type="button" class="opt" data-k="${f.k}" data-toggle></button></div>`;
       if (f.type === 'chips') ctl = `<div class="chips-row">${f.options.map(([v, t]) => `<button type="button" class="opt" data-k="${f.k}" data-v="${v}">${t}</button>`).join('')}</div>`;
       if (f.type === 'multi') ctl = `<div class="chips-row">${f.options.map(([v, t]) => `<button type="button" class="opt" data-k="${f.k}" data-m="${v}">${t}</button>`).join('')}</div>`;
-      if (f.type === 'color') ctl = `<div class="chips-row">${f.swatches.map(([c, t]) => `<button type="button" class="swatch" title="${t}" data-name="${t}" style="background:${c}" data-k="${f.k}" data-v="${c}"></button>`).join('')}<input type="color" data-k="${f.k}" title="Outra cor"></div>`;
+      if (f.type === 'color') ctl = `<div class="chips-row">${f.swatches.map(([c, t]) => `<button type="button" class="swatch" title="${t}" data-name="${t}" style="background:${c === 'auto' ? 'conic-gradient(#fff 0 25%, #777 0 50%, #fff 0 75%, #777 0) 0 0 / 50% 50%' : c}" data-k="${f.k}" data-v="${c}"></button>`).join('')}<input type="color" data-k="${f.k}" title="Outra cor"></div>`;
+      const themeBtn = (attrs, t) => `<button type="button" class="opt theme-opt" ${attrs} data-name="${t.pt}"><img src="${kakeraIcon(t)}" alt="${t.pt}"></button>`;
+      if (f.type === 'themes') ctl = `<div class="chips-row"><button type="button" class="opt" data-k="${f.k}" data-v="${DEFAULT_VISUAL[f.k]}">Padrão</button>${TIERS.map(t => themeBtn(`data-k="${f.k}" data-v="k-${t.key}"`, t)).join('')}</div>`;
+      if (f.type === 'themeall') ctl = `<div class="chips-row"><button type="button" class="opt" data-theme="">Padrão</button>${TIERS.map(t => themeBtn(`data-theme="k-${t.key}"`, t)).join('')}</div>`;
       if (f.type === 'info') ctl = `<div class="info-line" id="${f.id}"></div>`;
       if (f.type === 'range') ctl = `<div class="range-wrap"><input type="range" data-k="${f.k}" min="${f.min}" max="${f.max}" step="${f.step}"><output data-out="${f.k}"></output></div>`;
       return `<div class="field${f.label ? '' : ' full'}">${f.label ? `<label>${f.label}</label>` : ''}${ctl}</div>`;
     }
 
-    panel.innerHTML = SCHEMA.map(sec => `<section class="sec"><h3>${sec.title}${SECTION_RULES[sec.title] ? `<span class="sec-rule" data-rule="${sec.title}"></span>` : ''}</h3>${sec.presets
+    /* Seções recolhíveis: clique no título. Tudo começa aberto; o navegador lembra o que foi fechado. */
+    const COLLAPSE_KEY = STORE_KEY + '-recolhidas';
+    let collapsed = new Set();
+    try { collapsed = new Set(JSON.parse(localStorage.getItem(COLLAPSE_KEY) || '[]')); } catch (err) { /* sem armazenamento: tudo aberto */ }
+    const saveCollapsed = () => { try { localStorage.setItem(COLLAPSE_KEY, JSON.stringify([...collapsed])); } catch (err) { /* ignora */ } };
+
+    panel.innerHTML = `<div class="panel-tools"><button type="button" class="btn" data-fold="close">Recolher tudo</button><button type="button" class="btn" data-fold="open">Abrir tudo</button></div>`
+      + SCHEMA.map(sec => `<section class="sec${collapsed.has(sec.title) ? ' collapsed' : ''}" data-sec="${sec.title}"><h3 tabindex="0" role="button" aria-expanded="${!collapsed.has(sec.title)}"><span class="sec-title">${sec.title}</span>${SECTION_RULES[sec.title] ? `<span class="sec-rule" data-rule="${sec.title}"></span>` : ''}<span class="sec-chevron" aria-hidden="true"></span></h3><div class="sec-body">${sec.presets
       ? `<div class="field full"><div class="chips-row">${PRESETS.map(([n], i) => `<button type="button" class="opt" data-preset="${i}">${n}</button>`).join('')}</div></div>`
-      : sec.fields.map(fieldHTML).join('')}</section>`).join('');
+      : sec.fields.map(fieldHTML).join('')}</div></section>`).join('');
+
+    function setCollapsed(secEl, closed) {
+      secEl.classList.toggle('collapsed', closed);
+      secEl.querySelector('h3').setAttribute('aria-expanded', String(!closed));
+      closed ? collapsed.add(secEl.dataset.sec) : collapsed.delete(secEl.dataset.sec);
+    }
+    panel.addEventListener('keydown', ev => {
+      const head = ev.target.closest('.sec > h3');
+      if (!head || (ev.key !== 'Enter' && ev.key !== ' ')) return;
+      ev.preventDefault();
+      head.click();
+    });
 
     const FIELD_BY_KEY = Object.fromEntries(SCHEMA.flatMap(s => s.fields || []).filter(f => f.k).map(f => [f.k, f]));
 
@@ -788,11 +928,11 @@ const MudaeCardEffects = (() => {
           else if (el.dataset.m) on = v.includes(el.dataset.m);
           else on = String(v).toLowerCase() === el.dataset.v.toLowerCase();
           el.classList.toggle('on', on);
-          if (el.matches('.opt')) el.title = lock || '';
+          if (el.matches('.opt')) el.title = [el.dataset.name, lock].filter(Boolean).join(' · ');
           else el.title = lock ? `${el.dataset.name} · ${lock}` : el.dataset.name;
         } else {
           if (el.type === 'color') el.title = lock || 'Outra cor';
-          if (el !== document.activeElement) el.value = v;
+          if (el !== document.activeElement) el.value = el.type === 'color' && !HEX.test(v) ? '#ffffff' : v;
         }
       });
       panel.querySelectorAll('[data-out]').forEach(o => {
@@ -804,6 +944,15 @@ const MudaeCardEffects = (() => {
         const rule = SECTION_RULES[chip.dataset.rule], ok = rule.ok(state);
         chip.className = 'sec-rule ' + (ok ? 'ok' : 'locked');
         chip.textContent = (ok ? '✓ ' : '🔒 ') + rule.text;
+      });
+      // "Tudo de uma vez": aplica o tema na moldura, nome, série, kakera, chave e OP
+      panel.querySelectorAll('[data-theme]').forEach(btn => {
+        const v = btn.dataset.theme, vals = THEME_TARGETS.map(k => v || DEFAULT_VISUAL[k]);
+        // chave e OP com regra própria: se ainda não liberaram, o tema é aplicado só no resto
+        const lock = THEME_TARGETS.filter(k => !BADGE_TARGETS.includes(k)).map(k => optionLock(k, v || DEFAULT_VISUAL[k], state)).find(Boolean);
+        btn.disabled = !!lock;
+        btn.title = [btn.dataset.name, lock].filter(Boolean).join(' · ');
+        btn.classList.toggle('on', THEME_TARGETS.every((k, i) => eff[k] === vals[i] || !!optionLock(k, vals[i], state)));
       });
       // modelos prontos que usam algo bloqueado ficam desativados
       panel.querySelectorAll('[data-preset]').forEach(btn => {
@@ -824,9 +973,25 @@ const MudaeCardEffects = (() => {
     function commit() { save(); renderCard(); syncPanel(); }
 
     panel.addEventListener('click', ev => {
+      const fold = ev.target.closest('[data-fold]');
+      if (fold) {
+        panel.querySelectorAll('.sec').forEach(el => setCollapsed(el, fold.dataset.fold === 'close'));
+        return saveCollapsed();
+      }
+      const head = ev.target.closest('.sec > h3');
+      if (head) {
+        const secEl = head.parentElement;
+        setCollapsed(secEl, !secEl.classList.contains('collapsed'));
+        return saveCollapsed();
+      }
       const preset = ev.target.closest('[data-preset]');
       if (preset) {
         Object.assign(state, DEFAULT_VISUAL, PRESETS[+preset.dataset.preset][1]);
+        return commit();
+      }
+      const themeAll = ev.target.closest('[data-theme]');
+      if (themeAll) {
+        THEME_TARGETS.forEach(k => { state[k] = themeAll.dataset.theme || DEFAULT_VISUAL[k]; });
         return commit();
       }
       const b = ev.target.closest('button[data-k]');
@@ -943,7 +1108,8 @@ const MudaeCardEffects = (() => {
           foil: pick(ok('foil', FOILS)), fxi: 1, glit: !optionLock('glit', true, state) && Math.random() < .4, glare: 1,
           filter: maybe('filter', FILTERS, .5), tint: pick(TINTS), soft: false,
           texture: maybe('texture', TEXTURES, .4), anim: maybe('anim', ANIMS, .5), xfx: maybe('xfx', XFX, .5),
-          font: pick(ok('font', FONTS)), nameColor: '#ffffff', panel: 'dark',
+          font: pick(ok('font', FONTS)), nameColor: 'auto', kakColor: 'auto', keyColor: 'auto', opColor: 'auto', themeShine: false, panel: 'dark',
+          seriesColor: optionLock('seriesColor', '#000001', state) || Math.random() < .6 ? 'auto' : pick(SERIES_COLORS),
         });
         commit();
       }

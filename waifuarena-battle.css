@@ -645,6 +645,7 @@
 }
 
 .wa-log li b { color: var(--text); }
+.wa-log-time { margin-right: 6px; font-size: 10px; font-variant-numeric: tabular-nums; color: var(--muted); opacity: .7; }
 .wa-log li.me { border-left-color: var(--cyan); }
 .wa-log li.opp { border-left-color: #ff5c7a; }
 .wa-log-turn { color: var(--purple) !important; border-left-color: var(--purple) !important; }
@@ -2050,3 +2051,103 @@
 /* novas classes: carta do banco também treme quando é atingida; estados ruins em vermelho */
 .wa-bench-card.hit { animation: wa-hit .45s ease; }
 .wa-floor .wa-flags .wa-flag-bad { color: #ff9fb2; border-color: rgba(255, 92, 122, .45); }
+
+
+/* ============================================================
+   PAINEL DO TABULEIRO EM 3 COLUNAS
+   - classes à esquerda (fora do chão inclinado, sem a curva);
+   - tabuleiro maior no meio;
+   - histórico dentro do painel, à direita, com o fundo opaco.
+   ============================================================ */
+
+/* o painel do tabuleiro ocupa a largura toda (antes dividia com o histórico) */
+#waBattle .wa-board { grid-template-columns: minmax(0, 1fr); }
+
+/* tabuleiro maior (no celular continuam as medidas menores) */
+@media (min-width: 641px) {
+    #waBattle .wa-floor { --card: 136px; --bench: 70px; width: min(800px, 100%); }
+}
+#waBattle #waField { display: grid; column-gap: 18px; align-items: start; }
+@media (min-width: 641px) {
+    #waBattle #waField { padding: 18px 20px 16px; }
+}
+
+
+/* histórico, classe e painel lateral ficam acima das partículas do evento */
+#waBattle .wa-dock { display: contents; }
+#waBattle .wa-cls-dock,
+#waBattle #waField .wa-side { position: relative; z-index: 5; }
+
+/* histórico: o mesmo .wa-side de sempre, só com o fundo opaco garantido */
+#waBattle #waField .wa-side { display: flex; flex-direction: column; min-height: 0; background: var(--bg-panel); }
+#waBattle #waField .wa-log { flex: 1 1 0; min-height: 0; max-height: none; }
+
+/* ---------- quadro da classe, reto ---------- */
+.wa-cls-dock { display: flex; flex-direction: column; gap: 6px; min-width: 0; }
+.wa-cls-dock::before { color: var(--muted); font: 800 9.5px var(--mono); letter-spacing: 1px; }
+.wa-cls-dock[data-side="opp"]::before { content: "CLASSE DO RIVAL"; }
+.wa-cls-dock[data-side="me"]::before { content: "SUA CLASSE"; }
+.wa-cls-dock:has(.wa-cls-side[hidden])::before { content: none; }
+
+.wa-cls-dock .wa-cls-side {
+    display: flex; flex-direction: column; gap: 8px; padding: 12px 14px; border-radius: 12px;
+    border: 1px solid color-mix(in srgb, var(--c) 60%, transparent);
+    background: linear-gradient(160deg, color-mix(in srgb, var(--c) 14%, #0a0c16), #0a0c16);
+    box-shadow: 0 0 18px -8px var(--c);
+}
+.wa-cls-dock .wa-cls-side[hidden] { display: none; }
+.wa-cls-dock .wa-cls-side:not(.open) { padding: 0; border: 0; background: none; box-shadow: none; }
+.wa-cls-dock .wa-cls-head {
+    display: flex; align-items: center; gap: 8px; width: 100%; padding: 6px 12px 6px 6px; border-radius: 999px; cursor: pointer;
+    border: 1px solid color-mix(in srgb, var(--c) 60%, transparent);
+    background: linear-gradient(160deg, color-mix(in srgb, var(--c) 16%, #0a0c16), #0a0c16);
+    box-shadow: 0 0 16px -8px var(--c); color: var(--text); font-family: var(--mono); transition: box-shadow .15s ease, transform .15s ease;
+}
+.wa-cls-dock .wa-cls-head:hover { box-shadow: 0 0 20px -4px var(--c); transform: translateY(-2px); }
+.wa-cls-dock .wa-cls-head i { margin-left: auto; padding-left: 6px; color: var(--muted); font-style: normal; font-size: 12px; }
+.wa-cls-dock .wa-cls-side.open .wa-cls-head { padding: 0; border: 0; border-radius: 0; background: none; box-shadow: none; transform: none; }
+.wa-cls-dock .wa-cls-side.open { animation: wa-dock-open .18s ease; }
+.wa-cls-dock .wa-cls-line { font-size: 12.5px; line-height: 1.45; }
+.wa-cls-dock .wa-cls-line span { font-size: 10px; }
+@keyframes wa-dock-open { from { opacity: 0; transform: scale(.97); } }
+
+/* ---------- telas menores: tudo em uma coluna, na ordem do jogo ---------- */
+@media (max-width: 1100px) {
+    #waBattle #waField { grid-template-columns: minmax(0, 1fr) !important; }
+    #waBattle #waField > *:not(.wa-arena-fx):not(.wa-overlay):not(.wa-end),
+    #waBattle .wa-dock > * { grid-column: 1 / -1 !important; grid-row: auto !important; align-self: stretch !important; margin: 0 !important; }
+    #waBattle #waField > .wa-scene { margin-top: -100px !important; }
+    #waBattle .wa-dock { display: contents !important; }
+    #waBattle .wa-cls-dock { margin-top: 12px !important; }
+    #waBattle #waField .wa-side { margin-top: 14px !important; }
+    #waBattle #waField .wa-log { flex: none; max-height: 320px; }
+}
+/* posições na grade do painel: classes à esquerda, tabuleiro no meio, histórico à direita */
+#waBattle #waField { grid-template-columns: 240px minmax(0, 1fr) 330px; grid-template-rows: auto 1fr auto auto; }
+#waBattle #waField > .wa-event   { grid-column: 2; grid-row: 1; }
+#waBattle #waField > .wa-scene   { grid-column: 2; grid-row: 2; }
+#waBattle #waField > .wa-hud     { grid-column: 2; grid-row: 3; }
+#waBattle #waField > .wa-actions { grid-column: 2; grid-row: 4; }
+#waBattle .wa-cls-dock[data-side="opp"] { grid-column: 1; grid-row: 1 / 3; align-self: start; margin-top: 30px; }
+#waBattle .wa-cls-dock[data-side="me"]  { grid-column: 1; grid-row: 2 / 5; align-self: end; margin-bottom: 150px; }
+#waBattle #waField .wa-side { grid-column: 3; grid-row: 1 / -1; align-self: stretch; }
+
+/* ---------- janelas de escolha: classe da carta e ordem do tabuleiro ---------- */
+.wa-choice-cls {
+    display: inline-flex; align-items: center; justify-content: center; gap: 5px; align-self: center; max-width: 100%;
+    padding: 2px 9px 2px 3px; border-radius: 999px;
+    border: 1px solid color-mix(in srgb, var(--c) 60%, transparent);
+    background: linear-gradient(160deg, color-mix(in srgb, var(--c) 18%, #0a0c16), #0a0c16);
+    color: var(--c); font: 800 9.5px var(--mono); letter-spacing: .6px; white-space: nowrap;
+}
+.wa-choice-cls .wa-cls-ico { width: 18px; height: 18px; font-size: 11px; }
+
+/* escolher quem recebe o item: banco à esquerda e à direita, a da frente no meio e mais alta */
+.wa-choices.wa-choices-board { display: flex; justify-content: center; align-items: flex-end; gap: 16px; padding-top: 22px; }
+.wa-choices-board .wa-choice { width: 124px; }
+.wa-choices-board .wa-choice.is-front { width: 140px; transform: translateY(-22px); border-color: color-mix(in srgb, var(--cyan) 55%, transparent); box-shadow: 0 0 22px -8px var(--cyan); }
+.wa-choices-board .wa-choice.is-bench { opacity: .92; }
+@media (max-width: 520px) {
+    .wa-choices-board .wa-choice { width: 30%; }
+    .wa-choices-board .wa-choice.is-front { width: 34%; transform: translateY(-14px); }
+}

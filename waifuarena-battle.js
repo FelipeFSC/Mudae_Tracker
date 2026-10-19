@@ -910,6 +910,15 @@
   const esc = s => String(s).replace(/[&<>"]/g, ch => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[ch]));
   const sleep = ms => new Promise(r => setTimeout(r, ms));
 
+  /* histórico: fica dentro do painel do tabuleiro (#waField), na coluna da direita */
+  const SIDE_HTML = `<div class="wa-side">
+        <div class="wa-side-head">
+          <span>HISTÓRICO</span>
+          <button type="button" class="pill red" id="waQuit">DESISTIR</button>
+        </div>
+        <ul class="wa-log" id="waLog"></ul>
+      </div>`;
+
   const SECTION_HTML = `
   <div class="wa-battle" id="waBattle">
     <div class="panel wa-setup" id="waSetup">
@@ -994,15 +1003,14 @@
         <div class="wa-actions" id="waActions">
           ${Object.entries(ACTIONS).map(([k, a]) => `<button type="button" class="wa-act wa-act-${k}" data-act="${k}"><span class="wa-act-ico">${a.ico}</span><b>${a.label}</b><small>${a.hint}</small></button>`).join('')}
         </div>
+        <!-- quadro da classe fora do chão inclinado (sem a curva): rival em cima, você embaixo -->
+        <div class="wa-dock">
+          <div class="wa-cls-dock" data-side="opp"><div class="wa-cls-side" hidden></div></div>
+          <div class="wa-cls-dock" data-side="me"><div class="wa-cls-side" hidden></div></div>
+          ${SIDE_HTML}
+        </div>
         <div class="wa-overlay" id="waOverlay" hidden></div>
         <div class="wa-end" id="waEnd" hidden></div>
-      </div>
-      <div class="wa-side">
-        <div class="wa-side-head">
-          <span>HISTÓRICO</span>
-          <button type="button" class="pill red" id="waQuit">DESISTIR</button>
-        </div>
-        <ul class="wa-log" id="waLog"></ul>
       </div>
     </div>
   </div>`;
@@ -1480,7 +1488,6 @@
     const tag = mine ? 'VOCÊ' : B.mode === 'online' ? 'RIVAL ONLINE' : `BOT · ${DIFFICULTIES[B.difficulty].label.toUpperCase()}`;
     const front = `
       <div class="wa-front">
-        <div class="wa-cls-side"></div>
         <div class="wa-card-slot"></div>
         <div class="wa-info">
           <div class="wa-name"><span class="wa-tag ${mine ? 'me' : 'opp'}">${tag}</span> <span class="wa-name-txt"></span></div>
@@ -1547,8 +1554,9 @@
     row.querySelector('.wa-stats').innerHTML =
       `<span title="Ataque">⚔️ <b>${f.atk}</b></span><span title="Defesa">🛡️ <b>${f.def}</b></span><span title="Estudo">📔 <b>${f.study}</b></span><span title="Força do lewd">🍓 <b>${f.lewdPower}</b></span>${dyn}` +
       (C ? `<span class="wa-meter${f.meter >= RULES.meterMax ? ' full' : ''}" title="${esc(`${C.special}: ${C.specialDesc}`)}">⚡ ${Array.from({ length: RULES.meterMax }, (_, i) => `<i${i < f.meter ? ' class="on"' : ''}></i>`).join('')} <small>${C.special}</small></span>` : '');
-    // quadro da classe, do outro lado da carta
-    const side = row.querySelector('.wa-cls-side');
+    // quadro da classe
+    // o quadro da classe fica no painel, fora do chão (sem a perspectiva)
+    const side = $.field.querySelector(`.wa-cls-dock[data-side="${s === B.me ? 'me' : 'opp'}"] .wa-cls-side`);
     side.hidden = !C;
     if (C) {
       // fechado: só ícone e nome; clicando, abre passiva, especial e fraqueza
@@ -1622,7 +1630,9 @@
     for (const k of Object.keys(ACTIONS)) $.actions.querySelector(`[data-act="${k}"]`).disabled = !allowed.includes(k);
     const study = $.actions.querySelector('[data-act="study"] small');
     if (eventIs(front(B, B.me), 'rain')) study.textContent = 'Grátis (Chuva de Kakera)';
-    else study.textContent = T.studies > 0 ? `Restam ${T.studies} de ${RULES.studies}` : 'Acabaram os estudos';
+    else if (T.studies > 0) study.textContent = `Restam ${T.studies} de ${RULES.studies}`;
+    // a Chuva anunciada ainda não vale: sem isso parecia que o 📔 estava travado durante a chuva
+    else study.textContent = B.arena.next === 'rain' ? 'Acabaram · grátis na Chuva, no próximo turno' : 'Acabaram os estudos';
     const f = front(B, B.me), C = clsOf(f);
     $.actions.querySelector('[data-act="protect"] small').textContent = `−${protectValue(f)} de dano recebido`;
     const spName = C ? C.special : 'Sem classe';
@@ -1702,7 +1712,9 @@
   function addLog(html, kind = '', s = null) {
     const li = document.createElement('li');
     li.className = `wa-log-${kind}${s ? (s === B.me ? ' me' : ' opp') : ''}`;
-    li.innerHTML = html;
+    // hora em que a linha apareceu (no online, a hora de quem está vendo)
+    const time = new Date().toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit', second: '2-digit' });
+    li.innerHTML = `<time class="wa-log-time">${time}</time>${html}`;
     $.log.prepend(li);
   }
 
@@ -1823,11 +1835,22 @@
   }
 
   /* opção de carta nas janelas de escolha: a carta desenhada + vida e atributos */
-  function cardChoiceHTML(c, i, extra = '') {
-    return `<div class="wa-choice${c.ko ? ' is-off' : ''}" data-choice="${i}" data-pick tabindex="${c.ko ? -1 : 0}" role="button" aria-label="${esc(c.name)}">
+  function cardChoiceHTML(c, i, extra = '', cls = '') {
+    // a classe aparece em cada opção: dá para saber em quem está colocando o item
+    const C = clsOf(c);
+    const clsTag = C ? `<span class="wa-choice-cls" style="--c:${C.color}" title="${esc(`${C.name} · ${C.passive}`)}"><span class="wa-cls-ico">${clsIcon(c.cls)}</span>${C.name.toUpperCase()}</span>` : '';
+    return `<div class="wa-choice${c.ko ? ' is-off' : ''}${cls ? ` ${cls}` : ''}" data-choice="${i}" data-pick tabindex="${c.ko ? -1 : 0}" role="button" aria-label="${esc(C ? `${c.name} · ${C.name}` : c.name)}">
       <div class="wa-choice-card"></div>
+      ${clsTag}
       <span class="wa-choice-stats">${c.ko ? 'NOCAUTEADA' : `${c.hp}/${c.hpMax}💗 · ⚔️${c.atk} 🛡️${c.def} 📔${c.study}`}</span>${extra}
     </div>`;
+  }
+
+  /* opções na ordem do tabuleiro: banco à esquerda, a carta da frente no meio, banco à direita */
+  function boardOrderHTML(T, extraOf) {
+    const bench = T.cards.map((c, i) => i).filter(i => i !== T.active);
+    const order = [bench[0], T.active, ...bench.slice(1)].filter(i => i !== undefined);
+    return order.map(i => cardChoiceHTML(T.cards[i], i, extraOf(i), i === T.active ? 'is-front' : 'is-bench')).join('');
   }
 
   function showOverlay(req) {
@@ -1847,12 +1870,12 @@
             <b>${esc(it.name)}</b><span>${itemSummary(it) || '—'}</span>${it.note ? `<small>${esc(it.note)}</small>` : ''}
           </button>`).join('')}</div>
         <p class="wa-ov-label">PARA QUAL CARTA?</p>
-        <div class="wa-choices">${T.cards.map((c, i) => cardChoiceHTML(c, i, i === T.active ? '<em>NA FRENTE</em>' : '<em>NO BANCO</em>')).join('')}</div></div>`;
+        <div class="wa-choices wa-choices-board">${boardOrderHTML(T, i => (i === T.active ? '<em>NA FRENTE</em>' : '<em>NO BANCO</em>'))}</div></div>`;
     }
     $.overlay.innerHTML = html;
     $.overlay.querySelectorAll('[data-choice]').forEach(el => {
       const c = T.cards[Number(el.dataset.choice)];
-      if (c) el.querySelector('.wa-choice-card').appendChild(cardHost(c.char));
+      if (c) el.querySelector('.wa-choice-card').appendChild(cardHost(c.char, c.cls));   // com o broche da classe, como no tabuleiro
     });
     $.overlay.hidden = false;
     $.overlay.dataset.kind = req.kind;
