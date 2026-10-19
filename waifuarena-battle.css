@@ -2113,7 +2113,7 @@
 
 /* ---------- telas menores: tudo em uma coluna, na ordem do jogo ---------- */
 @media (max-width: 1100px) {
-    #waBattle #waField { grid-template-columns: minmax(0, 1fr) !important; }
+    #waBattle #waField { grid-template-columns: minmax(0, 1fr) !important; grid-template-rows: none !important; }
     #waBattle #waField > *:not(.wa-arena-fx):not(.wa-overlay):not(.wa-end),
     #waBattle .wa-dock > * { grid-column: 1 / -1 !important; grid-row: auto !important; align-self: stretch !important; margin: 0 !important; }
     #waBattle #waField > .wa-scene { margin-top: -100px !important; }
@@ -2123,7 +2123,7 @@
     #waBattle #waField .wa-log { flex: none; max-height: 320px; }
 }
 /* posições na grade do painel: classes à esquerda, tabuleiro no meio, histórico à direita */
-#waBattle #waField { grid-template-columns: 240px minmax(0, 1fr) 330px; grid-template-rows: auto 1fr auto auto; }
+#waBattle #waField { grid-template-columns: 240px minmax(0, 1fr) 330px; grid-template-rows: 46px 1fr auto auto; }
 #waBattle #waField > .wa-event   { grid-column: 2; grid-row: 1; }
 #waBattle #waField > .wa-scene   { grid-column: 2; grid-row: 2; }
 #waBattle #waField > .wa-hud     { grid-column: 2; grid-row: 3; }
@@ -2151,3 +2151,14 @@
     .wa-choices-board .wa-choice { width: 30%; }
     .wa-choices-board .wa-choice.is-front { width: 34%; transform: translateY(-14px); }
 }
+
+/* durante o duelo a página usa a largura larga (como o #app.app-wide): o #app normal tem 1080px
+   e deixava o painel de 3 colunas apertado; a preparação e as outras abas continuam iguais */
+#app:has(#view-arena.active #waBoard:not([hidden])) { max-width: 1680px; }
+
+/* durante o duelo o cabeçalho do tracker (abas) some: para sair há o DESISTIR e o ← MODOS */
+body:has(#view-arena.active #waBoard:not([hidden])) > .topbar { display: none; }
+
+/* a faixa do evento tem uma linha fixa (46px) acima do chão: o painel não muda de altura quando um evento começa */
+#waBattle #waField > .wa-event { align-self: center; max-width: 100%; white-space: nowrap; overflow: hidden; }
+#waBattle #waField > .wa-event span { overflow: hidden; text-overflow: ellipsis; max-width: 100%; }
