@@ -982,6 +982,9 @@ const filterKakeraMaxEl = document.getElementById("filterKakeraMax");
 const filterSortKakeraEl = document.getElementById("filterSortKakera");
 const filterSortKeysEl = document.getElementById("filterSortKeys");
 const filterGenderRow = document.getElementById("filterGenderRow");
+const filterOpContainsEl = document.getElementById("filterOpContains");
+const filterOpLevelRow = document.getElementById("filterOpLevelRow");
+const filterOpBuffRow = document.getElementById("filterOpBuffRow");
 const btnClearFilters = document.getElementById("btnClearFilters");
 const viewToggle = document.getElementById("viewToggle");
 const gridDetailsToggle = document.getElementById("gridDetailsToggle");
@@ -999,6 +1002,9 @@ const charFilters = {
     sortKakera: "",
     sortKeys: "",
     genders: new Set(),
+    opContains: true,
+    opLevels: new Set(),
+    opBuffs: new Set(),
     groupBySeries: false
 };
 
@@ -1128,7 +1134,29 @@ function extractDominantColor(url) {
     });
 }
 
+// Com "Contém" ligado e nada selecionado o filtro fica inerte; desligado e sem
+// seleção, mostra quem não tem nenhum perk de OP.
+function isOpFilterActive() {
+    return !charFilters.opContains || charFilters.opLevels.size > 0 || charFilters.opBuffs.size > 0;
+}
+
+// Busca OU: basta um perk selecionado estar em um nível selecionado (sem perk
+// selecionado vale qualquer perk; sem nível selecionado vale qualquer nível > 0).
+// O nível segue o rótulo da tela de OP: perks 6–10 só têm MAX, nunca LVL 1.
+function matchesOpSelection(c) {
+    const levels = normalizeOpLevels(c.opLevels);
+    return BUFF_DEFS.some((buff, i) => {
+        if (charFilters.opBuffs.size > 0 && !charFilters.opBuffs.has(buff.id)) return false;
+        const level = levels[buff.id];
+        if (level <= 0) return false;
+        if (charFilters.opLevels.size === 0) return true;
+        const isMax = level >= (i < 5 ? 6 : 1);
+        return charFilters.opLevels.has(isMax ? "max" : String(level));
+    });
+}
+
 function passesFilters(c) {
+    if (isOpFilterActive() && matchesOpSelection(c) !== charFilters.opContains) return false;
     if (charFilters.categories.size > 0 && !charFilters.categories.has(c.category)) return false;
     if (charFilters.series && (c.series || "").trim() !== charFilters.series) return false;
     if (charFilters.kakeraMin !== null && c.kakera < charFilters.kakeraMin) return false;
@@ -1208,33 +1236,101 @@ if (filterGenderRow) {
         });
     });
 }
+if (filterOpContainsEl) {
+    filterOpContainsEl.addEventListener("change", () => {
+        charFilters.opContains = filterOpContainsEl.checked;
+        renderCharacters();
+    });
+}
+if (filterOpLevelRow) {
+    filterOpLevelRow.querySelectorAll(".gender-btn").forEach(btn => {
+        btn.addEventListener("click", () => {
+            const level = btn.dataset.opLevel;
+            if (charFilters.opLevels.has(level)) {
+                charFilters.opLevels.delete(level);
+            } else {
+                charFilters.opLevels.add(level);
+            }
+            btn.classList.toggle("active", charFilters.opLevels.has(level));
+            renderCharacters();
+        });
+    });
+}
+if (filterOpBuffRow) {
+    filterOpBuffRow.innerHTML = BUFF_DEFS.map((buff, i) =>
+        `<button type="button" class="gender-btn" data-op-buff="${buff.id}">${i + 1} · ${escapeXml(buff.title)}</button>`
+    ).join("");
+    filterOpBuffRow.querySelectorAll(".gender-btn").forEach(btn => {
+        btn.addEventListener("click", () => {
+            const id = btn.dataset.opBuff;
+            if (charFilters.opBuffs.has(id)) {
+                charFilters.opBuffs.delete(id);
+            } else {
+                charFilters.opBuffs.add(id);
+            }
+            btn.classList.toggle("active", charFilters.opBuffs.has(id));
+            renderCharacters();
+        });
+    });
+}
 if (groupBySeriesToggle) {
     groupBySeriesToggle.addEventListener("change", () => {
         charFilters.groupBySeries = groupBySeriesToggle.checked;
         renderCharacters();
     });
 }
-// Extraído em função própria para poder ser reaproveitado ao trocar de
-// perfil (ver PROFILES): os filtros de um perfil não fazem sentido nos
-// personagens de outro, então são limpos automaticamente na troca.
-function resetCharFilters() {
+function resetPersonFilters() {
     charFilters.categories.clear();
     charFilters.series = "";
     charFilters.kakeraMin = null;
     charFilters.kakeraMax = null;
-    charFilters.sortKakera = "";
-    charFilters.sortKeys = "";
     charFilters.genders.clear();
-    charFilters.groupBySeries = false;
 
     if (filterCategoryRow) filterCategoryRow.querySelectorAll(".cat-toggle-btn").forEach(btn => btn.classList.remove("active"));
     if (filterSeriesEl) filterSeriesEl.value = "";
     if (filterKakeraMinEl) filterKakeraMinEl.value = "";
     if (filterKakeraMaxEl) filterKakeraMaxEl.value = "";
+    if (filterGenderRow) filterGenderRow.querySelectorAll(".gender-btn").forEach(btn => btn.classList.remove("active"));
+}
+
+function resetOpFilters() {
+    charFilters.opContains = true;
+    charFilters.opLevels.clear();
+    charFilters.opBuffs.clear();
+
+    if (filterOpContainsEl) filterOpContainsEl.checked = true;
+    if (filterOpLevelRow) filterOpLevelRow.querySelectorAll(".gender-btn").forEach(btn => btn.classList.remove("active"));
+    if (filterOpBuffRow) filterOpBuffRow.querySelectorAll(".gender-btn").forEach(btn => btn.classList.remove("active"));
+}
+
+function resetSortFilters() {
+    charFilters.sortKakera = "";
+    charFilters.sortKeys = "";
+
     if (filterSortKakeraEl) filterSortKakeraEl.value = "";
     if (filterSortKeysEl) filterSortKeysEl.value = "";
-    if (filterGenderRow) filterGenderRow.querySelectorAll(".gender-btn").forEach(btn => btn.classList.remove("active"));
+}
+
+function resetGroupBySeries() {
+    charFilters.groupBySeries = false;
     if (groupBySeriesToggle) groupBySeriesToggle.checked = false;
+}
+
+// Os demais interruptores são sincronizados por applyViewMode() a cada renderização.
+function resetDisplayOptions() {
+    resetGroupBySeries();
+    state.config.viewMode = "list";
+    state.config.effectsEnabled = true;
+    state.config.gridDetailsEnabled = true;
+    state.config.cardStyleEnabled = false;
+    scheduleSaveConfig();
+}
+
+// Não inclui a Exibição, que é só aparência e tem o próprio botão de limpar.
+function resetCharFilters() {
+    resetPersonFilters();
+    resetOpFilters();
+    resetSortFilters();
 }
 
 if (btnClearFilters) {
@@ -1243,6 +1339,70 @@ if (btnClearFilters) {
         renderCharacters();
     });
 }
+
+/* ------------------------------------------------------------
+   CAIXAS DE FILTRO: só o painel da caixa aberta aparece, e cada
+   caixa mostra quantos itens estão diferentes do padrão.
+   ------------------------------------------------------------ */
+const filterTabEls = document.querySelectorAll("[data-filter-tab]");
+const filterPanelEls = document.querySelectorAll("[data-filter-panel]");
+const FILTER_BOX_RESETS = {
+    person: resetPersonFilters,
+    op: resetOpFilters,
+    sort: resetSortFilters,
+    display: resetDisplayOptions
+};
+
+function countActiveFilters() {
+    const isGrid = state.config.viewMode === "grid";
+    const cardsOn = state.config.cardStyleEnabled === true;
+    return {
+        person: charFilters.categories.size + charFilters.genders.size +
+            [charFilters.series, charFilters.kakeraMin !== null, charFilters.kakeraMax !== null].filter(Boolean).length,
+        op: charFilters.opLevels.size + charFilters.opBuffs.size + (charFilters.opContains ? 0 : 1),
+        sort: [charFilters.sortKakera, charFilters.sortKeys].filter(Boolean).length,
+        // INFORMAÇÕES só existe na grade, e ligar CARTAS já a desliga sozinho.
+        display: [
+            isGrid,
+            charFilters.groupBySeries,
+            state.config.effectsEnabled === false,
+            cardsOn,
+            isGrid && !cardsOn && state.config.gridDetailsEnabled === false
+        ].filter(Boolean).length
+    };
+}
+
+function updateFilterBadges() {
+    const counts = countActiveFilters();
+    filterTabEls.forEach(tab => {
+        const count = counts[tab.dataset.filterTab];
+        const badge = tab.querySelector(".filter-badge");
+        badge.textContent = String(count);
+        badge.hidden = count === 0;
+    });
+}
+
+filterTabEls.forEach(tab => {
+    tab.addEventListener("click", () => {
+        const key = tab.dataset.filterTab;
+        const opening = tab.getAttribute("aria-expanded") !== "true";
+        filterTabEls.forEach(other => {
+            const isOpen = opening && other === tab;
+            other.classList.toggle("active", isOpen);
+            other.setAttribute("aria-expanded", String(isOpen));
+        });
+        filterPanelEls.forEach(panel => {
+            panel.hidden = !(opening && panel.dataset.filterPanel === key);
+        });
+    });
+});
+
+document.querySelectorAll("[data-filter-clear]").forEach(btn => {
+    btn.addEventListener("click", () => {
+        FILTER_BOX_RESETS[btn.dataset.filterClear]();
+        renderCharacters();
+    });
+});
 
 /* ============================================================
    ALTERNÂNCIA DE VISUALIZAÇÃO (LISTA / GRADE)
@@ -1304,6 +1464,7 @@ if (effectsToggle) {
         state.config.effectsEnabled = effectsToggle.checked;
         // Efeitos são só CSS: basta alternar a classe, sem redesenhar a lista.
         applyViewMode();
+        updateFilterBadges();
         scheduleSaveConfig();
     });
 }
@@ -1362,7 +1523,7 @@ function exitClearHaremSelectionMode() {
 }
 
 // Personagens atualmente visíveis na listagem, respeitando os mesmos filtros
-// usados por renderCharacters() (categoria, série, kakera, gêneros).
+// usados por renderCharacters() (categoria, série, kakera, gêneros, OP).
 function visibleClearHaremCharacters() {
     return state.characters.filter(passesFilters);
 }
@@ -1484,6 +1645,7 @@ function renderCharacters() {
 
     populateSeriesFilter();
     applyViewMode();
+    updateFilterBadges();
     // Com muitas séries diferentes, o espaço extra evita que cada série
     // fique espremida em colunas estreitas no modo grade.
     if (appEl) appEl.classList.toggle("app-wide", !!charFilters.groupBySeries);
@@ -1494,7 +1656,8 @@ function renderCharacters() {
         !!charFilters.series ||
         charFilters.kakeraMin !== null ||
         charFilters.kakeraMax !== null ||
-        charFilters.genders.size > 0;
+        charFilters.genders.size > 0 ||
+        isOpFilterActive();
 
     LIST_SECTIONS.forEach(section => {
         // Se houver categorias selecionadas no filtro e NENHUMA delas pertencer
@@ -2524,6 +2687,106 @@ document.getElementById("ecExportModalClose")?.addEventListener("click", closeEc
 document.getElementById("ecExportCloseBtn")?.addEventListener("click", closeEcExportModal);
 ecExportModalOverlay?.addEventListener("click", (e) => {
     if (e.target === ecExportModalOverlay) closeEcExportModal();
+});
+
+/* ============================================================
+   COMANDO $opp -> abre o $op só dos personagens escolhidos
+   ------------------------------------------------------------
+   Formato do Mudae: "$opp Nome $Nome $Nome" — o primeiro nome vai
+   sem "$" e os seguintes com "$" grudado. Só entram reivindicados,
+   e listas grandes viram mais de um comando para caber numa mensagem.
+   ============================================================ */
+const DISCORD_MESSAGE_LIMIT = 2000;
+const oppCommandModalOverlay = document.getElementById("oppCommandModalOverlay");
+const oppCommandListEl = document.getElementById("oppCommandList");
+const oppCommandCopyStatusEl = document.getElementById("oppCommandCopyStatus");
+const oppCommandSummaryEl = document.getElementById("oppCommandSummary");
+
+function buildOppCommands(names) {
+    const commands = [];
+    let current = "";
+    names.forEach(name => {
+        const next = current ? `${current} $${name}` : `$opp ${name}`;
+        if (current && next.length > DISCORD_MESSAGE_LIMIT) {
+            commands.push(current);
+            current = `$opp ${name}`;
+        } else {
+            current = next;
+        }
+    });
+    if (current) commands.push(current);
+    return commands;
+}
+
+async function copyOppCommand(command) {
+    if (!navigator.clipboard || !navigator.clipboard.writeText) {
+        throw new Error("Clipboard API indisponível");
+    }
+    await navigator.clipboard.writeText(command);
+}
+
+function renderOppCommandModal() {
+    const names = state.characters
+        .filter(c => c.claimed !== false && passesFilters(c))
+        .map(c => String(c.name || "").trim())
+        .filter(Boolean);
+    const commands = buildOppCommands(names);
+    oppCommandCopyStatusEl.textContent = "";
+
+    if (!commands.length) {
+        oppCommandListEl.innerHTML = `<p class="series-order-empty">Nenhum personagem reivindicado passa nos filtros atuais.</p>`;
+        oppCommandSummaryEl.textContent = "";
+        return;
+    }
+
+    oppCommandListEl.innerHTML = commands.map((command, idx) => `
+        <div class="clear-harem-command-wrap">
+            <code class="clear-harem-command">${escapeXml(command)}</code>
+            <button type="button" class="pill cyan opp-command-copy-btn" data-idx="${idx}">COPIAR</button>
+        </div>
+    `).join("");
+
+    oppCommandListEl.querySelectorAll(".opp-command-copy-btn").forEach(btn => {
+        btn.addEventListener("click", async () => {
+            const idx = Number(btn.dataset.idx);
+            try {
+                await copyOppCommand(commands[idx]);
+                oppCommandCopyStatusEl.textContent = `✓ Comando ${idx + 1} de ${commands.length} copiado.`;
+            } catch (err) {
+                console.error("Erro ao copiar o comando $opp:", err);
+                oppCommandCopyStatusEl.textContent = "Não foi possível copiar automaticamente. Selecione o texto manualmente.";
+            }
+        });
+    });
+
+    oppCommandSummaryEl.textContent = `${names.length} personagem(ns) em ${commands.length} comando(s).`;
+}
+
+function closeOppCommandModal() {
+    oppCommandModalOverlay.classList.remove("active");
+}
+
+document.getElementById("btnOpenOppCommand")?.addEventListener("click", () => {
+    renderOppCommandModal();
+    oppCommandModalOverlay.classList.add("active");
+});
+document.getElementById("oppCommandModalClose")?.addEventListener("click", closeOppCommandModal);
+document.getElementById("oppCommandCloseBtn")?.addEventListener("click", closeOppCommandModal);
+oppCommandModalOverlay?.addEventListener("click", (e) => {
+    if (e.target === oppCommandModalOverlay) closeOppCommandModal();
+});
+
+// Botão da modal de OP: copia o comando só do personagem aberto nela.
+document.getElementById("opCopyOppBtn")?.addEventListener("click", async () => {
+    const character = state.characters.find(c => c.id === editingOpCharacterId);
+    if (!character) return;
+    try {
+        await copyOppCommand(`$opp ${String(character.name || "").trim()}`);
+        showOpStatus("✓ Comando copiado.", false, true);
+    } catch (err) {
+        console.error("Erro ao copiar o comando $opp:", err);
+        showOpStatus("Não foi possível copiar.", true);
+    }
 });
 
 document.querySelectorAll(".pill[data-jump]").forEach(pill => {
@@ -3900,7 +4163,9 @@ async function refreshProfileSelector() {
 // Recarrega toda a interface depois de uma troca/criação/exclusão de perfil,
 // sem duplicar a lógica de renderização que já existe em cada view.
 async function refreshAppAfterProfileChange() {
+    // Os filtros de um perfil não fazem sentido nos personagens de outro.
     resetCharFilters();
+    resetGroupBySeries();
     await loadActiveProfileData();
     loadConfigForm();
     renderConfigStats();

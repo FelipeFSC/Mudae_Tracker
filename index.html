@@ -6,7 +6,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>Mudae-Tracker</title>
     <link rel="icon" type="image/webp" href="Mudae.webp" />
-    <link rel="stylesheet" href="style.css?v=79" />
+    <link rel="stylesheet" href="style.css?v=82" />
     <!-- Cartas com efeitos (v1.0): fontes das cartas e encaixe no tracker -->
     <link rel="preconnect" href="https://fonts.googleapis.com" />
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
@@ -269,6 +269,7 @@
                     <button class="pill green" id="btnOpenImport">📥 IMPORTAR MUDAE</button>
                     <button class="pill yellow" id="btnOpenOpImport">⚡ IMPORTAR BUFFS OP</button>
                     <button class="pill purple" id="btnOpenWishlistOrder">⇅ REORDENAR WISHLIST</button>
+                    <button class="pill yellow" id="btnOpenSeriesOrder" title="Gerar o comando pra organizar a ordem das séries no seu harém do Mudae">⇅ ORGANIZAR SÉRIES</button>
                     <button class="pill pink" id="btnOpenEcExport" title="Gerar o comando $ec com as embed colors salvas">🎨 EXPORTAR EC</button>
                     <button class="pill red" id="btnClearHarem">🗑 LIMPAR HAREM</button>
                 </div>
@@ -286,68 +287,120 @@
             </div>
 
             <div class="panel chars-toolbar">
-                <!-- Faixa 1: categoria e série -->
-                <div class="toolbar-row toolbar-row-main">
-                    <div class="field toolbar-field toolbar-categories">
-                        <label>CATEGORIA</label>
-                        <div class="cat-toggle-row" id="filterCategoryRow">
-                            <button type="button" class="cat-toggle-btn cat-pink" data-category="favoritos">♥ FAVORITOS</button>
-                            <button type="button" class="cat-toggle-btn cat-yellow" data-category="estrelas">★ ESTRELAS</button>
-                            <button type="button" class="cat-toggle-btn cat-cyan" data-category="comuns">👥 COMUNS</button>
+                <!-- Caixas de filtro: uma aberta por vez; o número mostra quantos itens estão ativos -->
+                <div class="filter-tabs">
+                    <button type="button" class="filter-tab" data-filter-tab="person" aria-expanded="false" aria-controls="filterPanelPerson">PERSONAGEM<span class="filter-badge" hidden></span></button>
+                    <button type="button" class="filter-tab" data-filter-tab="op" aria-expanded="false" aria-controls="filterPanelOp">OP<span class="filter-badge" hidden></span></button>
+                    <button type="button" class="filter-tab" data-filter-tab="sort" aria-expanded="false" aria-controls="filterPanelSort">ORDENAÇÃO<span class="filter-badge" hidden></span></button>
+                    <button type="button" class="filter-tab" data-filter-tab="display" aria-expanded="false" aria-controls="filterPanelDisplay">EXIBIÇÃO<span class="filter-badge" hidden></span></button>
+                    <button id="btnClearFilters" class="btn-clear-filters" title="Limpa Personagem, OP e Ordenação. A Exibição tem o próprio botão de limpar.">LIMPAR FILTROS</button>
+                </div>
+
+                <div class="filter-panel" id="filterPanelPerson" data-filter-panel="person" hidden>
+                    <div class="toolbar-row toolbar-row-main">
+                        <div class="field toolbar-field toolbar-categories">
+                            <label>CATEGORIA</label>
+                            <div class="cat-toggle-row" id="filterCategoryRow">
+                                <button type="button" class="cat-toggle-btn cat-pink" data-category="favoritos">♥ FAVORITOS</button>
+                                <button type="button" class="cat-toggle-btn cat-yellow" data-category="estrelas">★ ESTRELAS</button>
+                                <button type="button" class="cat-toggle-btn cat-cyan" data-category="comuns">👥 COMUNS</button>
+                            </div>
                         </div>
-                    </div>
-                    <div class="field toolbar-field toolbar-series">
-                        <label>SÉRIE</label>
-                        <div class="series-filter-row">
+                        <div class="field toolbar-field toolbar-series">
+                            <label>SÉRIE</label>
                             <select id="filterSeries">
                                 <option value="">Todas</option>
                             </select>
-                            <button type="button" class="pill yellow" id="btnOpenSeriesOrder" title="Gerar o comando pra organizar a ordem das séries no seu harém do Mudae">⇅ ORGANIZAR</button>
                         </div>
+                    </div>
+                    <div class="toolbar-row toolbar-row-person">
+                        <div class="field toolbar-field toolbar-genders">
+                            <label>GÊNEROS</label>
+                            <div class="gender-row" id="filterGenderRow">
+                                <button type="button" class="gender-btn" data-gender="wa">$wa</button>
+                                <button type="button" class="gender-btn" data-gender="wg">$wg</button>
+                                <button type="button" class="gender-btn" data-gender="ha">$ha</button>
+                                <button type="button" class="gender-btn" data-gender="hg">$hg</button>
+                            </div>
+                        </div>
+                        <div class="field toolbar-field">
+                            <label>KAKERA MÍNIMO</label>
+                            <input type="number" id="filterKakeraMin" min="0" placeholder="0" />
+                        </div>
+                        <div class="field toolbar-field">
+                            <label>KAKERA MÁXIMO</label>
+                            <input type="number" id="filterKakeraMax" min="0" placeholder="Sem limite" />
+                        </div>
+                    </div>
+                    <div class="filter-panel-actions">
+                        <button type="button" class="btn-clear-filters" data-filter-clear="person">LIMPAR PERSONAGEM</button>
                     </div>
                 </div>
 
-                <!-- Faixa 2: kakera, ordenações e gêneros -->
-                <div class="toolbar-row toolbar-row-filters">
-                    <div class="field toolbar-field">
-                        <label>KAKERA MÍNIMO</label>
-                        <input type="number" id="filterKakeraMin" min="0" placeholder="0" />
-                    </div>
-                    <div class="field toolbar-field">
-                        <label>KAKERA MÁXIMO</label>
-                        <input type="number" id="filterKakeraMax" min="0" placeholder="Sem limite" />
-                    </div>
-                    <div class="field toolbar-field">
-                        <label>ORDENAR POR KAKERA</label>
-                        <select id="filterSortKakera">
-                            <option value="">Sem ordenação</option>
-                            <option value="asc">Menor → Maior</option>
-                            <option value="desc">Maior → Menor</option>
-                        </select>
-                    </div>
-                    <div class="field toolbar-field">
-                        <label>ORDENAR POR CHAVES</label>
-                        <select id="filterSortKeys">
-                            <option value="">Sem ordenação</option>
-                            <option value="desc">Mais → Menos</option>
-                            <option value="asc">Menos → Mais</option>
-                        </select>
-                    </div>
-                    <div class="field toolbar-field toolbar-genders">
-                        <label>GÊNEROS</label>
-                        <div class="gender-row" id="filterGenderRow">
-                            <button type="button" class="gender-btn" data-gender="wa">$wa</button>
-                            <button type="button" class="gender-btn" data-gender="wg">$wg</button>
-                            <button type="button" class="gender-btn" data-gender="ha">$ha</button>
-                            <button type="button" class="gender-btn" data-gender="hg">$hg</button>
+                <!-- Busca OU entre os níveis e buffs selecionados -->
+                <div class="filter-panel" id="filterPanelOp" data-filter-panel="op" hidden>
+                    <div class="toolbar-row toolbar-row-op">
+                        <div class="toolbar-field toolbar-op-contains">
+                            <span class="toolbar-op-label">OP</span>
+                            <label class="grid-details-control" title="Ligado: mostra quem tem algum dos buffs/níveis selecionados. Desligado: mostra quem não tem nenhum deles.">
+                                <span class="grid-details-label">CONTÉM</span>
+                                <input type="checkbox" id="filterOpContains" checked />
+                                <span class="switch-track" aria-hidden="true"><span class="switch-thumb"></span></span>
+                            </label>
+                            <button type="button" class="pill cyan" id="btnOpenOppCommand" title="Gerar o comando $opp com os personagens filtrados">⧉ GERAR $OPP</button>
                         </div>
+                        <div class="field toolbar-field">
+                            <label>NÍVEIS DO OP</label>
+                            <div class="gender-row" id="filterOpLevelRow">
+                                <button type="button" class="gender-btn" data-op-level="1">LVL 1</button>
+                                <button type="button" class="gender-btn" data-op-level="2">LVL 2</button>
+                                <button type="button" class="gender-btn" data-op-level="3">LVL 3</button>
+                                <button type="button" class="gender-btn" data-op-level="4">LVL 4</button>
+                                <button type="button" class="gender-btn" data-op-level="5">LVL 5</button>
+                                <button type="button" class="gender-btn" data-op-level="max">MAX</button>
+                            </div>
+                        </div>
+                        <div class="field toolbar-field toolbar-op-buffs">
+                            <label>BUFFS DO OP</label>
+                            <div class="gender-row" id="filterOpBuffRow"></div>
+                        </div>
+                    </div>
+                    <div class="filter-panel-actions">
+                        <button type="button" class="btn-clear-filters" data-filter-clear="op">LIMPAR OP</button>
                     </div>
                 </div>
 
-                <!-- Rodapé: opções de exibição (não são filtros) -->
-                <div class="toolbar-footer">
+                <div class="filter-panel" id="filterPanelSort" data-filter-panel="sort" hidden>
+                    <div class="toolbar-row toolbar-row-sort">
+                        <div class="field toolbar-field">
+                            <label>ORDENAR POR KAKERA</label>
+                            <select id="filterSortKakera">
+                                <option value="">Sem ordenação</option>
+                                <option value="asc">Menor → Maior</option>
+                                <option value="desc">Maior → Menor</option>
+                            </select>
+                        </div>
+                        <div class="field toolbar-field">
+                            <label>ORDENAR POR CHAVES</label>
+                            <select id="filterSortKeys">
+                                <option value="">Sem ordenação</option>
+                                <option value="desc">Mais → Menos</option>
+                                <option value="asc">Menos → Mais</option>
+                            </select>
+                        </div>
+                    </div>
+                    <div class="filter-panel-actions">
+                        <button type="button" class="btn-clear-filters" data-filter-clear="sort">LIMPAR ORDENAÇÃO</button>
+                    </div>
+                </div>
+
+                <!-- Só aparência: não esconde personagens -->
+                <div class="filter-panel" id="filterPanelDisplay" data-filter-panel="display" hidden>
                     <div class="view-controls">
-                        <span class="toolbar-footer-label">EXIBIÇÃO</span>
+                        <div class="view-toggle" id="viewToggle" title="Formato de exibição">
+                            <button type="button" class="view-toggle-btn active" data-view-mode="list" title="Lista">☰</button>
+                            <button type="button" class="view-toggle-btn" data-view-mode="grid" title="Grade">▦</button>
+                        </div>
                         <label class="grid-details-control" id="groupBySeriesControl" title="Agrupar personagens por série dentro de cada categoria">
                             <span class="grid-details-label">AGRUPAR POR SÉRIE</span>
                             <input type="checkbox" id="groupBySeriesToggle" />
@@ -364,12 +417,8 @@
                             <span class="switch-track" aria-hidden="true"><span class="switch-thumb"></span></span>
                         </label>
                     </div>
-                    <div class="toolbar-footer-actions">
-                        <div class="view-toggle" id="viewToggle" title="Formato de exibição">
-                            <button type="button" class="view-toggle-btn active" data-view-mode="list" title="Lista">☰</button>
-                            <button type="button" class="view-toggle-btn" data-view-mode="grid" title="Grade">▦</button>
-                        </div>
-                        <button id="btnClearFilters" class="btn-clear-filters">LIMPAR FILTROS</button>
+                    <div class="filter-panel-actions">
+                        <button type="button" class="btn-clear-filters" data-filter-clear="display">LIMPAR EXIBIÇÃO</button>
                     </div>
                 </div>
             </div>
@@ -689,6 +738,7 @@
             </div>
             <div class="op-buff-list" id="opBuffList"></div>
             <div class="op-modal-footer">
+                <button type="button" id="opCopyOppBtn" class="pill cyan">⧉ COPIAR $OPP</button>
                 <span class="op-save-status" id="opSaveStatus"></span>
                 <button id="opCloseBtn" class="btn-minimal op-close-btn">FECHAR</button>
                 <button id="opSaveBtn" class="btn-cancel op-save-btn">SALVAR</button>
@@ -786,6 +836,29 @@
         </div>
     </div>
 
+    <!-- ============ MODAL: COMANDO $opp DOS PERSONAGENS FILTRADOS ============ -->
+    <div id="oppCommandModalOverlay" class="modal-overlay">
+        <div class="modal series-order-modal">
+            <div class="modal-head">
+                <div>
+                    <h2>Comando $opp</h2>
+                    <p class="tower-modal-sub">Abre o $op só dos personagens reivindicados que passam nos filtros
+                        atuais. Listas grandes são divididas em mais de um comando para caber no limite de
+                        2.000 caracteres do Discord.</p>
+                </div>
+                <button id="oppCommandModalClose" class="modal-x">✕</button>
+            </div>
+
+            <div class="series-order-command-box" id="oppCommandList"></div>
+            <p class="clear-harem-copy-status" id="oppCommandCopyStatus"></p>
+
+            <div class="op-modal-footer">
+                <span class="op-save-status" id="oppCommandSummary"></span>
+                <button id="oppCommandCloseBtn" class="btn-minimal op-close-btn">FECHAR</button>
+            </div>
+        </div>
+    </div>
+
     <!-- ============ MODAL: CONFIRMAR REMOÇÃO (LIMPAR HAREM) ============ -->
     <div id="clearHaremModalOverlay" class="modal-overlay">
         <div class="modal clear-harem-modal">
@@ -853,7 +926,7 @@
     <!-- monta a tela da Waifu Arena antes do script.js, que descobre as telas pelo id -->
     <script src="waifuarena.js?v=5"></script>
     <script src="waifuarena-battle.js?v=27"></script>
-    <script src="script.js?v=76"></script>
+    <script src="script.js?v=79"></script>
     <script src="card-effects.js?v=5"></script>
 </body>
 
