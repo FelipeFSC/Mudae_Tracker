@@ -1,0 +1,123 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<!-- mesma política do index.html: as fotos do Mudae carregam sem referrer -->
+<meta name="referrer" content="no-referrer">
+<title>Mudae TFT</title>
+<link rel="icon" type="image/webp" href="Mudae.webp">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Orbitron:wght@500;800&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="tft.css?v=1">
+</head>
+<!--
+  Protótipo isolado: autobattler 1v1 com as waifus do tracker.
+  Só depende de database.js (leitura dos personagens). Para descartar:
+  apagar tft.html, tft.css, tft.js, tft-engine.js, tft-data.js e o link
+  "TFT (TESTE)" do index.html.
+-->
+<body>
+
+<section id="lobby" class="lobby">
+  <div class="lobby-box">
+    <a class="back-link" href="index.html">← Voltar ao tracker</a>
+    <p class="kicker">MUDAE · <span id="seasonName"></span></p>
+    <h1>MUDAE TFT</h1>
+    <p class="lead">Regras, traits e itens do TFT, com as suas waifus no lugar dos campeões. Quanto maior a kakera, maior o custo na loja.</p>
+    <p class="roster" id="rosterInfo">Lendo seus personagens…</p>
+
+    <label class="field" for="nameInput">SEU NOME</label>
+    <input id="nameInput" maxlength="24" placeholder="Seu nome na sala" autocomplete="off">
+
+    <div class="lobby-actions">
+      <button class="btn primary" id="btnBot">JOGAR CONTRA O BOT</button>
+      <button class="btn" id="btnCreate">CRIAR SALA 1V1</button>
+    </div>
+    <div class="join-row">
+      <input id="codeInput" maxlength="6" placeholder="CÓDIGO" autocomplete="off" spellcheck="false" aria-label="Código da sala">
+      <button class="btn" id="btnJoin">ENTRAR</button>
+    </div>
+    <div class="room-box" id="roomBox" hidden>
+      <span>CÓDIGO DA SALA</span>
+      <strong id="roomCode">------</strong>
+      <button class="btn small" id="btnCopy">COPIAR</button>
+      <button class="btn small" id="btnCancelRoom">CANCELAR</button>
+    </div>
+    <p class="status" id="lobbyStatus" role="status"></p>
+    <button class="link-btn" data-open-rules>Ver regras desta season</button>
+  </div>
+</section>
+
+<section id="game" class="game" hidden>
+  <header class="topline">
+    <div class="player-chip you" id="chipYou"></div>
+    <div class="round-box">
+      <div class="round-label" id="roundLabel"></div>
+      <div class="round-track" id="roundTrack"></div>
+      <div class="timer"><span id="timerBar"></span></div>
+    </div>
+    <div class="player-chip rival" id="chipRival"></div>
+  </header>
+
+  <div class="field-area">
+    <aside class="side left">
+      <h2>TRAITS</h2>
+      <div id="traitList" class="trait-list"></div>
+      <h2>ITENS</h2>
+      <div id="itemBench" class="item-bench"></div>
+    </aside>
+
+    <div class="center">
+      <div class="board-wrap"><div class="board" id="board"></div></div>
+      <div class="bench" id="bench"></div>
+    </div>
+
+    <aside class="side right">
+      <h2>PARTIDA</h2>
+      <ol id="logList" class="log-list"></ol>
+      <button class="link-btn" data-open-rules>Regras</button>
+      <button class="link-btn" id="btnQuit">Sair da partida</button>
+    </aside>
+  </div>
+
+  <footer class="shop-bar" id="shopBar" data-drop="sell">
+    <div class="eco">
+      <div class="gold" id="goldBox"></div>
+      <div class="level" id="levelBox"></div>
+      <div class="eco-btns">
+        <button class="btn small" id="btnXp"></button>
+        <button class="btn small" id="btnReroll"></button>
+      </div>
+    </div>
+    <div class="shop" id="shop"></div>
+    <div class="turn-btns">
+      <button class="btn small" id="btnLock"></button>
+      <button class="btn primary" id="btnReady"></button>
+    </div>
+    <div class="sell-hint" id="sellHint" hidden></div>
+  </footer>
+
+  <div class="banner" id="banner" hidden></div>
+  <div class="carousel" id="carousel" hidden></div>
+</section>
+
+<div class="end-screen" id="endScreen" hidden></div>
+<div class="tip" id="tip" hidden></div>
+<div class="toast" id="toast" role="status"></div>
+
+<div class="rules" id="rulesModal" hidden>
+  <div class="rules-box" role="dialog" aria-modal="true" aria-labelledby="rulesTitle">
+    <button class="btn small rules-close" data-close-rules>FECHAR</button>
+    <h2 id="rulesTitle">Regras · <span id="rulesSeason"></span></h2>
+    <div id="rulesBody"></div>
+  </div>
+</div>
+
+<script src="database.js?v=53"></script>
+<script src="tft-data.js?v=1"></script>
+<script src="tft-engine.js?v=1"></script>
+<script src="tft.js?v=1"></script>
+</body>
+</html>
