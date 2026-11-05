@@ -393,7 +393,7 @@ b[data-l]::before { content: attr(data-l) " "; font-weight: 400; font-size: .82e
 /* ---------- Evolução ---------- */
 .stars { font-size: clamp(9px, 1.25cqw, 14px); letter-spacing: -1px; }
 .star2 .hexpic { --c: #e2e8f0; filter: drop-shadow(0 0 3px rgba(226, 232, 240, .85)); }
-.star3 .hexpic { --c: var(--gold); filter: drop-shadow(0 0 6px rgba(245, 197, 66, .95)); }
+.star3 .hexpic { filter: drop-shadow(0 0 6px var(--c)); } /* borda na cor do custo: dourado é só de lendária */
 .star2 .stars, .star3 .stars { font-size: clamp(11px, 1.5cqw, 17px); }
 .stars.s2 { color: #f1f5f9; }
 .stars.s3 { color: var(--gold); }
