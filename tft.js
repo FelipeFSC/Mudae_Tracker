@@ -618,7 +618,7 @@
       </div></div>`;
     byId('btnEndLeave').addEventListener('click', leaveGame);
     const again = byId('btnAgain');
-    if (again) again.addEventListener('click', startBotGame);
+    if (again) again.addEventListener('click', L.g && L.g.mode === 'chaos' ? startChaosGame : startBotGame);
     const back = byId('btnBackRoom');
     if (back) back.addEventListener('click', backToRoom);
   }

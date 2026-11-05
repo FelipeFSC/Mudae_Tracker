@@ -1357,7 +1357,10 @@ const TFTEngine = (() => {
     u.uid = raw.uid;
     u.cost = ch.cost;
     let ids = raw.items.slice();
-    if (ids.includes('ThiefsGloves')) ids = ids.concat([pick(rng, FULL_ITEMS), pick(rng, FULL_ITEMS)]);
+    if (ids.includes('ThiefsGloves')) {
+      const first = pick(rng, FULL_ITEMS);
+      ids = ids.concat([first, pick(rng, FULL_ITEMS.filter(i => i !== first))]); // nunca dois iguais
+    }
     u.itemIds = ids;
     u.has = new Set(ids);
 
@@ -2204,7 +2207,7 @@ const TFTEngine = (() => {
       winner, survivors: winner === 0 ? a0 : winner === 1 ? a1 : 0, duration: t, goldDrops, frames, permGains, augGold,
       deaths: [units.filter(u => u.side === 0 && !u.alive).length, units.filter(u => u.side === 1 && !u.alive).length],
       meta: units.map(u => ({
-        id: u.id, side: u.side, champ: u.champ || null, creep: u.creep || null, star: u.star, maxMana: u.maxMana, items: u.items, stats: u.start,
+        id: u.id, side: u.side, champ: u.champ || null, creep: u.creep || null, star: u.star, maxMana: u.maxMana, items: u.itemIds, stats: u.start, // itemIds inclui o que as Luvas sortearam
         stat: Object.fromEntries(Object.entries(u.stat).map(([k, v]) => [k, Math.round(v * 10) / 10])),
       })),
     };
