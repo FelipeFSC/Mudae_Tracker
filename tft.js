@@ -288,7 +288,7 @@
       renderRoom();
     }
     if (msg.t === 'tft-start') {
-      L.skins = msg.skins || {};
+      L.skins = E.applyCollection(msg.skins || {}, TFTCollection.pins());
       L.viewer = msg.viewer;
       L.inMatch = true;
       openGame();
@@ -382,9 +382,23 @@
   /* ---------- Anfitrião: fluxo do jogo ---------- */
   function startBotGame() {
     const seed = Math.floor(Math.random() * 4294967296);
-    L.skins = E.buildSkins([L.roster], seed);
+    L.skins = E.applyCollection(E.buildSkins([L.roster], seed), TFTCollection.pins());
     L.mode = 'bot';
     beginMatch([myName(), 'Bot Kakera'], [false, true], seed);
+  }
+
+  function startChaosGame() {
+    const seed = Math.floor(Math.random() * 4294967296);
+    L.skins = E.applyCollection(E.buildSkins([L.roster], seed), TFTCollection.pins());
+    L.mode = 'bot';
+    L.viewer = 0;
+    L.scout = null;
+    L.g = E.createChaosGame({ name: myName(), seed, skins: L.skins });
+    openGame();
+    E.nextRound(L.g);
+    enterPhase();
+    stopLoop();
+    L.timerLoop = setInterval(hostTick, 200);
   }
 
   function startRoomGame() {
@@ -394,9 +408,11 @@
     const skins = E.buildSkins([L.roster, ...guests.map(g => g.roster)], seed);
     // as fotos vão para cada convidado: limita o peso da mensagem de início
     const kept = withinPhotoBudget(Object.entries(skins).map(([id, s]) => ({ ...s, id })));
-    L.skins = Object.fromEntries(kept.map(({ id, ...s }) => [id, s]));
+    const shared = Object.fromEntries(kept.map(({ id, ...s }) => [id, s]));
+    // cada um aplica a própria coleção: os convidados recebem só o sorteio
+    L.skins = E.applyCollection(shared, TFTCollection.pins());
     L.inMatch = true;
-    guests.forEach(g => { if (g.conn.open) g.conn.send({ t: 'tft-start', skins: L.skins, viewer: g.idx }); });
+    guests.forEach(g => { if (g.conn.open) g.conn.send({ t: 'tft-start', skins: shared, viewer: g.idx }); });
     beginMatch([L.hostName, ...guests.map(g => g.name)], [], seed);
   }
 
@@ -416,7 +432,7 @@
   function enterPhase() {
     const g = L.g;
     if (g.phase === 'plan') {
-      setDeadline(E.RULES.planSeconds);
+      setDeadline(g.mode === 'chaos' ? 86400 : E.RULES.planSeconds); // no caos não há cronômetro
       runBots();
     } else if (g.phase === 'carousel') {
       setDeadline(E.RULES.carouselSeconds);
@@ -663,6 +679,7 @@
     renderHeader(st);
     renderTraits(st);
     renderItems(st);
+    renderAugments(st);
     if (!L.playing) renderBoard(st);
     renderBench(st);
     renderShop(st);
@@ -687,25 +704,27 @@
   }
 
   function chipHtml(p, own) {
-    const pct = Math.max(0, p.hp);
+    const pct = L.st && L.st.mode === 'chaos' ? Math.max(0, (p.hp / (own ? 3 : 30)) * 100) : Math.max(0, p.hp);
     const streak = p.streak ? `<span class="streak ${p.streak > 0 ? 'hot' : 'cold'}">${p.streak > 0 ? '🔥' : '❄'} ${Math.abs(p.streak)}</span>` : '';
     return `<div class="chip-top"><b>${esc(p.name)}</b>${streak}<span class="chip-meta">Nv ${p.level} · ${p.gold}g${p.ready ? ' · PRONTO' : ''}</span></div>
       <div class="hp-bar ${own ? 'own' : ''}"><i style="width:${pct}%"></i><span>${p.hp}</span></div>`;
   }
 
-  const ROUND_ICON = { pvp: '⚔', pve: '🐾', carousel: '🎁' };
+  const ROUND_ICON = { pvp: '⚔', pve: '🐾', carousel: '🎁', chaos: '🦉', boss: '💀' };
   function renderHeader(st) {
     byId('chipYou').innerHTML = chipHtml(st.you, true);
     byId('chipRival').innerHTML = chipHtml(st.rival, false);
     const r = st.round;
     if (!r) return;
     const phaseName = { plan: 'Planejamento', carousel: 'Carrossel', combat: 'Combate', end: 'Fim' }[st.phase] || '';
-    byId('roundLabel').textContent = `Rodada ${r.label} · ${phaseName}`;
-    const count = r.stage === 1 ? 4 : 7;
+    byId('roundLabel').textContent = st.mode === 'chaos'
+      ? `Caos ${r.label} · ${st.chaos.roundName} · ${st.chaos.lives} vidas · ${st.chaos.score.toLocaleString('pt-BR')} pts`
+      : `Rodada ${r.label} · ${phaseName}`;
+    const count = st.mode === 'chaos' ? 10 : r.stage === 1 ? 4 : 7;
     let track = '';
     for (let n = 1; n <= count; n++) {
-      const idx = r.stage === 1 ? n - 1 : 4 + (r.stage - 2) * 7 + (n - 1);
-      const info = E.roundInfo(idx);
+      const idx = st.mode === 'chaos' ? (r.stage - 1) * 10 + (n - 1) : r.stage === 1 ? n - 1 : 4 + (r.stage - 2) * 7 + (n - 1);
+      const info = E.roundInfo(idx, st.mode);
       track += `<span class="pip ${n === r.n ? 'now' : n < r.n ? 'done' : ''}" title="${info.label}">${ROUND_ICON[info.type]}</span>`;
     }
     byId('roundTrack').innerHTML = track;
@@ -716,11 +735,46 @@
       const left = Math.max(0, L.deadline - Date.now()) / 1000;
       byId('timerBar').style.width = `${Math.min(100, (left / (L.totalTime || 1)) * 100)}%`;
       const btn = byId('btnReady');
-      if (L.st.phase === 'plan') btn.textContent = `${L.st.you.ready ? 'AGUARDANDO' : 'PRONTO'} · ${Math.ceil(left)}s`;
+      if (L.st.phase === 'plan') btn.textContent = L.st.mode === 'chaos' ? 'LUTAR!' : `${L.st.you.ready ? 'AGUARDANDO' : 'PRONTO'} · ${Math.ceil(left)}s`;
       if (L.st.phase === 'carousel') btn.textContent = `ESCOLHA · ${Math.ceil(left)}s`;
       if (L.st.phase === 'combat') btn.textContent = 'EM COMBATE';
     }
     requestAnimationFrame(updateTimer);
+  }
+
+  /* ---------- Aumentos ---------- */
+  const TIER_NAME = { 1: 'Prata', 2: 'Ouro', 3: 'Prismático' };
+  const augIcon = (id, extra = '') => {
+    const a = E.AUG[id];
+    return `<img class="aug-icon tier${a.tier}" src="${esc(asset(a.icon))}" alt="" draggable="false" ${extra}>`;
+  };
+  function renderAugments(st) {
+    const list = byId('augList');
+    const owned = st.you.augments || [];
+    list.innerHTML = owned.length
+      ? owned.map(id => `<span class="aug-chip tier${E.AUG[id].tier}" data-tip="aug:${esc(id)}">${augIcon(id)}<small>${esc(E.AUG[id].name)}</small></span>`).join('')
+      : `<p class="empty">Escolhas em ${st.mode === 'chaos' ? '1-5, 2-5 e 3-5' : '2-1, 3-2 e 4-2'}.</p>`;
+    const box = byId('augPick');
+    const offer = st.you.offer;
+    const choice = st.you.choices && st.you.choices[0];
+    if (!offer && !choice) L.augHidden = false;
+    const open = !L.augHidden && (offer || choice);
+    box.hidden = !open;
+    byId('augReopen').hidden = !(L.augHidden && (offer || choice));
+    if (!open) return;
+    if (offer) {
+      box.innerHTML = `<div class="aug-box"><h2>Escolha um aumento <small class="tier${offer.tier}">${TIER_NAME[offer.tier]}</small></h2>
+        <div class="aug-cards">${offer.opts.map((id, i) => {
+          const a = E.AUG[id];
+          return `<div class="aug-card tier${a.tier}"><button type="button" class="aug-pick-btn" data-augment="${i}">${augIcon(id)}<b>${esc(a.name)}</b><span>${esc(a.desc)}</span></button>
+            <button type="button" class="btn small" data-aug-reroll="${i}" ${offer.rerolled[i] ? 'disabled' : ''}>ATUALIZAR</button></div>`;
+        }).join('')}</div>
+        <button class="link-btn" data-aug-hide>Ver o tabuleiro antes de decidir</button></div>`;
+    } else {
+      box.innerHTML = `<div class="aug-box"><h2>${esc(choice.title)}</h2>
+        <div class="aug-cards">${choice.opts.map((id, i) => `<button type="button" class="aug-card aug-pick-btn" data-choose="${i}"><span class="item">${E.ITEMS[id] ? `<img src="${esc(asset(E.ITEMS[id].icon))}" alt="">` : ''}</span><b>${esc(E.ITEMS[id].name)}</b></button>`).join('')}</div>
+        <button class="link-btn" data-aug-hide>Ver o tabuleiro antes de decidir</button></div>`;
+    }
   }
 
   function renderTraits(st) {
@@ -776,7 +830,7 @@
       const [x, y] = key.split(',').map(Number);
       html += unitHtml(u, x, 3 - y, { mine: true, drag: canEdit ? `h:${x},${y}` : '', drop: `h:${x},${y}` });
     }
-    const foeNote = !st.you.alive ? 'Você está acompanhando a partida' : st.opponent ? `Próximo duelo: ${st.opponent.ghost ? 'Fantasma de ' : ''}${esc(st.players[st.opponent.i].name)}. Tabuleiro oculto até o combate` : 'Tabuleiros dos outros jogadores ocultos até o combate';
+    const foeNote = st.mode === 'chaos' ? `Próximo desafio: ${esc(st.chaos.roundName)}` : !st.you.alive ? 'Você está acompanhando a partida' : st.opponent ? `Próximo duelo: ${st.opponent.ghost ? 'Fantasma de ' : ''}${esc(st.players[st.opponent.i].name)}. Tabuleiro oculto até o combate` : 'Tabuleiros dos outros jogadores ocultos até o combate';
     html += `<div class="foe-note">${foeNote}</div>`;
     board.innerHTML = html;
   }
@@ -856,7 +910,7 @@
   function announceRound(st) {
     const r = st.round;
     const foe = st.opponent ? `${st.opponent.ghost ? 'Fantasma de ' : ''}${st.players[st.opponent.i].name}` : '';
-    const type = r.type === 'pvp' ? `Duelo contra ${foe}` : 'Monstros: rende itens e ouro';
+    const type = st.mode === 'chaos' ? st.chaos.roundName : r.type === 'pvp' ? `Duelo contra ${foe}` : 'Monstros: rende itens e ouro';
     showBanner(`${r.label} · ${type}`, 'info');
   }
   function showResult(res) {
@@ -958,6 +1012,7 @@
 
     const pb = { view, flip, els, metas, mySide, start: performance.now(), frame: -1, raf: 0, ended: false };
     L.playing = pb;
+    TFTFx.begin(board, { flip, els, metas });
     L.lastFight = { view, mySide, spectate };
     hideSummary();
     renderEnemyPanel(pb);
@@ -967,6 +1022,7 @@
       while (pb.frame < idx) { pb.frame++; applyFrame(pb, view.frames[pb.frame]); }
       if (!pb.ended && pb.frame === view.frames.length - 1) {
         pb.ended = true;
+        if (L.fxTest) { L.fxTest.onEnd(); pb.raf = requestAnimationFrame(step); return; }
         byId('btnLastFight').hidden = false;
         L.summaryAuto = true;
         renderSummary();
@@ -978,6 +1034,7 @@
   }
 
   function stopPlayback() {
+    TFTFx.end();
     if (L.playing) cancelAnimationFrame(L.playing.raf);
     L.playing = null;
     byId('enemyPanel').hidden = true;
@@ -1088,6 +1145,8 @@
     const [kind, id, a, b, c] = ev;
     const el = pb.els.get(id);
     if (!el) return;
+    const highFx = TFTFx.isOn();
+    if (highFx) TFTFx.event(ev);
     if (kind === 'x') { if (pb.metas.get(id).creep) floatText(el, '✦ saque', 'lootfx'); }
     else if (kind === 'd') floatText(el, String(a), `dmg-${b}${c ? ' crit' : ''}`);
     else if (kind === 'h') floatText(el, `+${a}`, 'heal');
@@ -1095,7 +1154,7 @@
     else if (kind === 'c') { el.classList.remove('casting'); void el.offsetWidth; el.classList.add('casting'); }
     else if (kind === 'a') {
       const to = pb.els.get(a);
-      if (to) shot(el, to, b);
+      if (to && !highFx) shot(el, to, b);
     } else if (kind === 'sh') { el.classList.remove('shielded'); void el.offsetWidth; el.classList.add('shielded'); }
   }
 
@@ -1276,6 +1335,10 @@
   }
   function tipFor(key) {
     const [kind, a, b, c] = key.split(':');
+    if (kind === 'aug') {
+      const aug = E.AUG[a];
+      return aug ? `<h4>${esc(aug.name)}</h4><p class="tip-sub">${TIER_NAME[aug.tier]}</p><p>${esc(aug.desc)}</p>` : '';
+    }
     if (kind === 'item') {
       const it = E.ITEMS[a];
       if (!it) return '';
@@ -1293,7 +1356,7 @@
           return recipeHtml(a, other, x.id);
         }).join('')}</div>`;
       }
-      return `<h4>${esc(it.name)}</h4>${line ? `<p class="tip-line">${colorStats(esc(line))}</p>` : ''}${E.ITEM_TEXT[a] ? `<p>${colorStats(esc(E.ITEM_TEXT[a]))}</p>` : ''}${recipes}`;
+      return `<h4>${esc(it.name)}</h4>${line ? `<p class="tip-line">${colorStats(esc(line))}</p>` : ''}${E.ITEM_TEXT[a] || it.text ? `<p>${colorStats(esc(E.ITEM_TEXT[a] || it.text))}</p>` : ''}${recipes}`;
     }
     if (kind === 'info') {
       const you = L.st.you;
@@ -1386,7 +1449,20 @@
     byId('rulesBody').innerHTML = rulesHtml();
     try { byId('nameInput').value = localStorage.getItem(NAME_KEY) || ''; } catch (err) { /* sem armazenamento */ }
 
+    TFTFx.init();
+    const qualityEl = byId('qualitySelect');
+    const fpsEl = byId('fpsToggle');
+    qualityEl.value = TFTFx.getQuality();
+    fpsEl.checked = TFTFx.showsFps();
+    byId('fpsToggleBox').hidden = qualityEl.value !== 'high';
+    qualityEl.addEventListener('change', () => {
+      TFTFx.setQuality(qualityEl.value);
+      byId('fpsToggleBox').hidden = qualityEl.value !== 'high';
+    });
+    fpsEl.addEventListener('change', () => TFTFx.setFps(fpsEl.checked));
+
     byId('btnBot').addEventListener('click', startBotGame);
+    byId('btnChaos').addEventListener('click', startChaosGame);
     byId('btnCreate').addEventListener('click', () => createRoom());
     byId('btnJoin').addEventListener('click', joinRoom);
     byId('codeInput').addEventListener('input', ev => { ev.target.value = ev.target.value.toUpperCase().replace(/[^A-Z0-9]/g, ''); });
@@ -1417,6 +1493,14 @@
         render();
         return;
       }
+      const augBtn = ev.target.closest('[data-augment]');
+      if (augBtn) { sendGame({ a: 'augment', i: Number(augBtn.dataset.augment) }); hideTip(); return; }
+      const augRoll = ev.target.closest('[data-aug-reroll]');
+      if (augRoll && !augRoll.disabled) { sendGame({ a: 'augReroll', i: Number(augRoll.dataset.augReroll) }); return; }
+      const chooseBtn = ev.target.closest('[data-choose]');
+      if (chooseBtn) { sendGame({ a: 'choose', i: Number(chooseBtn.dataset.choose) }); return; }
+      if (ev.target.closest('[data-aug-hide]')) { L.augHidden = true; if (L.st) renderAugments(L.st); return; }
+      if (ev.target.closest('#augReopen')) { L.augHidden = false; if (L.st) renderAugments(L.st); return; }
       const buy = ev.target.closest('[data-buy]');
       if (buy) { sendGame({ a: 'buy', slot: Number(buy.dataset.buy) }); hideTip(); return; }
       const pickBtn = ev.target.closest('[data-pick]');
@@ -1456,6 +1540,66 @@
     window.addEventListener('beforeunload', closeNet);
   }
 
+  /* ---------- Vitrine de golpes: tft.html?fxtest ----------
+     Roda o golpe real no motor contra unidades de teste, sem precisar jogar. */
+  function openFxTest() {
+    const champs = E.D.champions.slice().sort((a, b) => a.cost - b.cost || a.name.localeCompare(b.name, 'pt-BR'));
+    const bar = document.createElement('div');
+    bar.className = 'fxtest-bar';
+    bar.innerHTML = `<a class="back-link" href="tft.html">← Sair da vitrine</a>
+      <select id="fxChamp" aria-label="Campeão">${[1, 2, 3, 4, 5].map(cost => `<optgroup label="Custo ${cost}">${champs.filter(c => c.cost === cost).map(c => `<option value="${esc(c.id)}">${E.ABILITIES[c.name].steps ? '★ ' : ''}${esc(c.name)}</option>`).join('')}</optgroup>`).join('')}</select>
+      <button class="btn small" id="fxAgain">REPETIR</button>
+      <label class="fx-check"><input type="checkbox" id="fxAuto"> Passar por todos</label>
+      <label class="fx-check"><input type="checkbox" id="fxStress"> Estresse</label>
+      <select id="fxQuality" aria-label="Qualidade"><option value="high">Alto</option><option value="low">Baixo</option></select>
+      <span class="fxtest-hint">★ = golpe novo nesta etapa</span>`;
+    document.body.appendChild(bar);
+    document.body.classList.add('fxtest');
+    byId('lobby').hidden = true;
+    byId('game').hidden = false;
+    L.skins = {};
+    TFTFx.setQuality('high', false);
+    TFTFx.setFps(true, false);
+
+    const dummy = (name, x, y, extra = {}) => ({ c: E.CH_BY_NAME[name].id, star: 2, x, y, items: [], ...extra });
+    const scene = champ => E.simulate(
+      { units: [{ c: champ, star: 2, x: 3, y: 1, items: [], fullMana: true }] },
+      { units: [dummy('Alistar', 3, 0), dummy('Sejuani', 2, 1), dummy('Braum', 4, 1), dummy('Poppy', 3, 2), dummy('Galio', 1, 2), dummy('Leona', 5, 2)] },
+      Math.floor(Math.random() * 1e9),
+    );
+    const stress = () => {
+      const pool = E.D.champions.filter(c => E.ABILITIES[c.name].steps);
+      const pick = () => pool[Math.floor(Math.random() * pool.length)].id;
+      const team = () => Array.from({ length: 9 }, (_, i) => ({ c: pick(), star: 2, x: i % 7, y: i < 7 ? 2 : 1, items: [], fullMana: true }));
+      return E.simulate({ units: team() }, { units: team() }, Math.floor(Math.random() * 1e9));
+    };
+    let index = 0;
+    const play = () => {
+      const isStress = byId('fxStress').checked;
+      const view = isStress ? stress() : scene(byId('fxChamp').value);
+      const cut = isStress ? 14 : 7;
+      startPlayback({ ...view, names: ['Vitrine', 'Teste'], frames: view.frames.filter(f => f.t <= cut) }, false, false);
+    };
+    L.fxTest = {
+      onEnd() {
+        setTimeout(() => {
+          if (byId('fxAuto').checked && !byId('fxStress').checked) {
+            index = (byId('fxChamp').selectedIndex + 1) % byId('fxChamp').options.length;
+            byId('fxChamp').selectedIndex = index;
+          }
+          if (byId('fxAuto').checked || byId('fxStress').checked) play();
+        }, 700);
+      },
+    };
+    byId('fxAgain').addEventListener('click', play);
+    byId('fxChamp').addEventListener('change', play);
+    byId('fxStress').addEventListener('change', play);
+    byId('fxQuality').addEventListener('change', ev => { TFTFx.setQuality(ev.target.value, false); play(); });
+    play();
+  }
+
   initEvents();
   loadRoster();
+  TFTCollection.init({ esc, safePhoto, asset });
+  if (new URLSearchParams(location.search).has('fxtest')) openFxTest();
 })();

@@ -10,12 +10,12 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Orbitron:wght@500;800&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="tft.css?v=10">
+<link rel="stylesheet" href="tft.css?v=15">
 </head>
 <!--
   Protótipo isolado: autobattler 1v1 com as waifus do tracker.
   Só depende de database.js (leitura dos personagens). Para descartar:
-  apagar tft.html, tft.css, tft.js, tft-engine.js, tft-data.js e o link
+  apagar tft.html, tft.css, tft.js, tft-engine.js, tft-data.js, tft-collection.js, tft-fx.js, tft-augments.js, tft-augments-data.js, tft-chaos.js e o link
   "TFT (TESTE)" do index.html.
 -->
 <body>
@@ -25,12 +25,22 @@
     <a class="back-link" href="index.html">← Voltar ao tracker</a>
     <p class="kicker">MUDAE · <span id="seasonName"></span></p>
     <h1>MUDAE TFT</h1>
-    <p class="lead">Regras, traits e itens do TFT, com as suas waifus no lugar dos campeões. Quanto maior a kakera, maior o custo na loja.</p>
+    <p class="lead">Regras, traits e itens do TFT, com as suas waifus no lugar dos campeões. Quanto maior a kakera, maior o custo na loja, exceto nos campeões que você vincular na coleção.</p>
     <p class="roster" id="rosterInfo">Lendo seus personagens…</p>
+    <button class="btn" id="btnCollection">MONTAR COLEÇÃO</button>
+    <div class="quality-box" id="qualityBox">
+      <label class="field" for="qualitySelect">QUALIDADE DOS EFEITOS</label>
+      <select id="qualitySelect">
+        <option value="low">Baixo: visual simples, para qualquer máquina</option>
+        <option value="high">Alto: cada golpe com seu efeito</option>
+      </select>
+      <label class="quality-check" id="fpsToggleBox"><input type="checkbox" id="fpsToggle"> Mostrar FPS na partida</label>
+    </div>
 
     <label class="field" for="nameInput">SEU NOME</label>
     <input id="nameInput" maxlength="24" placeholder="Seu nome na sala" autocomplete="off">
 
+    <button class="btn chaos-btn" id="btnChaos">🦉 DESAFIO DA HORUJA: MODO CAOS</button>
     <div class="lobby-actions">
       <button class="btn primary" id="btnBot">JOGAR CONTRA O BOT</button>
       <button class="btn" id="btnCreate">CRIAR SALA</button>
@@ -59,6 +69,62 @@
   </div>
 </section>
 
+<section id="collection" class="coll" hidden>
+  <div class="coll-inner">
+    <header class="coll-head">
+      <button class="link-btn" id="collBack">← Voltar ao lobby</button>
+      <h1>MONTAR COLEÇÃO</h1>
+      <p class="lead">Escolha um campeão e o personagem do Mudae que vai aparecer no lugar dele. Quem ficar sem vínculo continua sorteado.</p>
+      <div class="coll-summary">
+        <b id="collCount"></b>
+        <button class="btn small" id="collClear">LIMPAR VÍNCULOS</button>
+      </div>
+      <p class="status" id="collStatus" role="status"></p>
+    </header>
+
+    <div class="coll-filters">
+      <input id="collSearch" placeholder="Buscar campeão" autocomplete="off" aria-label="Buscar campeão">
+      <label class="coll-check"><input type="checkbox" id="collOnlyFree"> Só sem vínculo</label>
+    </div>
+    <div class="coll-traits" id="collTraits"></div>
+    <div id="collGroups"></div>
+    <p class="coll-empty" id="collEmpty" hidden>Nenhum campeão com esses filtros.</p>
+  </div>
+
+  <div class="coll-modal" id="collModal" hidden>
+    <div class="coll-panel" role="dialog" aria-modal="true" aria-labelledby="collChampName">
+      <button class="btn small coll-close" id="collClose">FECHAR</button>
+      <div class="coll-champ" id="collChamp"></div>
+      <div class="coll-picker">
+        <h3>Personagem do Mudae</h3>
+        <div class="coll-picker-filters">
+          <input id="collCharSearch" placeholder="Nome ou série" autocomplete="off" aria-label="Buscar por nome ou série">
+          <select id="collCharClaim" aria-label="Situação">
+            <option value="">Todas as situações</option>
+            <option value="claimed">No harém</option>
+            <option value="unclaimed">Não reivindicados</option>
+          </select>
+          <select id="collCharCategory" aria-label="Categoria">
+            <option value="">Todas as categorias</option>
+            <option value="favoritos">Favoritos</option>
+            <option value="estrelas">Estrelas</option>
+            <option value="comuns">Comuns</option>
+          </select>
+          <select id="collCharGender" aria-label="Roleta">
+            <option value="">Todas as roletas</option>
+            <option value="wa">$wa</option>
+            <option value="wg">$wg</option>
+            <option value="ha">$ha</option>
+            <option value="hg">$hg</option>
+          </select>
+        </div>
+        <p class="coll-char-count" id="collCharCount"></p>
+        <div class="coll-chars" id="collChars"></div>
+      </div>
+    </div>
+  </div>
+</section>
+
 <section id="game" class="game" hidden>
   <header class="topline">
     <div class="player-chip you" id="chipYou"></div>
@@ -76,6 +142,9 @@
       <div id="traitList" class="trait-list"></div>
       <h2>ITENS</h2>
       <div id="itemBench" class="item-bench"></div>
+      <h2>AUMENTOS</h2>
+      <div id="augList" class="aug-list"></div>
+      <button class="link-btn" id="augReopen" hidden>Decidir aumento</button>
     </aside>
 
     <div class="center">
@@ -121,11 +190,13 @@
     <div class="sell-hint" id="sellHint" hidden></div>
   </footer>
 
+  <div class="aug-pick" id="augPick" hidden></div>
   <div class="banner" id="banner" hidden></div>
   <div class="carousel" id="carousel" hidden></div>
   <div class="summary" id="summary" hidden></div>
 </section>
 
+<div class="fx-fps" id="fxFps" role="status" hidden></div>
 <div class="end-screen" id="endScreen" hidden></div>
 <div class="tip" id="tip" hidden></div>
 <div class="toast" id="toast" role="status"></div>
@@ -140,7 +211,12 @@
 
 <script src="database.js?v=53"></script>
 <script src="tft-data.js?v=1"></script>
-<script src="tft-engine.js?v=6"></script>
-<script src="tft.js?v=10"></script>
+<script src="tft-augments-data.js?v=1"></script>
+<script src="tft-augments.js?v=1"></script>
+<script src="tft-chaos.js?v=1"></script>
+<script src="tft-engine.js?v=11"></script>
+<script src="tft-fx.js?v=1"></script>
+<script src="tft-collection.js?v=3"></script>
+<script src="tft.js?v=15"></script>
 </body>
 </html>
