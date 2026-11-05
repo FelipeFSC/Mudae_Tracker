@@ -10,7 +10,7 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Orbitron:wght@500;800&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="tft.css?v=1">
+<link rel="stylesheet" href="tft.css?v=10">
 </head>
 <!--
   Protótipo isolado: autobattler 1v1 com as waifus do tracker.
@@ -21,7 +21,7 @@
 <body>
 
 <section id="lobby" class="lobby">
-  <div class="lobby-box">
+  <div class="lobby-box" id="lobbyBox">
     <a class="back-link" href="index.html">← Voltar ao tracker</a>
     <p class="kicker">MUDAE · <span id="seasonName"></span></p>
     <h1>MUDAE TFT</h1>
@@ -33,17 +33,26 @@
 
     <div class="lobby-actions">
       <button class="btn primary" id="btnBot">JOGAR CONTRA O BOT</button>
-      <button class="btn" id="btnCreate">CRIAR SALA 1V1</button>
+      <button class="btn" id="btnCreate">CRIAR SALA</button>
     </div>
     <div class="join-row">
       <input id="codeInput" maxlength="6" placeholder="CÓDIGO" autocomplete="off" spellcheck="false" aria-label="Código da sala">
       <button class="btn" id="btnJoin">ENTRAR</button>
     </div>
     <div class="room-box" id="roomBox" hidden>
-      <span>CÓDIGO DA SALA</span>
-      <strong id="roomCode">------</strong>
-      <button class="btn small" id="btnCopy">COPIAR</button>
-      <button class="btn small" id="btnCancelRoom">CANCELAR</button>
+      <div class="room-code">
+        <span>CÓDIGO DA SALA</span>
+        <strong id="roomCode">------</strong>
+        <button class="btn small" id="btnCopy">COPIAR</button>
+      </div>
+      <div class="room-head"><b>Jogadores</b><span id="roomCount"></span></div>
+      <ol class="room-players" id="roomPlayers"></ol>
+      <div class="room-timer" id="roomTimer" role="status" hidden></div>
+      <p class="room-hint" id="roomHint"></p>
+      <div class="room-actions">
+        <button class="btn primary" id="btnRoomReady">ESTOU PRONTO</button>
+        <button class="btn" id="btnCancelRoom">SAIR DA SALA</button>
+      </div>
     </div>
     <p class="status" id="lobbyStatus" role="status"></p>
     <button class="link-btn" data-open-rules>Ver regras desta season</button>
@@ -75,32 +84,46 @@
     </div>
 
     <aside class="side right">
-      <h2>PARTIDA</h2>
-      <ol id="logList" class="log-list"></ol>
+      <h2>JOGADORES</h2>
+      <div id="playerList" class="player-list"></div>
+      <h2 id="rivalTraitsTitle"></h2>
+      <div id="rivalTraits" class="trait-list"></div>
+      <div id="enemyPanel" class="enemy-panel" hidden></div>
+      <div id="matchPanel" class="match-panel">
+        <h2>PARTIDA</h2>
+        <ol id="logList" class="log-list"></ol>
+      </div>
+      <button class="link-btn" id="btnLastFight" hidden>📊 Gráficos da última luta</button>
       <button class="link-btn" data-open-rules>Regras</button>
       <button class="link-btn" id="btnQuit">Sair da partida</button>
     </aside>
   </div>
 
   <footer class="shop-bar" id="shopBar" data-drop="sell">
-    <div class="eco">
-      <div class="gold" id="goldBox"></div>
-      <div class="level" id="levelBox"></div>
-      <div class="eco-btns">
-        <button class="btn small" id="btnXp"></button>
-        <button class="btn small" id="btnReroll"></button>
+    <div class="shop-strip">
+      <div class="level-box" id="levelBox" data-tip="info:xp"></div>
+      <div class="odds" id="oddsBox" data-tip="info:odds"></div>
+      <div class="money">
+        <div class="gold" id="goldBox"></div>
+        <div class="interest" id="interestBox" data-tip="info:interest"></div>
       </div>
+      <div class="field-count" id="fieldCount"></div>
+      <button type="button" class="lock-btn" id="btnLock"></button>
     </div>
-    <div class="shop" id="shop"></div>
-    <div class="turn-btns">
-      <button class="btn small" id="btnLock"></button>
-      <button class="btn primary" id="btnReady"></button>
+    <div class="shop-body">
+      <div class="eco-btns">
+        <button type="button" class="eco-btn" id="btnXp"></button>
+        <button type="button" class="eco-btn" id="btnReroll"></button>
+      </div>
+      <div class="shop" id="shop"></div>
+      <button type="button" class="btn primary ready-btn" id="btnReady"></button>
     </div>
     <div class="sell-hint" id="sellHint" hidden></div>
   </footer>
 
   <div class="banner" id="banner" hidden></div>
   <div class="carousel" id="carousel" hidden></div>
+  <div class="summary" id="summary" hidden></div>
 </section>
 
 <div class="end-screen" id="endScreen" hidden></div>
@@ -117,7 +140,7 @@
 
 <script src="database.js?v=53"></script>
 <script src="tft-data.js?v=1"></script>
-<script src="tft-engine.js?v=1"></script>
-<script src="tft.js?v=1"></script>
+<script src="tft-engine.js?v=6"></script>
+<script src="tft.js?v=10"></script>
 </body>
 </html>

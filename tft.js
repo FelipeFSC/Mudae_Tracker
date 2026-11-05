@@ -2,8 +2,9 @@
    TFT.JS — tela e conexão do Mudae TFT (protótipo)
    ------------------------------------------------------------
    Conexão igual à da Waifu Arena: WebRTC via PeerJS, sala com código
-   de 6 letras, sem servidor próprio. O anfitrião roda o motor
-   (tft-engine.js); o convidado envia ações e desenha o estado.
+   de 6 letras, sem servidor próprio. Cabem de 2 a 8 jogadores, todos
+   ligados ao anfitrião: ele roda o motor (tft-engine.js) e os
+   convidados enviam ações e desenham o estado.
    ============================================================ */
 (() => {
   'use strict';
@@ -16,7 +17,12 @@
   const ASSET_BASE = 'https://raw.communitydragon.org/latest/game/';
   const MAX_ROSTER = 120;
   const MAX_DATA_PHOTO = 60000;
+  const DATA_PHOTO_BUDGET = 1500000;   // fotos salvas no tracker que cada mensagem pode carregar
+  const MAX_PLAYERS = 8;
+  const MIN_PLAYERS = 2;
+  const COUNTDOWN_SECONDS = 3;
   const HEARTBEAT_LIMIT = 15000;
+  const SUMMARY_SECONDS = 6;   // tempo para ver os gráficos antes da próxima rodada
 
   const byId = id => document.getElementById(id);
   const esc = s => String(s == null ? '' : s).replace(/[&<>"']/g, ch => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[ch]));
@@ -31,8 +37,10 @@
     roster: [], mode: null,            // 'bot' | 'host' | 'guest'
     g: null, st: null, skins: {},       // g só existe no anfitrião
     viewer: 0, deadline: 0, totalTime: 1,
-    peer: null, conn: null, code: null, rivalRoster: [], rivalName: '',
-    playing: null, timerLoop: null,
+    peer: null, conn: null, code: null,       // conn: só o convidado (ligação com o anfitrião)
+    guests: new Map(),                         // anfitrião: peerId → { conn, name, ready, roster, lastSeen, idx }
+    hostReady: false, inMatch: false, countdown: null, room: null, scout: null,
+    playing: null, timerLoop: null, preview: {}, snap: new Map(), lastFight: null, summaryAuto: false,
   };
 
   /* ---------- Toast ---------- */
@@ -51,9 +59,18 @@
     if (photo.startsWith('data:') && photo.length > MAX_DATA_PHOTO) photo = '';
     return { name: String(c.name || '').slice(0, 60), series: c.series && c.series !== '—' ? String(c.series).slice(0, 60) : '', photo, kakera: Number(c.kakera) || 0 };
   }
+  /* limita as fotos salvas no próprio tracker: as de link quase não pesam */
+  function withinPhotoBudget(list) {
+    let used = 0;
+    return list.map(c => {
+      if (!c.photo || !c.photo.startsWith('data:')) return c;
+      used += c.photo.length;
+      return used > DATA_PHOTO_BUDGET ? { ...c, photo: '' } : c;
+    });
+  }
   function cleanRoster(list) {
     if (!Array.isArray(list)) return [];
-    return list.slice(0, MAX_ROSTER).filter(c => c && typeof c === 'object' && c.name).map(rosterPayload);
+    return withinPhotoBudget(list.slice(0, MAX_ROSTER).filter(c => c && typeof c === 'object' && c.name).map(rosterPayload));
   }
   async function loadRoster() {
     const info = byId('rosterInfo');
@@ -61,7 +78,7 @@
       await Database.init();
       const all = await Database.getAllCharacters();
       const claimed = all.filter(c => c.claimed !== false && c.name);
-      L.roster = claimed.sort(() => Math.random() - 0.5).slice(0, MAX_ROSTER).map(rosterPayload);
+      L.roster = withinPhotoBudget(claimed.sort(() => Math.random() - 0.5).slice(0, MAX_ROSTER).map(rosterPayload));
       info.textContent = claimed.length
         ? `${claimed.length} personagens no perfil ativo. Até 60 entram em cada partida.`
         : 'Nenhum personagem no perfil ativo: quem faltar aparece como o campeão original.';
@@ -97,50 +114,136 @@
 
   function closeNet() {
     if (L.conn) try { L.conn.close(); } catch (err) { /* ignora */ }
+    for (const g of L.guests.values()) try { g.conn.close(); } catch (err) { /* ignora */ }
     if (L.peer) try { L.peer.destroy(); } catch (err) { /* ignora */ }
+    clearInterval(L.heartbeat);
+    cancelCountdown();
+    L.guests.clear();
     L.conn = null;
     L.peer = null;
     L.code = null;
+    L.room = null;
+    L.hostReady = false;
+    L.inMatch = false;
+  }
+
+  /* ---------- Sala: anfitrião ---------- */
+  function hostList() {
+    return [
+      { name: L.hostName, ready: L.hostReady, host: true },
+      ...[...L.guests.values()].filter(g => g.name).map(g => ({ name: g.name, ready: g.ready, host: false })),
+    ];
+  }
+  /* nome único na sala: "Ana", "Ana (2)"… */
+  function uniqueName(wanted) {
+    const taken = new Set(hostList().map(p => p.name));
+    if (!taken.has(wanted)) return wanted;
+    let i = 2;
+    while (taken.has(`${wanted} (${i})`)) i++;
+    return `${wanted} (${i})`;
+  }
+  const sendAllGuests = msg => { for (const g of L.guests.values()) if (g.name && g.conn.open) g.conn.send(msg); };
+
+  function publishRoom() {
+    const room = { code: L.code, players: hostList(), count: L.countdown ? L.countdown.left : null };
+    sendAllGuests({ t: 'tft-room', room });
+    L.room = room;
+    renderRoom();
+  }
+
+  /* todos prontos: 3 segundos e começa. Qualquer mudança na sala cancela. */
+  function roomChanged() {
+    const list = hostList();
+    const allReady = list.length >= MIN_PLAYERS && list.every(p => p.ready);
+    if (L.inMatch) return;
+    if (!allReady) cancelCountdown();
+    else if (!L.countdown) startCountdown();
+    publishRoom();
+  }
+  function startCountdown() {
+    L.countdown = { left: COUNTDOWN_SECONDS, timer: setInterval(() => {
+      L.countdown.left--;
+      if (L.countdown.left <= 0) { cancelCountdown(); startRoomGame(); return; }
+      publishRoom();
+    }, 1000) };
+  }
+  function cancelCountdown() {
+    if (L.countdown) clearInterval(L.countdown.timer);
+    L.countdown = null;
   }
 
   async function createRoom(attempt = 0) {
     lobbyStatus('Criando sala…');
     try { await loadPeerJs(); } catch (err) { return lobbyStatus(err.message); }
+    L.hostName = myName();
     const code = newCode();
     const peer = new window.Peer(ID_PREFIX + code);
     L.peer = peer;
     peer.on('open', () => {
       L.code = code;
       L.mode = 'host';
-      byId('roomCode').textContent = code;
-      byId('roomBox').hidden = false;
-      lobbyStatus('Mande o código para o outro jogador. Mantenha esta aba aberta.');
+      lobbyStatus('');
+      startHeartbeat();
+      publishRoom();
     });
-    peer.on('connection', conn => {
-      if (L.conn) { conn.on('open', () => { conn.send({ t: 'tft-full' }); setTimeout(() => conn.close(), 300); }); return; }
-      L.conn = conn;
-      conn.on('data', msg => onHostMessage(msg));
-      conn.on('close', onRivalGone);
-      conn.on('error', onRivalGone);
-    });
+    peer.on('connection', onGuestConnection);
     peer.on('error', err => {
       if (err.type === 'unavailable-id' && attempt < 3) { peer.destroy(); return createRoom(attempt + 1); }
+      // convidado que falhou ao conectar não derruba a sala
+      if (L.mode === 'host' && err.type === 'peer-unavailable') return;
       lobbyStatus(`Erro de conexão: ${err.type || err.message}`);
+    });
+    peer.on('disconnected', () => {
+      if (L.mode === 'host' && !L.inMatch) lobbyStatus('Sem contato com o servidor de encontro: novos jogadores não conseguem entrar.');
     });
   }
 
-  function onHostMessage(msg) {
-    if (!msg || typeof msg !== 'object') return;
-    L.lastSeen = Date.now();
-    if (msg.t === 'tft-hello') {
-      L.rivalName = cleanName(msg.name);
-      L.rivalRoster = cleanRoster(msg.roster);
-      startHeartbeat();
-      startHostGame(false);
+  function onGuestConnection(conn) {
+    if (L.inMatch || L.guests.size >= MAX_PLAYERS - 1 || L.countdown) {
+      const reason = L.inMatch ? 'A partida desta sala já começou.' : L.countdown ? 'A partida está para começar. Tente de novo em instantes.' : `A sala já tem ${MAX_PLAYERS} jogadores.`;
+      conn.on('open', () => { conn.send({ t: 'tft-full', reason }); setTimeout(() => conn.close(), 300); });
+      return;
     }
-    if (msg.t === 'tft-act' && L.g) hostAct(1, msg.a);
+    L.guests.set(conn.peer, { conn, name: null, ready: false, roster: [], lastSeen: Date.now(), idx: null });
+    conn.on('data', msg => onHostMessage(conn.peer, msg));
+    conn.on('close', () => onGuestGone(conn.peer, 'conexão fechada'));
+    conn.on('error', err => onGuestGone(conn.peer, `erro: ${err && (err.type || err.message)}`));
   }
 
+  function onHostMessage(id, msg) {
+    const guest = L.guests.get(id);
+    if (!guest || !msg || typeof msg !== 'object') return;
+    guest.lastSeen = Date.now();
+    if (msg.t === 'tft-hello' && !guest.name) {
+      guest.name = uniqueName(cleanName(msg.name));
+      guest.roster = cleanRoster(msg.roster);
+      guest.conn.send({ t: 'tft-welcome', name: guest.name });
+      roomChanged();
+    }
+    if (msg.t === 'tft-ready' && guest.name && !L.inMatch) {
+      guest.ready = !!msg.ready;
+      roomChanged();
+    }
+    if (msg.t === 'tft-act' && L.g && guest.idx != null) hostAct(guest.idx, msg.a);
+  }
+
+  function onGuestGone(id, reason) {
+    const guest = L.guests.get(id);
+    if (!guest) return;
+    console.warn('[Mudae TFT]', guest.name, 'saiu:', reason);
+    L.guests.delete(id);
+    if (L.inMatch && L.g && guest.idx != null) {
+      E.dropPlayer(L.g, guest.idx);
+      if (L.g.phase === 'end') stopLoop();
+      broadcastState();
+      if (L.g.phase === 'end') finishMatch();
+      else if (allDecided()) advance();
+      return;
+    }
+    if (guest.name) roomChanged();
+  }
+
+  /* ---------- Sala: convidado ---------- */
   async function joinRoom() {
     const code = byId('codeInput').value.trim().toUpperCase();
     if (!/^[A-Z0-9]{6}$/.test(code)) return lobbyStatus('Digite o código de 6 letras da sala.');
@@ -155,39 +258,61 @@
       L.conn = conn;
       let opened = false;
       const timeout = setTimeout(() => {
-        if (!opened) { closeNet(); lobbyStatus('Não deu para conectar. Confira o código ou se a sala está aberta.'); }
+        if (!opened) { closeNet(); L.mode = null; lobbyStatus('Não deu para conectar. Confira o código ou se a sala está aberta.'); }
       }, 15000);
       conn.on('open', () => {
         opened = true;
         clearTimeout(timeout);
-        lobbyStatus('Conectado. Preparando a partida…');
+        lobbyStatus('Conectado. Entrando na sala…');
         conn.send({ t: 'tft-hello', name, roster: L.roster });
+        startHeartbeat();
       });
       conn.on('data', onGuestMessage);
-      conn.on('close', onRivalGone);
+      conn.on('close', onHostGone);
     });
     peer.on('error', err => {
       lobbyStatus(err.type === 'peer-unavailable' ? 'Sala não encontrada. Confira o código.' : `Erro de conexão: ${err.type || err.message}`);
       closeNet();
+      L.mode = null;
     });
   }
 
   function onGuestMessage(msg) {
     if (!msg || typeof msg !== 'object') return;
     L.lastSeen = Date.now();
-    if (msg.t === 'tft-full') { closeNet(); lobbyStatus('A sala já tem dois jogadores.'); }
-    if (msg.t === 'tft-start') { L.skins = msg.skins || {}; L.viewer = 1; startHeartbeat(); openGame(); }
+    if (msg.t === 'tft-full') { const reason = msg.reason; closeNet(); L.mode = null; lobbyStatus(reason || 'Não deu para entrar na sala.'); }
+    if (msg.t === 'tft-welcome') { L.myRoomName = msg.name; lobbyStatus(''); }
+    if (msg.t === 'tft-room') {
+      L.room = msg.room;
+      L.code = msg.room.code;
+      renderRoom();
+    }
+    if (msg.t === 'tft-start') {
+      L.skins = msg.skins || {};
+      L.viewer = msg.viewer;
+      L.inMatch = true;
+      openGame();
+    }
     if (msg.t === 'tft-state') applyState(msg.st, msg.left, msg.total);
-    if (msg.t === 'tft-combat') startPlayback(msg.view, msg.flip);
+    if (msg.t === 'tft-combat') startPlayback(msg.view, msg.flip, msg.spectate);
     if (msg.t === 'tft-err') toast(msg.text);
   }
 
-  function onRivalGone() {
-    if (!L.conn && L.mode !== 'guest') return;
-    if (L.st && L.st.phase === 'end') return;
-    if (byId('game').hidden) { closeNet(); lobbyStatus('A conexão com o outro jogador caiu.'); byId('roomBox').hidden = true; return; }
-    stopLoop();
-    showEnd('A conexão caiu', 'O outro jogador saiu da partida.', false);
+  function onHostGone() {
+    if (L.mode !== 'guest' || !L.conn) return;
+    const midMatch = L.inMatch && L.st && L.st.phase !== 'end';
+    const onGame = !byId('game').hidden;
+    closeNet();
+    if (onGame) {
+      L.mode = 'gone';
+      if (midMatch) showEnd('A conexão caiu', 'O anfitrião saiu e a partida acabou.');
+      else if (byId('endScreen').hidden) leaveGame();
+      else { const back = byId('btnBackRoom'); if (back) back.remove(); }
+    } else {
+      L.mode = null;
+      renderRoom();
+      lobbyStatus('O anfitrião fechou a sala.');
+    }
   }
 
   /* sinal de presença: fechar a aba de repente demora a derrubar o WebRTC */
@@ -195,10 +320,58 @@
     clearInterval(L.heartbeat);
     L.lastSeen = Date.now();
     L.heartbeat = setInterval(() => {
-      if (!L.conn) return clearInterval(L.heartbeat);
-      if (L.conn.open) L.conn.send({ t: 'tft-ping' });
-      if (Date.now() - L.lastSeen > HEARTBEAT_LIMIT) { clearInterval(L.heartbeat); onRivalGone(); }
+      const now = Date.now();
+      if (L.mode === 'host') {
+        for (const [id, g] of [...L.guests]) {
+          if (g.conn.open) g.conn.send({ t: 'tft-ping' });
+          if (now - g.lastSeen > HEARTBEAT_LIMIT) onGuestGone(id, `sem sinal há ${Math.round((now - g.lastSeen) / 1000)}s`);
+        }
+      } else if (L.conn) {
+        if (L.conn.open) L.conn.send({ t: 'tft-ping' });
+        if (now - L.lastSeen > HEARTBEAT_LIMIT) onHostGone();
+      }
     }, 2000);
+  }
+
+  /* desenha a sala de espera */
+  function renderRoom() {
+    const box = byId('lobbyBox');
+    const room = L.room;
+    const inRoom = !!room && (L.mode === 'host' || L.mode === 'guest');
+    box.classList.toggle('in-room', inRoom);
+    byId('roomBox').hidden = !inRoom;
+    if (!inRoom) return;
+    byId('roomCode').textContent = room.code;
+    byId('roomCount').textContent = `${room.players.length}/${MAX_PLAYERS}`;
+    const me = L.mode === 'host' ? L.hostName : L.myRoomName;
+    byId('roomPlayers').innerHTML = room.players.map(p => `<li class="${p.ready ? 'ready' : ''}">
+      <b>${esc(p.name)}</b>
+      ${p.host ? '<span class="room-tag">ANFITRIÃO</span>' : ''}${p.name === me ? '<span class="room-tag you">VOCÊ</span>' : ''}
+      <em>${p.ready ? '✓ Pronto' : 'Aguardando'}</em>
+    </li>`).join('');
+    const mine = room.players.find(p => p.name === me);
+    const ready = !!(mine && mine.ready);
+    const btn = byId('btnRoomReady');
+    btn.textContent = ready ? 'CANCELAR PRONTO' : 'ESTOU PRONTO';
+    btn.classList.toggle('on', ready);
+    const timer = byId('roomTimer');
+    timer.hidden = room.count == null;
+    if (room.count != null) timer.textContent = `A partida começa em ${room.count}…`;
+    const waitingFor = room.players.filter(p => !p.ready).length;
+    byId('roomHint').textContent = room.players.length < MIN_PLAYERS
+      ? 'Mande o código para os outros jogadores. A partida precisa de pelo menos 2.'
+      : room.count != null ? 'Quem cancelar o pronto interrompe a contagem.'
+      : waitingFor ? `Falta ${waitingFor} jogador${waitingFor > 1 ? 'es' : ''} ficar pronto. Cabem até ${MAX_PLAYERS}.` : '';
+  }
+
+  function toggleRoomReady() {
+    if (L.mode === 'host') {
+      L.hostReady = !L.hostReady;
+      roomChanged();
+    } else if (L.conn && L.conn.open && L.room) {
+      const mine = L.room.players.find(p => p.name === L.myRoomName);
+      L.conn.send({ t: 'tft-ready', ready: !(mine && mine.ready) });
+    }
   }
 
   const sendGame = act => {
@@ -207,15 +380,30 @@
   };
 
   /* ---------- Anfitrião: fluxo do jogo ---------- */
-  function startHostGame(vsBot) {
+  function startBotGame() {
     const seed = Math.floor(Math.random() * 4294967296);
-    const name = myName();
-    const rosters = vsBot ? [L.roster] : [L.roster, L.rivalRoster];
-    L.skins = E.buildSkins(rosters, seed);
-    L.mode = vsBot ? 'bot' : 'host';
+    L.skins = E.buildSkins([L.roster], seed);
+    L.mode = 'bot';
+    beginMatch([myName(), 'Bot Kakera'], [false, true], seed);
+  }
+
+  function startRoomGame() {
+    const seed = Math.floor(Math.random() * 4294967296);
+    const guests = [...L.guests.values()].filter(g => g.name);
+    guests.forEach((g, i) => { g.idx = i + 1; });
+    const skins = E.buildSkins([L.roster, ...guests.map(g => g.roster)], seed);
+    // as fotos vão para cada convidado: limita o peso da mensagem de início
+    const kept = withinPhotoBudget(Object.entries(skins).map(([id, s]) => ({ ...s, id })));
+    L.skins = Object.fromEntries(kept.map(({ id, ...s }) => [id, s]));
+    L.inMatch = true;
+    guests.forEach(g => { if (g.conn.open) g.conn.send({ t: 'tft-start', skins: L.skins, viewer: g.idx }); });
+    beginMatch([L.hostName, ...guests.map(g => g.name)], [], seed);
+  }
+
+  function beginMatch(names, bots, seed) {
     L.viewer = 0;
-    L.g = E.createGame({ names: [name, vsBot ? 'Bot Kakera' : L.rivalName], seed, bots: [false, vsBot], skins: L.skins });
-    if (!vsBot) L.conn.send({ t: 'tft-start', skins: L.skins });
+    L.scout = null;
+    L.g = E.createGame({ names, seed, bots, skins: L.skins });
     openGame();
     E.nextRound(L.g);
     enterPhase();
@@ -229,13 +417,13 @@
     const g = L.g;
     if (g.phase === 'plan') {
       setDeadline(E.RULES.planSeconds);
-      runBot();
+      runBots();
     } else if (g.phase === 'carousel') {
       setDeadline(E.RULES.carouselSeconds);
-      runBot();
+      runBots();
     }
     broadcastState();
-    if (bothDecided()) advance();
+    if (allDecided()) advance();
   }
 
   function setDeadline(sec) {
@@ -243,17 +431,21 @@
     L.totalTime = sec;
   }
 
-  function runBot() {
+  function runBots() {
     const g = L.g;
-    if (!g.players[1].bot) return;
-    if (g.phase === 'carousel') E.botCarousel(g, 1);
-    else E.botPlan(g, 1);
+    g.players.forEach((p, i) => {
+      if (!p.bot || !p.alive) return;
+      if (g.phase === 'carousel') E.botCarousel(g, i);
+      else E.botPlan(g, i);
+    });
   }
 
-  function bothDecided() {
+  function allDecided() {
     const g = L.g;
-    if (g.phase === 'plan') return g.players.every(p => p.ready);
-    if (g.phase === 'carousel') return g.players.every(p => p.picked);
+    if (!g) return false;
+    const alive = g.players.filter(p => p.alive);
+    if (g.phase === 'plan') return alive.every(p => p.ready);
+    if (g.phase === 'carousel') return alive.every(p => p.picked);
     return false;
   }
 
@@ -265,23 +457,41 @@
       enterPhase();
     } else if (g.phase === 'plan') {
       const combat = E.startCombat(g);
-      const view = combat.views[0];
-      // no PvP o convidado é o lado 1; contra monstros cada um tem o seu combate
-      if (L.mode === 'host') L.conn.send({ t: 'tft-combat', view: combat.views[1], flip: combat.kind === 'pvp' });
-      setDeadline(Math.max(...combat.views.map(v => v.duration)) + 2.2);
+      // cada um recebe só o próprio combate; quem saiu da partida acompanha o primeiro
+      for (const guest of L.guests.values()) {
+        if (guest.idx == null || !guest.conn.open) continue;
+        const v = E.viewFor(g, guest.idx);
+        if (v) guest.conn.send({ t: 'tft-combat', view: v.view, flip: v.flip, spectate: v.spectate });
+      }
+      setDeadline(Math.max(...combat.fights.map(f => f.duration)) + SUMMARY_SECONDS);
       broadcastState();
-      startPlayback(view, false);
+      const mine = E.viewFor(g, 0);
+      if (mine) startPlayback(mine.view, mine.flip, mine.spectate);
     } else if (g.phase === 'combat') {
       E.finishCombat(g);
-      if (g.phase === 'end') { broadcastState(); stopLoop(); return; }
+      if (g.phase === 'end') {
+        stopLoop();
+        broadcastState();
+        finishMatch();
+        return;
+      }
       enterPhase();
     }
+  }
+
+  /* fim da partida: a sala continua aberta e volta a esperar todos ficarem prontos */
+  function finishMatch() {
+    if (L.mode !== 'host') return;
+    L.inMatch = false;
+    L.hostReady = false;
+    for (const g of L.guests.values()) { g.ready = false; g.idx = null; }
+    publishRoom();
   }
 
   function hostTick() {
     if (!L.g || L.g.phase === 'end') return;
     if (Date.now() >= L.deadline) advance();
-    else if (bothDecided()) advance();
+    else if (allDecided()) advance();
   }
 
   function hostAct(who, action) {
@@ -289,8 +499,8 @@
     if (!g || !action || typeof action !== 'object') return;
     const err = E.act(g, who, action);
     if (err) {
-      if (who === L.viewer) toast(err);
-      else if (L.conn && L.conn.open) L.conn.send({ t: 'tft-err', text: err });
+      if (who === 0) toast(err);
+      else for (const guest of L.guests.values()) if (guest.idx === who && guest.conn.open) guest.conn.send({ t: 'tft-err', text: err });
     }
     broadcastState();
   }
@@ -298,25 +508,49 @@
   function broadcastState() {
     const g = L.g;
     const left = Math.max(0, (L.deadline - Date.now()) / 1000);
-    if (L.mode === 'host' && L.conn && L.conn.open) L.conn.send({ t: 'tft-state', st: E.publicState(g, 1), left, total: L.totalTime });
+    for (const guest of L.guests.values()) {
+      if (guest.idx != null && guest.conn.open) guest.conn.send({ t: 'tft-state', st: E.publicState(g, guest.idx), left, total: L.totalTime });
+    }
     applyState(E.publicState(g, 0), left, L.totalTime);
+  }
+
+  /* quem aparece como "o rival" na tela: o que você escolheu na lista, ou o próximo duelo */
+  function pickRival(st) {
+    const others = st.players.filter(p => p.i !== st.viewer);
+    const scouted = L.scout != null ? others.find(p => p.i === L.scout) : null;
+    if (scouted) return scouted;
+    if (st.opponent) return st.players[st.opponent.i];
+    return others.find(p => p.alive) || others[0];
   }
 
   function applyState(st, left, total) {
     const prevRound = L.st && L.st.round && L.st.round.label;
     const prevPhase = L.st && L.st.phase;
+    const wasAlive = !L.st || L.st.you.alive;
+    if (st.round && st.round.label !== prevRound) L.scout = null;
+    st.rival = pickRival(st);
     L.st = st;
     L.deadline = Date.now() + (left || 0) * 1000;
     L.totalTime = total || 1;
     // terminou o combate: volta a mostrar o campo de planejamento
     if (st.phase !== 'combat' && L.playing) stopPlayback();
-    if (prevPhase === 'combat' && st.phase !== 'combat') showResult(st.you.lastResult);
-    render();
-    if (st.round && st.round.label !== prevRound && st.round.type !== 'carousel') announceRound(st.round);
-    if (st.phase === 'end') {
-      const won = st.winner === st.viewer;
-      showEnd(st.winner === -1 ? 'Empate!' : won ? 'Vitória!' : 'Derrota', `${st.you.name} ${st.you.hp} × ${st.rival.hp} ${st.rival.name}, na rodada ${st.round.label}.`, L.mode !== 'guest');
+    if (prevPhase === 'combat' && st.phase !== 'combat') {
+      if (L.summaryAuto) hideSummary();
+      showResult(st.you.lastResult);
     }
+    render();
+    showUnitChanges(st);
+    if (st.round && st.round.label !== prevRound && st.round.type !== 'carousel' && st.you.alive) announceRound(st);
+    if (wasAlive && !st.you.alive && st.phase !== 'end') {
+      showBanner(`Você terminou em ${st.you.placement}º. Pode acompanhar a partida ou sair.`, 'bad');
+    }
+    if (st.phase === 'end') showMatchEnd(st);
+  }
+
+  function showMatchEnd(st) {
+    const place = st.you.placement;
+    const title = st.winner === -1 && place === 1 ? 'Empate!' : place === 1 ? 'Vitória!' : st.players.length === 2 ? 'Derrota' : `${place}º lugar`;
+    showEnd(title, `Fim na rodada ${st.round.label}.`, st.players);
   }
 
   /* ---------- Abrir / sair ---------- */
@@ -327,35 +561,50 @@
     if (!L.timerStarted) { L.timerStarted = true; requestAnimationFrame(updateTimer); }
   }
 
-  function leaveGame() {
+  function resetMatchView() {
     stopLoop();
     stopPlayback();
-    closeNet();
-    Object.assign(L, { g: null, st: null, mode: null, rivalRoster: [], rivalName: '' });
+    hideSummary();
+    Object.assign(L, { g: null, st: null, snap: new Map(), lastFight: null, scout: null });
+    byId('btnLastFight').hidden = true;
     byId('game').hidden = true;
     byId('endScreen').hidden = true;
-    byId('lobby').hidden = false;
-    byId('roomBox').hidden = true;
     byId('carousel').hidden = true;
+    byId('lobby').hidden = false;
     lobbyStatus('');
   }
 
-  function showEnd(title, text, canRematch) {
+  function leaveGame() {
+    closeNet();
+    L.mode = null;
+    resetMatchView();
+    renderRoom();
+  }
+
+  /* volta à sala de espera, sem desconectar */
+  function backToRoom() {
+    if (L.mode === 'guest') L.inMatch = false;
+    resetMatchView();
+    renderRoom();
+  }
+
+  function showEnd(title, text, standings) {
     const el = byId('endScreen');
+    const inRoom = L.mode === 'host' || L.mode === 'guest';
+    const table = standings ? `<ol class="standings">${standings.slice().sort((a, b) => a.placement - b.placement).map(p => `
+      <li class="${p.i === L.st.viewer ? 'me' : ''}"><b>${p.placement}º</b><span>${esc(p.name)}${p.left ? ' <em>(saiu)</em>' : ''}</span><i>${p.hp}</i></li>`).join('')}</ol>` : '';
     el.hidden = false;
-    el.innerHTML = `<div class="end-box"><h2>${esc(title)}</h2><p>${esc(text)}</p>
+    el.innerHTML = `<div class="end-box"><h2>${esc(title)}</h2><p>${esc(text)}</p>${table}
       <div class="end-actions">
-        ${canRematch ? '<button class="btn primary" id="btnAgain">JOGAR DE NOVO</button>' : ''}
-        <button class="btn" id="btnEndLeave">VOLTAR</button>
+        ${L.mode === 'bot' ? '<button class="btn primary" id="btnAgain">JOGAR DE NOVO</button>' : ''}
+        ${standings && inRoom ? '<button class="btn primary" id="btnBackRoom">VOLTAR À SALA</button>' : ''}
+        <button class="btn" id="btnEndLeave">${inRoom ? 'SAIR DA SALA' : 'VOLTAR'}</button>
       </div></div>`;
     byId('btnEndLeave').addEventListener('click', leaveGame);
     const again = byId('btnAgain');
-    if (again) {
-      again.addEventListener('click', () => {
-        if (L.mode === 'host' && !(L.conn && L.conn.open)) return toast('O outro jogador já saiu da sala.');
-        startHostGame(L.mode === 'bot');
-      });
-    }
+    if (again) again.addEventListener('click', startBotGame);
+    const back = byId('btnBackRoom');
+    if (back) back.addEventListener('click', backToRoom);
   }
 
   /* ---------- Desenho de peças ---------- */
@@ -374,6 +623,19 @@
     return `<span class="item" data-tip="item:${esc(id)}" ${attrs}><img src="${esc(asset(it.icon))}" alt="${esc(it.name)}" draggable="false"></span>`;
   };
   const stars = n => `<span class="stars s${n}">${'★'.repeat(n)}</span>`;
+  /* ícone de trait; aceso quando a trait já está no seu campo */
+  const traitChips = (c, showNames = true) => {
+    const mine = new Set(L.st ? L.st.you.traits.map(t => t.name) : []);
+    return champOf(c).traits.map(name => `<i class="trait-chip ${mine.has(name) ? 'have' : ''}" data-tip="trait:${esc(name)}"><img src="${esc(asset(E.TRAITS[name].icon))}" alt="" draggable="false">${showNames ? `<span>${esc(name)}</span>` : ''}</i>`).join('');
+  };
+  const isMelee = range => range <= 2;
+  /* traits na peça; douradas quando a trait está ativa no seu campo */
+  const unitTraits = (c, mine = true) => {
+    const active = new Set(mine && L.st ? L.st.you.traits.filter(t => t.active).map(t => t.name) : []);
+    return `<div class="unit-traits">${champOf(c).traits.map(name => `<i class="${active.has(name) ? 'on' : ''}"><img src="${esc(asset(E.TRAITS[name].icon))}" alt="${esc(name)}" draggable="false"></i>`).join('')}</div>`;
+  };
+  const attrStrip = s => `<div class="attr-strip"><b class="s-ad">${s.ad}</b><b class="s-ap">${s.ap}</b></div>`;
+  const ownStats = u => L.preview[u.uid] || E.previewUnit(u.c, u.star, u.items);
 
   /* posição das casas: x/y em % do campo */
   const BOARD_W = 7.5;
@@ -386,13 +648,10 @@
 
   function unitHtml(u, dc, dr, opts = {}) {
     const ch = champOf(u.c);
-    const attrs = opts.mine
-      ? `data-uid="${u.uid}" ${opts.drag ? `data-drag="${opts.drag}"` : ''} ${opts.drop ? `data-drop="${opts.drop}"` : ''}`
-      : '';
-    return `<div class="unit cost${ch.cost} ${opts.mine ? 'mine' : 'enemy'}" style="${hexStyle(dc, dr)}" ${attrs} data-tip="unit:${esc(u.c)}:${u.star}:${esc((u.items || []).join('+'))}">
+    return `<div class="unit mine cost${ch.cost} star${u.star}" style="${hexStyle(dc, dr)}" data-uid="${u.uid}" ${opts.drag ? `data-drag="${opts.drag}"` : ''} data-drop="${opts.drop}" data-tip="own:${u.uid}">
       <div class="hexpic">${portrait(u.c)}</div>
-      ${stars(u.star)}
-      <div class="unit-items">${(u.items || []).map(i => itemIcon(i)).join('')}</div>
+      ${stars(u.star)}${unitTraits(u.c)}${attrStrip(ownStats(u))}
+      <div class="unit-items">${u.items.map(i => itemIcon(i)).join('')}</div>
     </div>`;
   }
 
@@ -400,6 +659,7 @@
   function render() {
     const st = L.st;
     if (!st) return;
+    L.preview = E.previewBoard(st.you.board, st.you.chrome);
     renderHeader(st);
     renderTraits(st);
     renderItems(st);
@@ -408,6 +668,22 @@
     renderShop(st);
     renderCarousel(st);
     renderLog(st);
+    renderPlayerList(st);
+    byId('game').classList.toggle('spectating', !st.you.alive);
+  }
+
+  /* todos os jogadores por Vida; clicar escolhe de quem ver as traits */
+  function renderPlayerList(st) {
+    const list = st.players.slice().sort((a, b) => (b.alive - a.alive) || (b.hp - a.hp) || ((a.placement || 0) - (b.placement || 0)));
+    byId('playerList').innerHTML = list.map(p => {
+      const me = p.i === st.viewer;
+      const next = st.opponent && st.opponent.i === p.i;
+      return `<button type="button" class="player-row ${me ? 'me' : ''} ${p.alive ? '' : 'out'} ${!me && st.rival && st.rival.i === p.i ? 'scouted' : ''}" ${me ? 'disabled' : `data-scout="${p.i}"`} title="${me ? 'Você' : `Ver as traits de ${esc(p.name)}`}">
+        <span class="player-name">${next ? '<i class="next-mark" title="Próximo duelo">⚔</i>' : ''}${esc(p.name)}</span>
+        <em>${p.alive ? p.hp : `${p.placement}º`}</em>
+        <span class="player-hp"><i style="width:${Math.max(0, p.hp)}%"></i></span>
+      </button>`;
+    }).join('');
   }
 
   function chipHtml(p, own) {
@@ -448,14 +724,33 @@
   }
 
   function renderTraits(st) {
-    const list = st.you.traits;
-    byId('traitList').innerHTML = list.length ? list.map(t => `
-      <div class="trait ${t.active ? 'on' : ''}" data-tip="trait:${esc(t.name)}">
-        <img src="${esc(asset(E.TRAITS[t.name].icon))}" alt="" draggable="false">
+    byId('traitList').innerHTML = traitListHtml(st.you.traits, 'Coloque unidades em campo para ativar traits.');
+    byId('rivalTraitsTitle').textContent = `TRAITS DE ${st.rival.name.toUpperCase()}`;
+    byId('rivalTraits').innerHTML = traitListHtml(st.rival.traits, 'Nenhuma unidade em campo.', 'rival');
+  }
+  /* cor da faixa como no TFT: bronze, prata, ouro e, na última de 4 ou mais, prismática */
+  function tierClass(tiers, count) {
+    let idx = -1;
+    tiers.forEach((n, i) => { if (count >= n) idx = i; });
+    if (idx < 0) return 'tier-off';
+    if (tiers.length === 1) return 'tier-gold';
+    if (tiers.length >= 4 && idx === tiers.length - 1) return 'tier-prism';
+    const pos = idx / (tiers.length - (tiers.length >= 4 ? 2 : 1));
+    return pos >= 1 ? 'tier-gold' : pos >= 0.5 ? 'tier-silver' : 'tier-bronze';
+  }
+  function traitListHtml(list, emptyText, owner = 'you') {
+    return list.length ? list.map(t => {
+      // próxima faixa a alcançar, como o "2/4" do TFT
+      const next = t.tiers.find(n => n > t.count);
+      const current = t.tiers.filter(n => n <= t.count).pop();
+      return `
+      <div class="trait ${t.active ? 'on' : ''} ${tierClass(t.tiers, t.count)}" data-tip="trait:${esc(t.name)}:${t.count}:${owner}">
+        <span class="trait-hex"><img src="${esc(asset(E.TRAITS[t.name].icon))}" alt="" draggable="false"></span>
         <b>${esc(t.name)}</b>
-        <span>${t.tiers.map(n => `<i class="${t.count >= n ? 'hit' : ''}">${n}</i>`).join('')}</span>
-        <em>${t.count}</em>
-      </div>`).join('') : '<p class="empty">Coloque unidades em campo para ativar traits.</p>';
+        <em>${t.count}${next ? `/${next}` : ''}</em>
+        <span class="trait-steps">${t.tiers.map(n => `<i class="${n === current ? 'cur' : n < t.count ? 'hit' : ''}">${n}</i>`).join('<u>›</u>')}</span>
+      </div>`;
+    }).join('') : `<p class="empty">${esc(emptyText)}</p>`;
   }
 
   function renderItems(st) {
@@ -481,45 +776,58 @@
       const [x, y] = key.split(',').map(Number);
       html += unitHtml(u, x, 3 - y, { mine: true, drag: canEdit ? `h:${x},${y}` : '', drop: `h:${x},${y}` });
     }
-    for (const [key, u] of Object.entries(st.rival.board)) {
-      const [x, y] = key.split(',').map(Number);
-      html += unitHtml(u, 6 - x, 4 + y, { mine: false });
-    }
+    const foeNote = !st.you.alive ? 'Você está acompanhando a partida' : st.opponent ? `Próximo duelo: ${st.opponent.ghost ? 'Fantasma de ' : ''}${esc(st.players[st.opponent.i].name)}. Tabuleiro oculto até o combate` : 'Tabuleiros dos outros jogadores ocultos até o combate';
+    html += `<div class="foe-note">${foeNote}</div>`;
     board.innerHTML = html;
   }
 
   function renderBench(st) {
     byId('bench').innerHTML = st.you.bench.map((u, i) => (u
-      ? `<div class="bench-slot" data-drop="b:${i}"><div class="unit bench-unit cost${champOf(u.c).cost} mine" data-uid="${u.uid}" data-drag="b:${i}" data-drop="b:${i}" data-tip="unit:${esc(u.c)}:${u.star}:${esc(u.items.join('+'))}">
-          <div class="hexpic">${portrait(u.c)}</div>${stars(u.star)}<div class="unit-items">${u.items.map(id => itemIcon(id)).join('')}</div></div></div>`
+      ? `<div class="bench-slot" data-drop="b:${i}"><div class="unit bench-unit cost${champOf(u.c).cost} star${u.star} mine" data-uid="${u.uid}" data-drag="b:${i}" data-drop="b:${i}" data-tip="own:${u.uid}">
+          <div class="hexpic">${portrait(u.c)}</div>${stars(u.star)}${unitTraits(u.c)}${attrStrip(ownStats(u))}<div class="unit-items">${u.items.map(id => itemIcon(id)).join('')}</div></div></div>`
       : `<div class="bench-slot" data-drop="b:${i}"></div>`)).join('');
   }
 
   function renderShop(st) {
     const you = st.you;
-    byId('goldBox').innerHTML = `<b>${you.gold}</b> ouro`;
-    const pct = you.xpNext ? (you.xp / you.xpNext) * 100 : 100;
+    byId('goldBox').innerHTML = `<i class="coin"></i><b>${you.gold}</b>`;
+    const interest = Math.min(5, Math.floor(you.gold / 10));
+    byId('interestBox').innerHTML = `Juros <b>+${interest}</b>`;
     const fielded = Object.keys(you.board).length;
-    byId('levelBox').innerHTML = `<span>Nível <b>${you.level}</b> · ${fielded}/${you.level} em campo</span>
-      <div class="xp-bar"><i style="width:${pct}%"></i></div><small>${you.xpNext ? `${you.xp}/${you.xpNext} XP` : 'nível máximo'}</small>`;
-    byId('btnXp').textContent = `XP +${E.RULES.xpGain} · ${E.RULES.xpCost}g`;
-    byId('btnReroll').textContent = `ATUALIZAR · ${E.RULES.rerollCost}g`;
+    byId('fieldCount').innerHTML = `Em campo <b>${fielded}/${you.level}</b>`;
+    // barra de XP em blocos, como no TFT (muitos blocos viram uma barra contínua)
+    const segs = you.xpNext ? Math.min(12, Math.ceil(you.xpNext / 2)) : 1;
+    const filled = you.xpNext ? (you.xp / you.xpNext) * segs : segs;
+    byId('levelBox').innerHTML = `<div class="level-top"><b>Nv. ${you.level}</b><span>${you.xpNext ? `${you.xp}/${you.xpNext}` : 'Máx.'}</span></div>
+      <div class="xp-bar">${Array.from({ length: segs }, (_, i) => `<i><u style="width:${Math.max(0, Math.min(1, filled - i)) * 100}%"></u></i>`).join('')}</div>`;
+    byId('oddsBox').innerHTML = E.RULES.odds[you.level].map((v, i) => `<span class="odd cost${i + 1} ${v ? '' : 'zero'}"><i class="odd-mark m${i + 1}"></i>${v}%</span>`).join('');
+    byId('btnXp').innerHTML = `<b>Comprar EXP</b><small><i class="coin"></i>${E.RULES.xpCost}</small><em>⏫</em>`;
+    byId('btnReroll').innerHTML = `<b>Atualizar</b><small><i class="coin"></i>${E.RULES.rerollCost}</small><em>⟳</em>`;
     byId('btnXp').disabled = you.gold < E.RULES.xpCost || you.level >= E.RULES.maxLevel;
     byId('btnReroll').disabled = you.gold < E.RULES.rerollCost;
-    byId('btnLock').textContent = you.locked ? '🔒 TRAVADA' : '🔓 TRAVAR';
+    byId('btnLock').textContent = you.locked ? '🔒' : '🔓';
+    byId('btnLock').title = you.locked ? 'Loja travada: não atualiza na próxima rodada. Clique para destravar.' : 'Travar a loja: mantém estas cartas na próxima rodada.';
+    byId('btnLock').setAttribute('aria-label', byId('btnLock').title);
     byId('btnLock').classList.toggle('on', you.locked);
     byId('btnReady').disabled = st.phase !== 'plan';
     byId('btnReady').classList.toggle('on', you.ready);
+    const owned = [...you.bench.filter(Boolean), ...Object.values(you.board)];
     byId('shop').innerHTML = (you.shop || []).map((c, i) => {
       if (!c) return '<div class="shop-card empty-card"></div>';
       const ch = champOf(c);
-      const s = skinOf(c);
       const cant = you.gold < ch.cost;
-      return `<button type="button" class="shop-card cost${ch.cost} ${cant ? 'cant' : ''}" data-buy="${i}" data-tip="unit:${esc(c)}:1:">
+      // quantas cópias já tem: a próxima compra evolui?
+      const ones = owned.filter(u => u.c === c && u.star === 1).length;
+      const twos = owned.filter(u => u.c === c && u.star === 2).length;
+      const evolves = ones === 2;
+      const copyTag = evolves
+        ? `<span class="copy-tag evolve">EVOLUI ${twos === 2 ? '★★★' : '★★'}</span>`
+        : ones === 1 ? '<span class="copy-tag">2/3</span>' : '';
+      return `<button type="button" class="shop-card cost${ch.cost} ${cant ? 'cant' : ''} ${evolves ? 'evolves' : ''}" data-buy="${i}" data-tip="unit:${esc(c)}:1:">
         ${portrait(c)}
-        <span class="shop-traits">${ch.traits.map(t => `<i>${esc(t)}</i>`).join('')}</span>
-        <span class="shop-name"><b>${esc(displayName(c))}</b>${s && s.series ? `<small>${esc(s.series)}</small>` : ''}</span>
-        <span class="shop-cost">${ch.cost}g</span>
+        <span class="shop-traits">${traitChips(c)}</span>
+        ${copyTag}
+        <span class="shop-foot"><b>${esc(displayName(c))}</b><span class="shop-cost"><i class="coin"></i>${ch.cost}</span></span>
       </button>`;
     }).join('');
   }
@@ -529,12 +837,13 @@
     const opts = st.you.carousel;
     if (st.phase !== 'carousel' || !opts) { el.hidden = true; el.innerHTML = ''; return; }
     el.hidden = false;
-    el.innerHTML = `<div class="carousel-box"><h2>🎁 Carrossel</h2><p>${st.you.picked ? 'Aguardando o rival…' : 'Escolha uma unidade com um componente.'}</p>
+    el.innerHTML = `<div class="carousel-box"><h2>🎁 Carrossel</h2><p>${st.you.picked ? 'Aguardando os outros jogadores…' : 'Escolha uma unidade com um componente.'}</p>
       <div class="carousel-opts">${opts.map((o, i) => {
         const ch = champOf(o.c);
         return `<button type="button" class="carousel-opt cost${ch.cost} ${o.taken ? 'taken' : ''}" data-pick="${i}" ${st.you.picked ? 'disabled' : ''} data-tip="unit:${esc(o.c)}:1:">
           ${portrait(o.c)}
           <span class="carousel-name">${esc(displayName(o.c))}</span>
+          <span class="carousel-traits">${traitChips(o.c)}</span>
           <span class="carousel-item">${itemIcon(o.item)} ${esc(E.ITEMS[o.item].name)}</span>
         </button>`;
       }).join('')}</div></div>`;
@@ -544,28 +853,77 @@
     byId('logList').innerHTML = st.log.slice().reverse().map(t => `<li>${esc(t)}</li>`).join('') || '<li class="empty">Nenhum combate ainda.</li>';
   }
 
-  function announceRound(r) {
-    const type = { pvp: 'Duelo contra o rival', pve: 'Monstros: rende itens e ouro' }[r.type];
+  function announceRound(st) {
+    const r = st.round;
+    const foe = st.opponent ? `${st.opponent.ghost ? 'Fantasma de ' : ''}${st.players[st.opponent.i].name}` : '';
+    const type = r.type === 'pvp' ? `Duelo contra ${foe}` : 'Monstros: rende itens e ouro';
     showBanner(`${r.label} · ${type}`, 'info');
   }
   function showResult(res) {
     if (!res) return;
     const lootTxt = res.loot ? [res.loot.gold ? `+${res.loot.gold}g` : '', ...res.loot.items.map(i => E.ITEMS[i].name)].filter(Boolean).join(' · ') : '';
     const main = res.res === 'win' ? 'Vitória' : res.res === 'draw' ? `Empate · −${res.dmg} de Vida` : `Derrota · −${res.dmg} de Vida`;
-    showBanner(lootTxt ? `${main} · ${lootTxt}` : main, res.res === 'win' ? 'good' : 'bad');
+    showBanner(lootTxt ? `${main} · Saque: ${lootTxt}` : main, res.res === 'win' ? 'good' : 'bad');
   }
-  let bannerTimer = null;
+  const bannerQueue = [];
+  let bannerBusy = false;
   function showBanner(text, kind) {
+    bannerQueue.push({ text, kind });
+    if (!bannerBusy) nextBanner();
+  }
+  function nextBanner() {
     const el = byId('banner');
-    el.textContent = text;
-    el.className = `banner ${kind}`;
+    const item = bannerQueue.shift();
+    if (!item) { bannerBusy = false; el.hidden = true; return; }
+    bannerBusy = true;
+    el.textContent = item.text;
+    el.className = `banner ${item.kind}`;
     el.hidden = false;
-    clearTimeout(bannerTimer);
-    bannerTimer = setTimeout(() => { el.hidden = true; }, 2200);
+    setTimeout(nextBanner, item.kind === 'info' ? 1500 : 2600);
+  }
+
+  /* ---------- Evolução e itens: mostra o que mudou na unidade ---------- */
+  const DELTA_KEYS = [['hp', 'Vida', 's-hp'], ['ad', 'DA', 's-ad'], ['ap', 'PH', 's-ap'], ['armor', 'Arm', 's-arm'], ['mr', 'RM', 's-mr'], ['as', 'VA', 's-as'], ['crit', 'Crít', 's-as']];
+  function popOver(el, text, cls, step) {
+    const r = el.getBoundingClientRect();
+    const p = document.createElement('span');
+    p.className = `stat-pop ${cls}`;
+    p.textContent = text;
+    p.style.left = `${r.left + r.width / 2}px`;
+    p.style.top = `${r.top + 4 - step * 15}px`;
+    p.style.animationDelay = `${step * 60}ms`;
+    document.body.appendChild(p);
+    setTimeout(() => p.remove(), 1700);
+  }
+  function showUnitChanges(st) {
+    const units = [...st.you.bench.filter(Boolean), ...Object.values(st.you.board)];
+    const next = new Map();
+    for (const u of units) {
+      const key = `${u.star}|${u.items.join('+')}`;
+      next.set(u.uid, key);
+      const before = L.snap.get(u.uid);
+      if (!before || before.key === key) continue;
+      const el = document.querySelector(`[data-uid="${u.uid}"]`);
+      if (!el) continue;
+      if (u.star > before.star) {
+        el.classList.add('evolving');
+        showBanner(`${'★'.repeat(u.star)} ${displayName(u.c)} evoluiu!`, 'evolve');
+      }
+      // comparação sem traits: mostra só o efeito da evolução ou do item
+      const was = E.previewUnit(u.c, before.star, before.items);
+      const now = E.previewUnit(u.c, u.star, u.items);
+      let step = 0;
+      for (const [k, label, cls] of DELTA_KEYS) {
+        const d = Math.round((now[k] - was[k]) * 100) / 100;
+        if (!d) continue;
+        popOver(el, `${d > 0 ? '+' : ''}${d}${k === 'crit' ? '%' : ''} ${label}`, `${cls} ${d < 0 ? 'loss' : ''}`, step++);
+      }
+    }
+    L.snap = new Map(units.map(u => [u.uid, { key: next.get(u.uid), star: u.star, items: u.items.slice() }]));
   }
 
   /* ---------- Reprodução do combate ---------- */
-  function startPlayback(view, flip) {
+  function startPlayback(view, flip, spectate = false) {
     stopPlayback();
     const board = byId('board');
     const mySide = flip ? 1 : 0;
@@ -582,28 +940,37 @@
       const mine = m.side === mySide;
       if (m.champ) {
         const [dc, dr] = place(row[2], row[1]);
-        el.className = `unit fight cost${champOf(m.champ).cost} ${mine ? 'mine' : 'enemy'}`;
+        el.className = `unit fight cost${champOf(m.champ).cost} star${m.star} ${mine ? 'mine' : 'enemy'}`;
         el.style.cssText = hexStyle(dc, dr);
-        el.innerHTML = `<div class="bars"><i class="hp"></i><i class="sh"></i><b class="mp"></b></div><div class="hexpic">${portrait(m.champ)}</div>${stars(m.star)}<div class="unit-items">${(m.items || []).map(i => itemIcon(i)).join('')}</div>`;
-        el.dataset.tip = `unit:${m.champ}:${m.star}:${(m.items || []).join('+')}`;
+        el.innerHTML = `<div class="bars"><i class="hp"></i><i class="sh"></i><b class="mp"></b></div><div class="hexpic">${portrait(m.champ)}</div>${stars(m.star)}${unitTraits(m.champ, mine)}${attrStrip(m.stats)}<div class="unit-items">${(m.items || []).map(i => itemIcon(i)).join('')}</div>`;
+        el.dataset.tip = `meta:${m.id}`;
       } else {
         const d = E.CREEPS[m.creep];
         const [dc, dr] = place(row[2], row[1]);
         el.className = `unit fight creep ${mine ? 'mine' : 'enemy'}`;
         el.style.cssText = hexStyle(dc, dr);
-        el.title = d.name;
+        el.dataset.tip = `meta:${m.id}`;
         el.innerHTML = `<div class="bars"><i class="hp"></i><i class="sh"></i><b class="mp"></b></div><div class="hexpic creep-face">${d.icon}</div>`;
       }
       board.appendChild(el);
       els.set(row[0], el);
     }
 
-    const pb = { view, flip, els, metas, start: performance.now(), frame: -1, raf: 0, seen: new Set() };
+    const pb = { view, flip, els, metas, mySide, start: performance.now(), frame: -1, raf: 0, ended: false };
     L.playing = pb;
+    L.lastFight = { view, mySide, spectate };
+    hideSummary();
+    renderEnemyPanel(pb);
     const step = now => {
       if (L.playing !== pb) return;
       const idx = Math.min(view.frames.length - 1, Math.floor((now - pb.start) / 100));
       while (pb.frame < idx) { pb.frame++; applyFrame(pb, view.frames[pb.frame]); }
+      if (!pb.ended && pb.frame === view.frames.length - 1) {
+        pb.ended = true;
+        byId('btnLastFight').hidden = false;
+        L.summaryAuto = true;
+        renderSummary();
+      }
       pb.raf = requestAnimationFrame(step);
     };
     pb.raf = requestAnimationFrame(step);
@@ -613,7 +980,79 @@
   function stopPlayback() {
     if (L.playing) cancelAnimationFrame(L.playing.raf);
     L.playing = null;
+    byId('enemyPanel').hidden = true;
+    byId('matchPanel').hidden = false;
   }
+
+  /* ---------- Atributos do rival durante o combate ---------- */
+  const metaName = m => (m.champ ? displayName(m.champ) : E.CREEPS[m.creep].name);
+  const metaThumb = m => (m.champ ? `<span class="thumb cost${champOf(m.champ).cost}">${portrait(m.champ)}</span>` : `<span class="thumb creep-thumb">${E.CREEPS[m.creep].icon}</span>`);
+  function renderEnemyPanel(pb) {
+    const foes = pb.view.meta.filter(m => m.side !== pb.mySide);
+    const title = pb.view.names[1 - pb.mySide];
+    byId('enemyPanel').innerHTML = `<h2>${esc(title).toUpperCase()}</h2>
+      ${foes.map(m => `<div class="foe-row" data-tip="meta:${m.id}">
+        ${metaThumb(m)}
+        <div class="foe-info">
+          <b>${esc(metaName(m))}${m.champ ? ` ${stars(m.star)}` : ''}</b>
+          ${m.champ ? `<span class="foe-icons">${traitChips(m.champ, false)}</span>` : ''}
+          <span><b class="s-hp" data-l="Vd">${m.stats.hp}</b><b class="s-ad" data-l="DA">${m.stats.ad}</b><b class="s-ap" data-l="PH">${m.stats.ap}</b><b class="s-arm" data-l="Ar">${m.stats.armor}</b><b class="s-mr" data-l="RM">${m.stats.mr}</b><b class="s-as" data-l="VA">${m.stats.as}</b></span>
+        </div></div>`).join('')}`;
+    byId('enemyPanel').hidden = false;
+    byId('matchPanel').hidden = true;
+  }
+
+  /* ---------- Gráficos do fim da luta ----------
+     Uma barra por unidade, um painel (e uma escala) por medida. As cores
+     passaram no validador de paleta contra o fundo --panel. */
+  const CHARTS = [
+    { key: 'dmg', title: 'Dano causado', series: [['p', 'Físico', 'c-phys'], ['m', 'Mágico', 'c-magic'], ['t', 'Verdadeiro', 'c-true']], fmt: v => Math.round(v).toLocaleString('pt-BR') },
+    { key: 'def', title: 'Defesa: dano evitado e cura', series: [['reduced', 'Reduzido', 'c-reduced'], ['shield', 'Escudo', 'c-shield'], ['heal', 'Cura', 'c-heal']], fmt: v => Math.round(v).toLocaleString('pt-BR') },
+    { key: 'cc', title: 'Controle de grupo: atordoamento', series: [['cc', 'Atordoamento', 'c-cc']], fmt: v => `${v.toFixed(1).replace('.', ',')}s`, empty: 'Ninguém atordoou nesta luta.' },
+  ];
+  const chartTotal = (m, c) => c.series.reduce((t, [k]) => t + (m.stat[k] || 0), 0);
+
+  function chartPanel(c, view, mySide) {
+    const max = Math.max(1, ...view.meta.map(m => chartTotal(m, c)));
+    const any = view.meta.some(m => chartTotal(m, c) > 0);
+    const rows = list => list.slice().sort((a, b) => chartTotal(b, c) - chartTotal(a, c)).map(m => {
+      const total = chartTotal(m, c);
+      const segs = c.series.map(([k, , cls]) => (m.stat[k] > 0 ? `<i class="${cls}" style="flex:${m.stat[k]} 0 0"></i>` : '')).join('');
+      return `<div class="chart-row" data-tip="chart:${m.id}:${c.key}">
+        ${metaThumb(m)}
+        <span class="chart-name">${esc(metaName(m))}</span>
+        <span class="chart-track"><span class="chart-bar" style="width:${(total / max) * 100}%">${segs}</span></span>
+        <span class="chart-val">${total > 0 ? c.fmt(total) : '—'}</span>
+      </div>`;
+    }).join('');
+    const mine = view.meta.filter(m => m.side === mySide);
+    const foes = view.meta.filter(m => m.side !== mySide);
+    const foeTitle = view.names[1 - mySide];
+    return `<section class="chart" aria-label="${esc(c.title)}">
+      <h3>${esc(c.title)}</h3>
+      ${c.series.length > 1 ? `<div class="chart-legend">${c.series.map(([, label, cls]) => `<span><i class="${cls}"></i>${esc(label)}</span>`).join('')}</div>` : ''}
+      ${any ? `<h4>${esc(view.names[mySide])}</h4>${rows(mine)}<h4>${esc(foeTitle)}</h4>${rows(foes)}` : `<p class="chart-empty">${esc(c.empty || 'Sem dados nesta luta.')}</p>`}
+    </section>`;
+  }
+
+  function renderSummary() {
+    const f = L.lastFight;
+    if (!f) return;
+    const { view, mySide, spectate } = f;
+    const title = view.winner === -1 ? 'Empate' : spectate ? `${view.names[view.winner]} venceu` : view.winner === mySide ? 'Vitória' : 'Derrota';
+    const loot = view.loot;
+    const lootHtml = loot ? `<div class="summary-loot"><b>Saque:</b>${loot.gold ? `<span class="loot-gold">+${loot.gold}g</span>` : ''}${loot.items.map(id => `<span class="loot-item">${itemIcon(id)}${esc(E.ITEMS[id].name)}</span>`).join('')}</div>` : '';
+    const el = byId('summary');
+    el.innerHTML = `<div class="summary-head">
+        <h2>${title}</h2>
+        <span class="summary-meta">${view.duration.toFixed(1).replace('.', ',')}s de luta${view.winner !== -1 ? ` · ${view.survivors} ${view.survivors === 1 ? 'unidade viva' : 'unidades vivas'}` : ''}</span>
+        <button class="btn small" data-close-summary>FECHAR</button>
+      </div>
+      ${lootHtml}
+      <div class="charts">${CHARTS.map(c => chartPanel(c, view, mySide)).join('')}</div>`;
+    el.hidden = false;
+  }
+  function hideSummary() { byId('summary').hidden = true; }
 
   function applyFrame(pb, f) {
     const alive = new Set();
@@ -649,7 +1088,8 @@
     const [kind, id, a, b, c] = ev;
     const el = pb.els.get(id);
     if (!el) return;
-    if (kind === 'd') floatText(el, String(a), `dmg-${b}${c ? ' crit' : ''}`);
+    if (kind === 'x') { if (pb.metas.get(id).creep) floatText(el, '✦ saque', 'lootfx'); }
+    else if (kind === 'd') floatText(el, String(a), `dmg-${b}${c ? ' crit' : ''}`);
     else if (kind === 'h') floatText(el, `+${a}`, 'heal');
     else if (kind === 'g') floatText(el, '+1g', 'goldfx');
     else if (kind === 'c') { el.classList.remove('casting'); void el.offsetWidth; el.classList.add('casting'); }
@@ -742,6 +1182,22 @@
     Object.assign(DRAG, { src: null, el: null, ghost: null, moved: false });
   }
 
+  function nearestOwnHex(px, py, under) {
+    if (L.playing || !under.closest('.board-wrap')) return null;
+    const b = byId('board').getBoundingClientRect();
+    let best = null, bd = Infinity;
+    for (let dr = 0; dr < 4; dr++) {
+      for (let dc = 0; dc < 7; dc++) {
+        const p = hexPos(dc, dr);
+        const cx = b.left + (b.width * (p.left + 100 / BOARD_W / 2)) / 100;
+        const cy = b.bottom - (b.height * (p.bottom + (1.1547 / BOARD_H) * 50)) / 100;
+        const d = Math.hypot(px - cx, py - cy);
+        if (d < bd) { bd = d; best = { x: dc, y: 3 - dr }; }
+      }
+    }
+    return best;
+  }
+
   function onPointerUp(ev) {
     if (!DRAG.src) return;
     const src = DRAG.src;
@@ -757,17 +1213,66 @@
       return;
     }
     const drop = under.closest('[data-drop]');
-    if (!drop) return;
-    if (drop.dataset.drop === 'sell') return sendGame({ a: 'sell', uid });
-    const to = parseSpot(drop.dataset.drop);
+    if (drop && drop.dataset.drop === 'sell') return sendGame({ a: 'sell', uid });
+    const to = drop ? parseSpot(drop.dataset.drop) : nearestOwnHex(ev.clientX, ev.clientY, under);
     if (to) sendGame({ a: 'move', from: parseSpot(src), to });
   }
 
   /* ---------- Dicas ---------- */
-  function statsLine(ch, star) {
-    const hp = Math.round(ch.hp * Math.pow(1.8, star - 1));
-    const ad = Math.round(ch.ad * Math.pow(1.5, star - 1));
-    return `<div class="tip-stats"><span>Vida <b>${hp}</b></span><span>DA <b>${ad}</b></span><span>VA <b>${ch.as.toFixed(2)}</b></span><span>Arm <b>${ch.armor}</b></span><span>RM <b>${ch.mr}</b></span><span>Alcance <b>${ch.range}</b></span><span>Mana <b>${ch.mana0}/${Math.max(ch.mana, ch.mana0)}</b></span></div>`;
+  /* atributos com a cor de cada um; base = sem itens nem traits, para mostrar o ganho */
+  function statsBlock(s, base) {
+    const row = (label, k, cls, suffix = '') => {
+      const d = base ? Math.round((s[k] - base[k]) * 100) / 100 : 0;
+      return `<span>${label} <b class="${cls}">${s[k]}${suffix}</b>${d ? `<em class="${d > 0 ? 'gain' : 'loss'}">${d > 0 ? '+' : ''}${d}</em>` : ''}</span>`;
+    };
+    return `<div class="tip-stats">${row('Vida', 'hp', 's-hp')}${row('DA', 'ad', 's-ad')}${row('PH', 'ap', 's-ap')}${row('Arm', 'armor', 's-arm')}${row('RM', 'mr', 's-mr')}${row('VA', 'as', 's-as')}${row('Crít', 'crit', 's-as', '%')}${row('Alcance', 'range', '')}${s.maxMana ? `<span>Mana <b class="s-mana">${s.mana}/${s.maxMana}</b></span>` : ''}</div>`;
+  }
+  /* DA e PH sempre com a própria cor, também nos textos */
+  const colorStats = html => html
+    .replace(/(\d+%? )?\bDA\b/g, m => `<b class="s-ad">${m}</b>`)
+    .replace(/(\d+ )?\bPH\b/g, m => `<b class="s-ap">${m}</b>`);
+
+  function unitTip(c, star, items, cur, base, extra = '') {
+    const ch = champOf(c);
+    const s = skinOf(c);
+    return `<h4>${esc(displayName(c))} ${stars(star)}</h4>
+      ${s ? `<p class="tip-sub">${esc(s.series)}${s.series ? ' · ' : ''}${Number(s.kakera).toLocaleString('pt-BR')} kakera · kit: ${esc(ch.name)}</p>` : ''}
+      <p class="tip-line">Custo ${ch.cost} · ${isMelee(ch.range) ? '⚔ Corpo a corpo' : '🏹 À distância'}</p>
+      <div class="tip-traits">${traitChips(c)}</div>
+      ${statsBlock(cur, base)}
+      <p><b>${esc(ch.abilityName)}:</b> ${colorStats(esc(E.abilityText(ch.name, star)))}</p>
+      ${items.length ? `<p class="tip-line">${items.map(i => esc(E.ITEMS[i] ? E.ITEMS[i].name : i)).join(' · ')}</p>` : ''}${extra}`;
+  }
+  function traitTip(name, countText, owner) {
+    const t = E.TRAITS[name];
+    const entry = L.st.you.traits.find(x => x.name === name);
+    const isRival = owner === 'rival';
+    const count = countText !== undefined && countText !== '' ? Number(countText) : entry ? entry.count : 0;
+    const tiers = E.traitTiers(name);
+    const current = tiers.filter(x => x.min <= count).pop();
+    const onBoard = new Set(Object.values(L.st.you.board).map(u => u.c));
+    const onBench = new Set(L.st.you.bench.filter(Boolean).map(u => u.c));
+    const champs = E.D.champions.filter(c => c.traits.includes(name));
+    return `<div class="trait-tip-head ${tierClass(t.tiers.map(x => x.min), count)}">
+        <span class="trait-hex"><img src="${esc(asset(t.icon))}" alt=""></span>
+        <h4>${esc(name)}</h4><em>${count} ${isRival ? 'do rival' : 'em campo'}</em>
+      </div>
+      <p>${colorStats(esc(E.TRAIT_TEXT[name] || ''))}</p>
+      <ol class="tier-list">${tiers.map(x => `<li class="${x === current ? 'cur' : count >= x.min ? 'hit' : ''}"><b>(${x.min})</b><span>${colorStats(esc(x.text))}</span></li>`).join('')}</ol>
+      <div class="trait-champs">${champs.map(c => {
+        const state = isRival ? '' : onBoard.has(c.id) ? 'field' : onBench.has(c.id) ? 'bench' : '';
+        return `<span class="trait-champ cost${c.cost} ${state}"><span class="thumb">${portrait(c.id)}</span><small>${esc(displayName(c.id))}</small><i>${c.cost}g</i></span>`;
+      }).join('')}</div>
+      ${isRival ? '<p class="tip-sub">As unidades do rival ficam ocultas até o combate.</p>' : '<p class="tip-sub">Contorno aceso: em campo. Tracejado: no banco.</p>'}`;
+  }
+  function metaById(id) {
+    const f = (L.playing && L.playing.view) || (L.lastFight && L.lastFight.view);
+    return f ? f.meta.find(m => m.id === id) : null;
+  }
+  /* receita em imagens: componente + componente = item */
+  function recipeHtml(a, b, result) {
+    const img = id => `<img src="${esc(asset(E.ITEMS[id].icon))}" alt="${esc(E.ITEMS[id].name)}">`;
+    return `<span class="recipe">${img(a)}<i>+</i>${img(b)}<i>=</i>${img(result)}</span>`;
   }
   function tipFor(key) {
     const [kind, a, b, c] = key.split(':');
@@ -780,31 +1285,57 @@
         fx.MagicResist ? `+${fx.MagicResist} RM` : '', fx.Health ? `+${fx.Health} Vida` : '', fx.CritChance ? `+${fx.CritChance}% Crít.` : '', fx.ManaRegen ? `+${fx.ManaRegen} Mana/s` : '',
       ].filter(Boolean).join(' · ');
       let recipes = '';
-      if (!it.from) {
+      if (it.from) {
+        recipes = `<div class="tip-recipes single">${recipeHtml(it.from[0], it.from[1], it.id)}</div>`;
+      } else if (!it.special) {
         recipes = `<div class="tip-recipes">${E.D.items.filter(x => x.from && x.from.includes(a)).map(x => {
           const other = x.from[0] === a ? x.from[1] : x.from[0];
-          return `<span><img src="${esc(asset(E.ITEMS[other].icon))}" alt="">→ ${esc(x.name)}</span>`;
+          return recipeHtml(a, other, x.id);
         }).join('')}</div>`;
       }
-      return `<h4>${esc(it.name)}</h4>${line ? `<p class="tip-line">${esc(line)}</p>` : ''}${E.ITEM_TEXT[a] ? `<p>${esc(E.ITEM_TEXT[a])}</p>` : ''}${recipes}`;
+      return `<h4>${esc(it.name)}</h4>${line ? `<p class="tip-line">${colorStats(esc(line))}</p>` : ''}${E.ITEM_TEXT[a] ? `<p>${colorStats(esc(E.ITEM_TEXT[a]))}</p>` : ''}${recipes}`;
+    }
+    if (kind === 'info') {
+      const you = L.st.you;
+      if (a === 'interest') {
+        const now = Math.min(5, Math.floor(you.gold / 10));
+        return `<h4>Juros: +${now} na próxima rodada</h4><p>+1 de ouro a cada 10 guardados, até +5.${now < 5 ? ` Faltam ${(now + 1) * 10 - you.gold} para +${now + 1}.` : ''}</p>`;
+      }
+      if (a === 'odds') return `<h4>Chance na loja no nível ${you.level}</h4><p>Probabilidade de cada carta ser de custo 1 a 5. Sobe conforme o nível.</p>`;
+      if (a === 'xp') return `<h4>Nível ${you.level}</h4><p>${you.xpNext ? `Faltam ${you.xpNext - you.xp} de XP para o nível ${you.level + 1}. ` : ''}Você ganha ${E.RULES.roundXp} de XP por rodada, e o nível define quantas unidades ficam em campo.</p>`;
+      return '';
     }
     if (kind === 'trait') {
       const t = E.TRAITS[a];
       if (!t) return '';
-      return `<h4>${esc(a)}</h4><p>${esc(E.TRAIT_TEXT[a] || '')}</p><p class="tip-line">Ativa com ${t.tiers.map(x => x.min).join(' / ')} unidades diferentes.</p>`;
+      return traitTip(a, b, c);
     }
     if (kind === 'unit') {
       const ch = champOf(a);
       if (!ch) return '';
       const star = Number(b) || 1;
-      const s = skinOf(a);
       const items = c ? c.split('+').filter(Boolean) : [];
-      return `<h4>${esc(displayName(a))} ${stars(star)}</h4>
-        ${s ? `<p class="tip-sub">${esc(s.series)}${s.series ? ' · ' : ''}${Number(s.kakera).toLocaleString('pt-BR')} kakera · kit: ${esc(ch.name)}</p>` : ''}
-        <p class="tip-line">Custo ${ch.cost} · ${ch.traits.map(esc).join(' · ')}</p>
-        ${statsLine(ch, star)}
-        <p><b>${esc(ch.abilityName)}:</b> ${esc(E.abilityText(ch.name, star))}</p>
-        ${items.length ? `<p class="tip-line">${items.map(i => esc(E.ITEMS[i] ? E.ITEMS[i].name : i)).join(' · ')}</p>` : ''}`;
+      return unitTip(a, star, items, E.previewUnit(a, star, items), null);
+    }
+    if (kind === 'own') {
+      const u = findMine(Number(a));
+      if (!u) return '';
+      const owned = [...L.st.you.bench.filter(Boolean), ...Object.values(L.st.you.board)];
+      const copies = owned.filter(x => x.c === u.c && x.star === u.star).length;
+      const next = u.star < 3 ? `<p class="tip-sub">Evolução: ${copies}/3 cópias de ${stars(u.star)} para ${stars(u.star + 1)}</p>` : '';
+      return unitTip(u.c, u.star, u.items, ownStats(u), E.previewUnit(u.c, u.star, []), next);
+    }
+    if (kind === 'meta') {
+      const m = metaById(Number(a));
+      if (!m) return '';
+      if (m.champ) return unitTip(m.champ, m.star, m.items, m.stats, E.previewUnit(m.champ, m.star, []));
+      return `<h4>${E.CREEPS[m.creep].icon} ${esc(E.CREEPS[m.creep].name)}</h4><p class="tip-line">${isMelee(m.stats.range) ? '⚔ Corpo a corpo' : '🏹 À distância'}</p>${statsBlock(m.stats)}`;
+    }
+    if (kind === 'chart') {
+      const m = metaById(Number(a));
+      const chart = CHARTS.find(x => x.key === b);
+      if (!m || !chart) return '';
+      return `<h4>${esc(metaName(m))}</h4><div class="tip-breakdown">${chart.series.map(([k, label, cls]) => `<span><i class="${cls}"></i>${esc(label)}<b>${chart.fmt(m.stat[k] || 0)}</b></span>`).join('')}</div>${b === 'dmg' ? `<p class="tip-sub">${m.stat.kills} abate(s)</p>` : ''}`;
     }
     return '';
   }
@@ -813,6 +1344,7 @@
     if (!html) return;
     const tip = byId('tip');
     tip.innerHTML = html;
+    tip.classList.toggle('wide', el.dataset.tip.startsWith('trait:'));
     tip.hidden = false;
     const r = tip.getBoundingClientRect();
     tip.style.left = `${Math.max(8, Math.min(window.innerWidth - r.width - 8, x + 14))}px`;
@@ -829,6 +1361,8 @@
       <p>Compre unidades na loja, posicione no campo e deixe o combate acontecer. Três cópias iguais viram 2★, e três 2★ viram 3★. O limite em campo é o seu nível. Quem chega a 0 de Vida perde.</p>
       <h3>Rodadas</h3>
       <p>Estágio 1: carrossel e monstros. Do 2 em diante: três duelos, carrossel, dois duelos e monstros. Perder custa ${R.stageDamage.slice(2).join('/')} de dano por estágio, mais 1 por unidade inimiga viva.</p>
+      <h3>Peças</h3>
+      <p>Os ícones nas peças são as traits, douradas quando ativas. Corpo a corpo, à distância e os atributos aparecem na dica ao passar o mouse. Na peça, <b class="s-ad">laranja</b> é Dano de Ataque (DA) e <b class="s-ap">roxo</b> é Poder de Habilidade (PH).</p>
       <h3>Economia</h3>
       <p>Renda de 5g por rodada, juros de 1g a cada 10g (até 5g), +1g por vitória em duelo e sequência (2-4: +1g, 5: +2g, 6+: +3g). Atualizar custa ${R.rerollCost}g e ${R.xpGain} XP custam ${R.xpCost}g. Atalhos: <b>D</b> atualiza, <b>F</b> compra XP.</p>
       <h3>Chance da loja por nível</h3>
@@ -836,9 +1370,11 @@
       <h3>O que muda neste protótipo</h3>
       <ul>
         <li><b>Skins:</b> cada waifu assume os números de um campeão da season. A kakera define o custo, e a dica mostra qual é o kit.</li>
-        <li><b>1v1:</b> os duelos são sempre contra o mesmo rival, e o carrossel é individual, com 4 opções.</li>
+        <li><b>Sala:</b> de 2 a 8 jogadores. Os duelos são sorteados a cada rodada; com número ímpar, quem sobra enfrenta o fantasma do time de outro jogador. O fantasma não sofre dano. O carrossel é individual, com 4 opções.</li>
         <li><b>Habilidades:</b> usam os valores oficiais em um modelo comum, sem as animações e os detalhes de cada uma.</li>
         <li><b>Traits:</b> as marcadas com "(adaptado)" na dica foram simplificadas.</li>
+        <li><b>Monstros:</b> todo evento dá ao menos um componente. Do 1-4 em diante, também um Removedor Magnético.</li>
+        <li><b>Rival:</b> as traits ficam sempre visíveis. O tabuleiro fica oculto no planejamento e aparece, com os atributos, durante o combate.</li>
         <li><b>Fora por enquanto:</b> augments, hacks, emblemas e a Espátula.</li>
       </ul>`;
   }
@@ -850,7 +1386,7 @@
     byId('rulesBody').innerHTML = rulesHtml();
     try { byId('nameInput').value = localStorage.getItem(NAME_KEY) || ''; } catch (err) { /* sem armazenamento */ }
 
-    byId('btnBot').addEventListener('click', () => startHostGame(true));
+    byId('btnBot').addEventListener('click', startBotGame);
     byId('btnCreate').addEventListener('click', () => createRoom());
     byId('btnJoin').addEventListener('click', joinRoom);
     byId('codeInput').addEventListener('input', ev => { ev.target.value = ev.target.value.toUpperCase().replace(/[^A-Z0-9]/g, ''); });
@@ -860,17 +1396,27 @@
       catch (err) { ev.target.textContent = 'COPIE À MÃO'; }
       setTimeout(() => { ev.target.textContent = 'COPIAR'; }, 1500);
     });
-    byId('btnCancelRoom').addEventListener('click', () => { closeNet(); L.mode = null; byId('roomBox').hidden = true; lobbyStatus(''); });
+    byId('btnCancelRoom').addEventListener('click', leaveGame);
+    byId('btnRoomReady').addEventListener('click', toggleRoomReady);
 
     byId('btnXp').addEventListener('click', () => sendGame({ a: 'xp' }));
     byId('btnReroll').addEventListener('click', () => sendGame({ a: 'reroll' }));
     byId('btnLock').addEventListener('click', () => sendGame({ a: 'lock' }));
     byId('btnReady').addEventListener('click', () => sendGame({ a: 'ready' }));
-    byId('btnQuit').addEventListener('click', () => { if (confirm('Sair abandona a partida. Continuar?')) leaveGame(); });
+    byId('btnLastFight').addEventListener('click', () => { L.summaryAuto = false; renderSummary(); });
+    byId('btnQuit').addEventListener('click', () => { if (confirm(L.mode === 'host' ? 'Você é o anfitrião: sair encerra a partida para todos. Continuar?' : 'Sair abandona a partida. Continuar?')) leaveGame(); });
 
     document.addEventListener('click', ev => {
       if (ev.target.closest('[data-open-rules]')) byId('rulesModal').hidden = false;
       if (ev.target.closest('[data-close-rules]') || ev.target.id === 'rulesModal') byId('rulesModal').hidden = true;
+      if (ev.target.closest('[data-close-summary]')) hideSummary();
+      const scout = ev.target.closest('[data-scout]');
+      if (scout) {
+        L.scout = Number(scout.dataset.scout);
+        L.st.rival = pickRival(L.st);
+        render();
+        return;
+      }
       const buy = ev.target.closest('[data-buy]');
       if (buy) { sendGame({ a: 'buy', slot: Number(buy.dataset.buy) }); hideTip(); return; }
       const pickBtn = ev.target.closest('[data-pick]');
@@ -894,6 +1440,7 @@
     document.addEventListener('keydown', ev => {
       if (byId('game').hidden || /INPUT|TEXTAREA/.test(ev.target.tagName)) return;
       const key = ev.key.toLowerCase();
+      if (key === 'escape') hideSummary();
       if (key === 'd') sendGame({ a: 'reroll' });
       if (key === 'f') sendGame({ a: 'xp' });
     });

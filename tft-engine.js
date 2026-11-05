@@ -18,6 +18,9 @@ const TFTEngine = (() => {
   const ITEMS = Object.fromEntries(D.items.map(i => [i.id, i]));
   const COMPONENTS = D.items.filter(i => !i.from).map(i => i.id);
   const FULL_ITEMS = D.items.filter(i => i.from && i.id !== 'ThiefsGloves').map(i => i.id);
+  // consumível: não é componente nem vai para uma unidade
+  const REMOVER = 'MagneticRemover';
+  ITEMS[REMOVER] = { id: REMOVER, name: 'Removedor Magnético', from: null, special: true, icon: 'assets/maps/tft/icons/items/hexcore/tft_consumable_itemremover.png', fx: {} };
 
   /* ---------- Constantes da season ---------- */
   const RULES = {
@@ -156,7 +159,40 @@ const TFTEngine = (() => {
     NightHarvester: '5% de durabilidade; 15% acima de 50% de Vida.', Quicksilver: 'Imune a atordoamento por 18s; +3% de Vel. de Ataque por segundo.',
     Deathblade: 'Amplifica o dano.', WarmogsArmor: 'Recebe 18% de Vida máxima.',
     StatikkShiv: 'Dano reduz 30% da RM do alvo por 5s.', HextechGunblade: 'Cura o aliado mais ferido em 20% do dano causado.',
+    MagneticRemover: 'Arraste até uma unidade: todos os itens dela voltam intactos para o banco de itens.',
   };
+
+  /* bônus de cada faixa, com os mesmos valores que applyTraits usa no combate */
+  const pct = v => `${Math.round(v * 100)}%`;
+  const TRAIT_TIER_TEXT = {
+    'Brutamontes': v => `+${pct(v.HealthBonus)} de Vida`,
+    'Bastião': v => `+${v.BonusArmor} de Armadura e RM`,
+    'Vanguarda': v => `Escudo de ${pct(v.ShieldPercentAmount)} da Vida`,
+    'Dizimador': v => `+${pct(v.AttackDamage)} de DA e ${pct(v.Healing)} de Vampirismo`,
+    'Fumegante': v => `+${pct(v.AttackSpeed)} de Vel. de Ataque por ataque`,
+    'Estratégico': v => `${pct(v.DamageAmp)} de amplificação atrás, ${pct(v.Durability)} de durabilidade na frente`,
+    'Atirador': v => `+${pct(v.BonusAD)} de DA`,
+    'Boi Dourado': v => `${pct(v.DamageAmp)} de amplificação e ${pct(v.KillDrop)} de chance de ouro`,
+    'Boom Bot': v => `Míssil de ${v.MissileDamage} de dano mágico`,
+    'Tecnológico': v => `+${v.APBonus} de PH`,
+    'Dínamo': v => `+${v.Mana} de Mana a cada 3s`,
+    'Carrasco': v => `+${pct(v.CRIT_PERCENT)} de chance e +${pct(v.CRIT_DAMAGE)} de dano crítico`,
+    'A.M.P.': v => `+${v.HPAmt} de Vida e +${pct(0.05 * v.SuperchargeAmount)} de dano da habilidade`,
+    'Esquadrão Anima': v => `+${v.Resists} de Armadura e RM, ${pct(v.DamageAmp)} de amplificação`,
+    'ExoTec': v => `+${v.HealthBonus} de Vida e +${v.ASBonus}% de Vel. de Ataque por item`,
+    'Demônio Urbano': v => `+${pct(v.HP)} de Vida, +${v.ADAP}% de DA e +${v.ADAP} de PH`,
+    'Transgressor': v => `+${v.MobHealth} de Vida, ${pct(v.DamageAmp)} de amplificação, ${v.NumBosses} Chapéu(s)`,
+    'Divinicorp': v => `Bônus de cada Divinicorp × ${Math.round(v.DivinicorpBonus * 100) / 100}`,
+    'Ciberchefão': v => `${v.min >= 4 ? 'Todos recebem' : 'O mais forte recebe'} +${pct(num(v.BossPercentHealth || v.BigBossPercentHealth))} de Vida e +${num(v.BossAP || v.BigBossAP)} de PH`,
+    'Cifra': v => `+${pct(v.AttackDamage)} de DA e +${v.AbilityPower} de PH`,
+    'Nitro': v => `+${v.HealthPerScrap} de Vida e +${v.APPerScrap} de PH por Cromo`,
+    'Mata-almas': () => 'Cura 25% da Vida e +10% de dano por abate',
+    'Soberano': v => `Recebe ${pct(v.PercentHPGain)} da Vida e ${pct(v.PercentADGain)} do DA do aliado atrás`,
+    'Deus das Redes': () => '+25% de Vida e de DA',
+    'Vírus': () => '+30% de Vida e +30 de PH',
+    'Atirador de Elite': v => `+${v.PercentDamageIncrease}% de dano por casa de distância`,
+  };
+  const traitTiers = name => TRAITS[name].tiers.map(v => ({ min: v.min, text: TRAIT_TIER_TEXT[name](v) }));
 
   const TANK_ROLES = new Set(['ADTank', 'APTank']);
   const num = v => Number(v) || 0;
@@ -232,16 +268,17 @@ const TFTEngine = (() => {
       name, bot: !!bot, hp: RULES.startHp, gold: 0, xp: 0, level: 1, streak: 0, ready: false, locked: false,
       shop: Array(RULES.shopSize).fill(null), bench: Array(RULES.benchSize).fill(null), board: {}, items: [],
       chrome: 0, carousel: null, picked: false, lastResult: null,
+      alive: true, left: false, placement: null, recent: [],
     };
   }
 
-  function createGame({ names, seed, bots = [false, false], skins = {} }) {
+  function createGame({ names, seed, bots = [], skins = {} }) {
     const pool = {};
     for (const c of D.champions) pool[c.id] = RULES.poolSize[c.cost];
     return {
       seed: seed >>> 0, rngN: 0, nextUid: 1, roundIdx: -1, phase: 'lobby', skins, pool,
-      players: [newPlayer(names[0], bots[0]), newPlayer(names[1], bots[1])],
-      combat: null, pending: null, winner: null, log: [],
+      players: names.map((name, i) => newPlayer(name, bots[i])),
+      combat: null, pairs: null, pending: null, winner: null, log: [],
     };
   }
 
@@ -365,6 +402,7 @@ const TFTEngine = (() => {
   function act(g, who, a) {
     const p = g.players[who];
     if (!p || !a || g.phase === 'end' || g.phase === 'lobby') return 'Fora de hora.';
+    if (!p.alive) return 'Você foi eliminado.';
     const planning = g.phase === 'plan' || g.phase === 'carousel';
 
     switch (a.a) {
@@ -420,6 +458,13 @@ const TFTEngine = (() => {
         const u = findUnit(p, a.uid);
         const id = p.items[a.item];
         if (!u || !id) return 'Item inválido.';
+        if (id === REMOVER) {
+          if (!u.items.length) return 'Esta unidade não tem itens.';
+          p.items.splice(a.item, 1);
+          p.items.push(...u.items);
+          u.items = [];
+          return null;
+        }
         const comp = COMPONENTS.includes(id);
         if (u.items.includes('ThiefsGloves')) return 'Luvas do Ladrão ocupam todos os espaços.';
         if (id === 'ThiefsGloves' && u.items.length) return 'A unidade precisa estar sem itens.';
@@ -476,24 +521,55 @@ const TFTEngine = (() => {
     return out;
   }
 
+  const alivePlayers = g => g.players.filter(p => p.alive);
+
+  /* sorteia os duelos da rodada, evitando repetir os últimos rivais.
+     Com número ímpar, quem sobra enfrenta o fantasma (cópia) do time de outro jogador. */
+  function makePairs(g) {
+    const ids = g.players.map((p, i) => (p.alive ? i : -1)).filter(i => i >= 0);
+    for (let i = ids.length - 1; i > 0; i--) { const j = Math.floor(rand(g) * (i + 1)); [ids[i], ids[j]] = [ids[j], ids[i]]; }
+    const memory = Math.max(0, Math.min(3, ids.length - 2));
+    const recentOf = i => (memory ? g.players[i].recent.slice(-memory) : []);
+    const free = ids.slice();
+    const pairs = [];
+    while (free.length > 1) {
+      const a = free.shift();
+      let idx = free.findIndex(b => !recentOf(a).includes(b) && !recentOf(b).includes(a));
+      if (idx < 0) idx = 0;
+      const b = free.splice(idx, 1)[0];
+      pairs.push({ a, b, ghost: null });
+      g.players[a].recent.push(b);
+      g.players[b].recent.push(a);
+    }
+    if (free.length) {
+      const a = free[0];
+      const others = ids.filter(i => i !== a);
+      const ghost = others.find(i => !recentOf(a).includes(i)) ?? others[0];
+      pairs.push({ a, b: null, ghost });
+      g.players[a].recent.push(ghost);
+    }
+    return pairs;
+  }
+
   /* abre a próxima rodada: paga renda, atualiza loja e define a fase */
   function nextRound(g) {
     g.roundIdx++;
     g.combat = null;
     g.pending = null;
     const info = roundInfo(g.roundIdx);
-    for (const p of g.players) {
-      p.ready = false;
-      p.lastResult = null;
+    const alive = alivePlayers(g);
+    for (const p of g.players) { p.ready = false; p.lastResult = null; }
+    for (const p of alive) {
       if (g.roundIdx === 0) continue;
       const passive = RULES.passiveGold[info.label] != null ? RULES.passiveGold[info.label] : 5;
       p.gold += passive + Math.min(5, Math.floor(p.gold / 10)) + streakGold(p.streak);
       gainXp(p, RULES.roundXp);
       if (!p.locked) refreshShop(g, p);
     }
+    g.pairs = info.type === 'pvp' ? makePairs(g) : null;
     if (info.type === 'carousel') {
       g.phase = 'carousel';
-      for (const p of g.players) { p.carousel = carouselOptions(g, info.stage); p.picked = false; }
+      for (const p of alive) { p.carousel = carouselOptions(g, info.stage); p.picked = false; }
     } else {
       g.phase = 'plan';
     }
@@ -502,7 +578,7 @@ const TFTEngine = (() => {
 
   /* fim do tempo do carrossel: quem não escolheu recebe uma opção qualquer */
   function endCarousel(g) {
-    for (const p of g.players) {
+    for (const p of alivePlayers(g)) {
       if (!p.picked && p.carousel && p.carousel.length) takeCarousel(g, p, randPick(g, p.carousel));
       p.carousel = null;
     }
@@ -527,25 +603,49 @@ const TFTEngine = (() => {
   /* roda os combates da rodada; o resultado só vale em finishCombat */
   function startCombat(g) {
     const info = roundInfo(g.roundIdx);
-    g.players.forEach(autoField);
+    alivePlayers(g).forEach(autoField);
     const seed = (g.seed ^ (g.roundIdx * 7919 + 13)) >>> 0;
+    let fights;
     if (info.type === 'pvp') {
-      const res = simulate(teamFromPlayer(g.players[0]), teamFromPlayer(g.players[1]), seed);
-      g.combat = { kind: 'pvp', views: [res, res] };
+      // alguém pode ter saído durante o planejamento
+      const stillValid = g.pairs && g.pairs.every(x => [x.a, x.b, x.ghost].every(i => i == null || g.players[i].alive));
+      if (!stillValid) g.pairs = makePairs(g);
+      fights = g.pairs.map((x, i) => {
+        const A = g.players[x.a];
+        const B = g.players[x.b != null ? x.b : x.ghost];
+        return {
+          ...simulate(teamFromPlayer(A), teamFromPlayer(B), (seed + i * 31) >>> 0),
+          a: x.a, b: x.b, names: [A.name, x.b != null ? B.name : `Fantasma de ${B.name}`],
+        };
+      });
     } else {
       const wave = creepWave(info);
-      g.combat = { kind: 'pve', views: g.players.map((p, i) => simulate(teamFromPlayer(p), wave, (seed + i) >>> 0)) };
+      fights = g.players.map((p, i) => (p.alive ? {
+        ...simulate(teamFromPlayer(p), wave, (seed + i) >>> 0),
+        a: i, b: null, names: [p.name, 'Monstros'], loot: combatLoot(g, info),
+      } : null)).filter(Boolean);
     }
+    g.combat = { kind: info.type === 'pvp' ? 'pvp' : 'pve', fights };
     g.phase = 'combat';
     return g.combat;
+  }
+
+  /* o combate que cada jogador vê; quem já saiu acompanha o primeiro da rodada */
+  function viewFor(g, who) {
+    const fights = g.combat ? g.combat.fights : [];
+    const own = fights.find(f => f.a === who || f.b === who);
+    if (own) return { view: own, flip: own.b === who, spectate: false };
+    return fights.length ? { view: fights[0], flip: false, spectate: true } : null;
   }
 
   function combatLoot(g, info) {
     const loot = { gold: 0, items: [] };
     const comp = () => randPick(g, COMPONENTS);
-    if (info.label === '1-2' || info.label === '1-4') loot.items.push(comp());
-    else if (info.label === '1-3') loot.gold = 3;
-    else { loot.gold = 3; loot.items.push(comp()); if (info.stage >= 4) loot.items.push(comp()); }
+    loot.items.push(comp());
+    if (info.label === '1-3') loot.gold = 2;
+    if (info.stage >= 2) loot.gold = 3;
+    if (info.stage >= 4) loot.items.push(comp());
+    if (info.label === '1-4' || info.stage >= 2) loot.items.push(REMOVER);
     return loot;
   }
 
@@ -555,44 +655,43 @@ const TFTEngine = (() => {
     const dmgFor = survivors => stageDamage(info.stage) + survivors;
 
     if (c.kind === 'pvp') {
-      const r = c.views[0];
-      const [p0, p1] = g.players;
-      if (r.winner === -1) {
-        const d = stageDamage(info.stage);
-        p0.hp -= d; p1.hp -= d;
-        p0.streak = 0; p1.streak = 0;
-        p0.lastResult = { res: 'draw', dmg: d };
-        p1.lastResult = { res: 'draw', dmg: d };
-        addLog(g, `${info.label}: empate (−${d} para os dois)`);
-      } else {
-        const win = g.players[r.winner];
-        const lose = g.players[1 - r.winner];
-        const d = dmgFor(r.survivors);
-        lose.hp -= d;
-        win.gold += 1;
-        win.streak = win.streak > 0 ? win.streak + 1 : 1;
-        lose.streak = lose.streak < 0 ? lose.streak - 1 : -1;
-        win.lastResult = { res: 'win', dmg: 0 };
-        lose.lastResult = { res: 'lose', dmg: d };
-        if (traitCounts(Object.values(lose.board).map(u => u.c))['Cifra'] >= 3) lose.gold += 1;
-        addLog(g, `${info.label}: ${win.name} venceu (${lose.name} −${d})`);
+      for (const f of c.fights) {
+        const A = g.players[f.a];
+        const B = f.b != null ? g.players[f.b] : null;   // sem B: o rival era um fantasma
+        const loseTo = (p, d) => { if (p && p.alive) { p.hp -= d; p.streak = p.streak < 0 ? p.streak - 1 : -1; p.lastResult = { res: 'lose', dmg: d }; } };
+        const winOver = p => { if (p && p.alive) { p.gold += 1; p.streak = p.streak > 0 ? p.streak + 1 : 1; p.lastResult = { res: 'win', dmg: 0 }; } };
+        if (f.winner === -1) {
+          const d = stageDamage(info.stage);
+          for (const p of [A, B]) if (p && p.alive) { p.hp -= d; p.streak = 0; p.lastResult = { res: 'draw', dmg: d }; }
+          addLog(g, `${info.label}: ${f.names[0]} empatou com ${f.names[1]}`);
+        } else {
+          const win = f.winner === 0 ? A : B;
+          const lose = f.winner === 0 ? B : A;
+          const d = dmgFor(f.survivors);
+          winOver(win);
+          loseTo(lose, d);
+          if (lose && lose.alive && traitCounts(Object.values(lose.board).map(u => u.c))['Cifra'] >= 3) lose.gold += 1;
+          addLog(g, `${info.label}: ${f.names[f.winner]} venceu ${f.names[1 - f.winner]}${lose ? ` (−${d})` : ''}`);
+        }
+        if (A.alive) A.gold += f.goldDrops[0];
+        if (B && B.alive) B.gold += f.goldDrops[1];
       }
-      r.goldDrops.forEach((n, side) => { g.players[side].gold += n; });
     } else {
-      g.players.forEach((p, i) => {
-        const r = c.views[i];
-        const loot = combatLoot(g, info);
+      for (const f of c.fights) {
+        const p = g.players[f.a];
+        if (!p.alive) continue;
+        const loot = f.loot;
         p.gold += loot.gold;
         p.items.push(...loot.items);
-        if (r.winner === 0) p.lastResult = { res: 'win', dmg: 0, loot };
-        else { const d = dmgFor(r.survivors); p.hp -= d; p.lastResult = { res: 'lose', dmg: d, loot }; }
-        p.gold += r.goldDrops[0];
-      });
+        if (f.winner === 0) p.lastResult = { res: 'win', dmg: 0, loot };
+        else { const d = dmgFor(f.survivors); p.hp -= d; p.lastResult = { res: 'lose', dmg: d, loot }; }
+        p.gold += f.goldDrops[0];
+      }
       addLog(g, `${info.label}: monstros`);
     }
 
     // Cromo do Nitro por estrela em campo (até 200)
-    for (const p of g.players) {
+    for (const p of alivePlayers(g)) {
       const counts = traitCounts(Object.values(p.board).map(u => u.c));
       if (activeTier('Nitro', counts['Nitro'] || 0)) {
         const stars = Object.values(p.board).filter(u => CH[u.c].traits.includes('Nitro')).reduce((t, u) => t + u.star, 0);
@@ -601,14 +700,60 @@ const TFTEngine = (() => {
     }
 
     g.combat = null;
-    g.players.forEach(p => { p.hp = Math.max(0, p.hp); });
-    const dead = g.players.map(p => p.hp <= 0);
-    if (dead[0] || dead[1]) {
-      g.phase = 'end';
-      g.winner = dead[0] && dead[1] ? -1 : dead[0] ? 1 : 0;
-      return;
+    settleDeaths(g);
+    if (g.phase !== 'end') nextRound(g);
+  }
+
+  /* sai da partida: as unidades voltam ao pool, como no TFT */
+  function eliminate(g, p) {
+    for (const u of allUnits(p)) g.pool[u.c] += copiesValue(u.star);
+    p.alive = false;
+    p.board = {};
+    p.bench = Array(RULES.benchSize).fill(null);
+    p.items = [];
+    p.shop = Array(RULES.shopSize).fill(null);
+    p.carousel = null;
+    p.ready = false;
+    addLog(g, `${p.name} terminou em ${p.placement}º`);
+  }
+
+  function endIfDecided(g, remaining) {
+    if (remaining.length > 1) return;
+    g.phase = 'end';
+    g.combat = null;
+    if (remaining.length === 1) {
+      remaining[0].placement = 1;
+      g.winner = g.players.indexOf(remaining[0]);
     }
-    nextRound(g);
+  }
+
+  /* quem chegou a 0 de Vida na rodada: menos dano sofrido fica mais bem colocado */
+  function settleDeaths(g) {
+    const alive = alivePlayers(g);
+    const dead = alive.filter(p => p.hp <= 0).sort((a, b) => b.hp - a.hp);
+    const remaining = alive.filter(p => p.hp > 0);
+    dead.forEach((p, i) => { p.placement = remaining.length + i + 1; eliminate(g, p); });
+    if (!remaining.length && dead.length) {
+      // todos caíram juntos: empate só se a Vida também for igual
+      const tied = dead.filter(p => p.hp === dead[0].hp);
+      tied.forEach(p => { p.placement = 1; });
+      g.winner = tied.length > 1 ? -1 : g.players.indexOf(dead[0]);
+    }
+    g.players.forEach(p => { p.hp = Math.max(0, p.hp); });
+    endIfDecided(g, remaining);
+  }
+
+  /* jogador desconectado: conta como eliminado na hora */
+  function dropPlayer(g, who) {
+    const p = g.players[who];
+    if (!p || !p.alive) return;
+    p.left = true;
+    p.placement = alivePlayers(g).length;
+    p.hp = 0;
+    eliminate(g, p);
+    endIfDecided(g, alivePlayers(g));
+    // saiu no planejamento: refaz os duelos, para ninguém esperar um rival que não existe mais
+    if (g.phase === 'plan' && g.pairs) g.pairs = makePairs(g);
   }
 
   /* ---------- Monstros ---------- */
@@ -626,7 +771,7 @@ const TFTEngine = (() => {
     const wave = { '1-2': ['melee', 'melee'], '1-3': ['melee', 'melee', 'ranged'], '1-4': ['melee', 'melee', 'ranged', 'ranged'] }[info.label]
       || { 2: ['krug', 'krug', 'krug'], 3: ['wolf', 'wolf', 'wolf', 'wolf', 'wolf'], 4: ['raptor', 'raptor', 'raptor', 'raptor', 'raptor', 'raptor'], 5: ['dragon'], 6: ['herald'] }[info.stage]
       || ['baron'];
-    const spots = ['3,0', '2,0', '4,0', '2,2', '4,2', '3,3'];
+    const spots = ['3,0', '0,0', '6,0', '1,2', '5,2', '3,3'];
     return { creeps: wave.map((k, i) => ({ key: k, spot: spots[i] })), chrome: 0 };
   }
 
@@ -663,6 +808,7 @@ const TFTEngine = (() => {
       sunderUntil: 0, sunderV: 0, shredUntil: 0, shredV: 0, burnUntil: 0, woundUntil: 0, debuffUntil: 0,
       dots: [], aura: null, buffUntil: 0, buffAS: 0, once: {}, stacks: {}, boom: 0, boomTier: null, vanguard: null,
       gargBonus: 0, critStacks: [], icd: {}, extraHits: 0,
+      stat: { p: 0, m: 0, t: 0, reduced: 0, shield: 0, heal: 0, cc: 0, taken: 0, kills: 0 },
     };
   }
 
@@ -864,6 +1010,29 @@ const TFTEngine = (() => {
     return shared;
   }
 
+  /* atributos prontos para a tela (já com itens e, em campo, traits) */
+  const statsOf = u => ({
+    hp: Math.round(u.maxHp), ad: Math.round(u.ad), ap: Math.round(u.ap), armor: Math.round(u.armor), mr: Math.round(u.mr),
+    as: Math.round(u.asBase * (1 + u.asBonus) * 100) / 100, crit: Math.round(u.crit * 100), range: u.range,
+    mana: Math.round(u.mana), maxMana: u.maxMana, vamp: Math.round(u.vamp * 100), amp: Math.round(u.amp * 100),
+  });
+  function previewUnit(c, star, items) {
+    const u = makeChampionUnit({ c, star, items, x: 0, y: 0 }, 1, 0, makeRng(1));
+    u.ad = u.baseAd * (1 + u.adPct);
+    return statsOf(u);
+  }
+  function previewBoard(board, chrome) {
+    const rng = makeRng(1);
+    const list = Object.entries(board).map(([key, raw], i) => {
+      const [x, y] = key.split(',').map(Number);
+      const u = makeChampionUnit({ ...raw, x, y }, i + 1, 0, rng);
+      u.uid = raw.uid;
+      return u;
+    });
+    applyTraits(list, chrome || 0);
+    return Object.fromEntries(list.map(u => [u.uid, statsOf(u)]));
+  }
+
   function simulate(teamA, teamB, seed) {
     const rng = makeRng(seed);
     const units = [];
@@ -877,6 +1046,7 @@ const TFTEngine = (() => {
       units.push(...list);
     });
 
+    units.forEach(u => { u.start = statsOf(u); });
     const occ = new Map();
     const cellKey = (c, r) => `${c},${r}`;
     units.forEach(u => occ.set(cellKey(u.c, u.r), u.id));
@@ -893,20 +1063,47 @@ const TFTEngine = (() => {
     const targetable = x => x.alive && x.untargetUntil <= t;
     const nearest = (u, list) => {
       let best = null, bd = 99;
-      for (const x of list) { const d = dist(u, x); if (d < bd || (d === bd && best && x.id < best.id)) { best = x; bd = d; } }
+      let ties = 1;
+      for (const x of list) {
+        const d = dist(u, x);
+        if (d < bd) { best = x; bd = d; ties = 1; }
+        else if (d === bd && rng() < 1 / ++ties) best = x;   // empate: sem preferência de lado
+      }
       return best;
     };
+
+    /* primeiro passo do caminho mais curto até ficar ao alcance de tgt, desviando das outras unidades */
+    function pathStep(u, tgt) {
+      const seen = new Set([cellKey(u.c, u.r)]);
+      const queue = [{ c: u.c, r: u.r, first: null }];
+      for (let i = 0; i < queue.length; i++) {
+        const cur = queue[i];
+        const next = neighbors(cur.c, cur.r);
+        for (let j = next.length - 1; j > 0; j--) { const k = Math.floor(rng() * (j + 1)); [next[j], next[k]] = [next[k], next[j]]; }
+        for (const [x, y] of next) {
+          const key = cellKey(x, y);
+          if (seen.has(key) || occ.has(key)) continue;
+          seen.add(key);
+          const first = cur.first || [x, y];
+          if (hexDist(x, y, tgt.c, tgt.r) <= u.range) return first;
+          queue.push({ c: x, r: y, first });
+        }
+      }
+      return null;
+    }
 
     function addShield(u, amount, dur) { u.shields.push({ v: amount, until: t + dur }); events.push(['sh', u.id]); }
     const shieldTotal = u => u.shields.reduce((s, x) => s + x.v, 0);
     function heal(u, amount) {
       if (!u.alive || amount <= 0) return;
       const real = amount * (u.woundUntil > t ? 0.67 : 1);
+      u.stat.heal += Math.min(real, u.maxHp - u.hp);
       u.hp = Math.min(u.maxHp, u.hp + real);
       if (real >= 15) events.push(['h', u.id, Math.round(real)]);
     }
-    function stun(u, sec) {
+    function stun(u, sec, src) {
       if (!u.alive || u.ccImmuneUntil > t) return;
+      if (src) src.stat.cc += Math.max(0, t + sec - Math.max(u.stunUntil, t));
       u.stunUntil = Math.max(u.stunUntil, t + sec);
     }
 
@@ -914,6 +1111,7 @@ const TFTEngine = (() => {
       u.alive = false;
       occ.delete(cellKey(u.c, u.r));
       events.push(['x', u.id]);
+      if (src) src.stat.kills++;
       if (src && src.goldChance && rng() < src.goldChance) { goldDrops[src.side]++; events.push(['g', src.id]); }
       if (src && src.soul) { heal(src, src.maxHp * 0.25); src.amp += 0.1; }
     }
@@ -953,12 +1151,16 @@ const TFTEngine = (() => {
       if (o.attack && tgt.has.has('BrambleVest')) final *= 0.95;
 
       const dealt = final;
+      src.stat[type] += dealt;
+      tgt.stat.taken += dealt;
+      tgt.stat.reduced += Math.max(0, amount - dealt);
       for (const s of tgt.shields) {
         const take = Math.min(s.v, final);
         s.v -= take;
         final -= take;
         if (final <= 0) break;
       }
+      tgt.stat.shield += dealt - final;
       tgt.shields = tgt.shields.filter(s => s.v > 0);
       tgt.hp -= final;
       if (!tgt.casting) tgt.mana += Math.min(42, raw * 0.01 + dealt * 0.03);
@@ -1019,7 +1221,7 @@ const TFTEngine = (() => {
       const dmg = spellDamage(u, spec);
       if (spec.dot) tgt.dots.push({ dps: dmg / spec.dot, until: t + spec.dot, src: u.id });
       else if (dmg > 0) hit(u, tgt, dmg, spec.type || 'm', { ability: true });
-      if (spec.stun && !spec.stunAoe) stun(tgt, spec.stun);
+      if (spec.stun && !spec.stunAoe) stun(tgt, spec.stun, u);
       if (spec.sunder) { tgt.sunderUntil = t + 4.4; tgt.sunderV = Math.max(tgt.sunderV, spec.sunder); }
       if (spec.shred) { tgt.shredUntil = t + 30; tgt.shredV = Math.max(tgt.shredV, spec.shred); }
       if (spec.wound) tgt.woundUntil = t + 5;
@@ -1056,11 +1258,11 @@ const TFTEngine = (() => {
         for (const x of around) {
           if (spec.splash) hit(u, x, spec.splash[u.star - 1] * u.ap / 100, spec.type || 'm', { ability: true });
           if (spec.splashAd) hit(u, x, spec.splashAd * u.ad, spec.type || 'p', { ability: true });
-          if (spec.stunAoe) stun(x, spec.stun);
+          if (spec.stunAoe) stun(x, spec.stun, u);
           if (spec.wound) x.woundUntil = t + 5;
         }
-        if (spec.stunAoe) stun(main, spec.stun);
-      } else if (spec.stunAoe) stun(main, spec.stun);
+        if (spec.stunAoe) stun(main, spec.stun, u);
+      } else if (spec.stunAoe) stun(main, spec.stun, u);
     }
 
     function attack(u, tgt) {
@@ -1132,7 +1334,7 @@ const TFTEngine = (() => {
     }
     function applyTrue(u, amount, src, type = 't') {
       if (!u.alive) return;
-      hit(src || { amp: 0, abilityAmp: 0, has: new Set(), critStacks: [], vamp: 0, debuffUntil: 0, crit: 0 }, u, amount, type, { noProc: true });
+      hit(src || { amp: 0, abilityAmp: 0, has: new Set(), critStacks: [], vamp: 0, debuffUntil: 0, crit: 0, stat: { p: 0, m: 0, t: 0 } }, u, amount, type, { noProc: true });
     }
 
     /* início: escudos e efeitos instantâneos */
@@ -1182,14 +1384,15 @@ const TFTEngine = (() => {
           const speed = Math.min(5, u.asBase * (1 + u.asBonus + (u.buffUntil > t ? u.buffAS : 0)));
           if (u.atkT >= 1 / speed) { u.atkT = 0; attack(u, u.target); }
         } else if (u.moveT <= t) {
-          const cur = dist(u, u.target);
-          let best = null, bd = 99;
-          for (const [x, y] of neighbors(u.c, u.r)) {
-            if (occ.has(cellKey(x, y))) continue;
-            const d = hexDist(x, y, u.target.c, u.target.r);
-            if (d < bd) { bd = d; best = [x, y]; }
+          let best = pathStep(u, u.target);
+          if (!best) {
+            // alvo cercado: procura outro inimigo que dê para alcançar
+            for (const e of enemiesOf(u).filter(x => x !== u.target && targetable(x)).sort((a, b) => dist(u, a) - dist(u, b))) {
+              best = pathStep(u, e);
+              if (best) { u.target = e; break; }
+            }
           }
-          if (best && (bd < cur || rng() < 0.35)) {
+          if (best) {
             occ.delete(cellKey(u.c, u.r));
             u.c = best[0]; u.r = best[1];
             occ.set(cellKey(u.c, u.r), u.id);
@@ -1205,7 +1408,10 @@ const TFTEngine = (() => {
     const winner = a0 && !a1 ? 0 : a1 && !a0 ? 1 : -1;
     return {
       winner, survivors: winner === 0 ? a0 : winner === 1 ? a1 : 0, duration: t, goldDrops, frames,
-      meta: units.map(u => ({ id: u.id, side: u.side, champ: u.champ || null, creep: u.creep || null, star: u.star, maxMana: u.maxMana, items: u.items })),
+      meta: units.map(u => ({
+        id: u.id, side: u.side, champ: u.champ || null, creep: u.creep || null, star: u.star, maxMana: u.maxMana, items: u.items, stats: u.start,
+        stat: Object.fromEntries(Object.entries(u.stat).map(([k, v]) => [k, Math.round(v * 10) / 10])),
+      })),
     };
   }
 
@@ -1243,7 +1449,7 @@ const TFTEngine = (() => {
     const front = field.filter(u => CH[u.c].range <= 2);
     const back = field.filter(u => CH[u.c].range > 2);
     const place = (list, rows) => {
-      const cols = [3, 2, 4, 1, 5, 0, 6];
+      const cols = [3, 0, 6, 1, 5, 2, 4];   // abre pelas pontas: a luta não fica presa no meio
       for (const u of list) {
         for (const y of rows) {
           const x = cols.find(col => !p.board[`${col},${y}`]);
@@ -1256,6 +1462,7 @@ const TFTEngine = (() => {
     // itens no carregador principal
     const carrier = () => field.slice().sort((a, b) => score(b) - score(a)).find(u => u.items.length < 3 || u.items.some(i => COMPONENTS.includes(i)));
     for (let i = p.items.length - 1; i >= 0; i--) {
+      if (p.items[i] === REMOVER) continue;
       const c = carrier();
       if (c) act(g, who, { a: 'equip', item: i, uid: c.uid });
     }
@@ -1274,15 +1481,22 @@ const TFTEngine = (() => {
   /* ---------- Estado enviado à tela ---------- */
   function publicState(g, viewer) {
     const info = g.roundIdx >= 0 ? roundInfo(g.roundIdx) : null;
-    const view = (p, own) => ({
-      name: p.name, hp: p.hp, gold: p.gold, level: p.level, xp: p.xp,
-      xpNext: p.level >= RULES.maxLevel ? 0 : RULES.xpToLevel[p.level], streak: p.streak, ready: p.ready,
-      bench: p.bench, board: p.board, items: p.items, traits: traitSummary(p), lastResult: p.lastResult,
-      shop: own ? p.shop : null, locked: p.locked, carousel: own ? p.carousel : null, picked: p.picked,
-    });
+    const me = g.players[viewer];
+    const pair = g.pairs && me.alive ? g.pairs.find(x => x.a === viewer || x.b === viewer) : null;
     return {
-      phase: g.phase, round: info, you: view(g.players[viewer], true), rival: view(g.players[1 - viewer], false),
-      viewer, winner: g.winner, log: g.log.slice(-12),
+      phase: g.phase, round: info, viewer, winner: g.winner, log: g.log.slice(-12),
+      you: {
+        name: me.name, hp: me.hp, gold: me.gold, level: me.level, xp: me.xp,
+        xpNext: me.level >= RULES.maxLevel ? 0 : RULES.xpToLevel[me.level], streak: me.streak, ready: me.ready,
+        lastResult: me.lastResult, picked: me.picked, traits: traitSummary(me), alive: me.alive, placement: me.placement,
+        bench: me.bench, board: me.board, items: me.items, shop: me.shop, locked: me.locked, carousel: me.carousel, chrome: me.chrome,
+      },
+      // dos outros só vão as traits: tabuleiro, banco, itens e loja aparecem (as unidades) só no combate
+      players: g.players.map((p, i) => ({
+        i, name: p.name, hp: p.hp, level: p.level, gold: p.gold, streak: p.streak, ready: p.ready, picked: p.picked,
+        alive: p.alive, left: p.left, placement: p.placement, traits: traitSummary(p),
+      })),
+      opponent: pair ? (pair.b == null ? { i: pair.ghost, ghost: true } : { i: pair.a === viewer ? pair.b : pair.a, ghost: false }) : null,
     };
   }
 
@@ -1317,8 +1531,8 @@ const TFTEngine = (() => {
 
   return {
     D, CH, CH_BY_NAME, TRAITS, ITEMS, COMPONENTS, RULES, CREEPS, TRAIT_TEXT, ITEM_TEXT,
-    makeRng, roundInfo, buildSkins, createGame, act, nextRound, endCarousel, startCombat, finishCombat, simulate,
-    botPlan, botCarousel, publicState, abilityText, sellPrice, activeTier, stageDamage,
+    makeRng, roundInfo, buildSkins, createGame, act, nextRound, endCarousel, startCombat, finishCombat, dropPlayer, viewFor, simulate,
+    botPlan, botCarousel, publicState, abilityText, sellPrice, activeTier, stageDamage, previewUnit, previewBoard, traitCounts, traitTiers, REMOVER,
   };
 })();
 if (typeof module !== 'undefined') module.exports = TFTEngine;
