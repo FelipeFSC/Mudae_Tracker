@@ -15,6 +15,7 @@
   const CODE_CHARS = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789'; // sem 0/O, 1/I
   const NAME_KEY = 'mudaeTracker_arenaName';             // mesmo nome da Waifu Arena
   const ASSET_BASE = 'https://raw.communitydragon.org/latest/game/';
+  const BLOBLET_ICON = 'https://raw.communitydragon.org/15.14/game/assets/ux/tft/championsplashes/tft14_virusboblet_mobile.png';
   const MAX_ROSTER = 120;
   const MAX_DATA_PHOTO = 60000;
   const DATA_PHOTO_BUDGET = 1500000;   // fotos salvas no tracker que cada mensagem pode carregar
@@ -26,7 +27,7 @@
 
   const byId = id => document.getElementById(id);
   const esc = s => String(s == null ? '' : s).replace(/[&<>"']/g, ch => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[ch]));
-  const asset = path => (path ? ASSET_BASE + path : '');
+  const asset = path => (!path ? '' : /^https?:/.test(path) ? path : ASSET_BASE + path);
   const cleanName = n => String(n || '').trim().slice(0, 24) || 'Jogador';
   const safePhoto = src => {
     const s = typeof src === 'string' ? src.trim().replace(/^http:\/\//i, 'https://') : '';
@@ -675,7 +676,7 @@
   function render() {
     const st = L.st;
     if (!st) return;
-    L.preview = E.previewBoard(st.you.board, st.you.chrome);
+    L.preview = E.previewBoard(st.you.board, st.you.chrome, st.you);
     renderHeader(st);
     renderTraits(st);
     renderItems(st);
@@ -847,7 +848,7 @@
     byId('goldBox').innerHTML = `<i class="coin"></i><b>${you.gold}</b>`;
     const interest = Math.min(5, Math.floor(you.gold / 10));
     byId('interestBox').innerHTML = `Juros <b>+${interest}</b>`;
-    const fielded = Object.keys(you.board).length;
+    const fielded = Object.values(you.board).filter(u => !u.summon).length; // o robô da Nitro não ocupa vaga
     byId('fieldCount').innerHTML = `Em campo <b>${fielded}/${you.level}</b>`;
     // barra de XP em blocos, como no TFT (muitos blocos viram uma barra contínua)
     const segs = you.xpNext ? Math.min(12, Math.ceil(you.xpNext / 2)) : 1;
@@ -867,6 +868,13 @@
     byId('btnReady').classList.toggle('on', you.ready);
     const owned = [...you.bench.filter(Boolean), ...Object.values(you.board)];
     byId('shop').innerHTML = (you.shop || []).map((c, i) => {
+      // Vírus: Bloblet por cima da vaga; comprar revela o que está embaixo
+      if (you.shopBlob === i) {
+        return `<button type="button" class="shop-card cost0 bloblet ${you.gold < 1 ? 'cant' : ''}" data-buy="${i}" title="Bloblet: o Zac mais forte recebe +1,5% de Vida máxima e +1 de PH para sempre. Comprados: ${you.blobs || 0}">
+        <img class="pic" src="${esc(BLOBLET_ICON)}" alt="Bloblet" draggable="false">
+        <span class="shop-foot"><b>Bloblet</b><span class="shop-cost"><i class="coin"></i>1</span></span>
+      </button>`;
+      }
       if (!c) return '<div class="shop-card empty-card"></div>';
       const ch = champOf(c);
       const cant = you.gold < ch.cost;
@@ -1345,7 +1353,7 @@
       const fx = it.fx;
       const line = [
         fx.AD ? `+${Math.round(fx.AD * 100)}% DA` : '', fx.AP ? `+${fx.AP} PH` : '', fx.AS ? `+${fx.AS}% VA` : '', fx.Armor ? `+${fx.Armor} Arm` : '',
-        fx.MagicResist ? `+${fx.MagicResist} RM` : '', fx.Health ? `+${fx.Health} Vida` : '', fx.CritChance ? `+${fx.CritChance}% Crít.` : '', fx.ManaRegen ? `+${fx.ManaRegen} Mana/s` : '',
+        fx.MagicResist ? `+${fx.MagicResist} RM` : '', fx.Health ? `+${fx.Health} Vida` : '', fx.CritChance ? `+${fx.CritChance}% Crít.` : '', fx.Mana ? `+${fx.Mana} Mana inicial` : '',
       ].filter(Boolean).join(' · ');
       let recipes = '';
       if (it.from) {
@@ -1602,4 +1610,6 @@
   loadRoster();
   TFTCollection.init({ esc, safePhoto, asset });
   if (new URLSearchParams(location.search).has('fxtest')) openFxTest();
+  // só para testes automáticos (tft.html?debug): expõe o estado local
+  if (new URLSearchParams(location.search).has('debug')) window.__tft = { L, E, render, enterPhase, broadcastState };
 })();

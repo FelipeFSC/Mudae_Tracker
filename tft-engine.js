@@ -15,6 +15,30 @@ const TFTEngine = (() => {
   const CH = Object.fromEntries(D.champions.map(c => [c.id, c]));
   const CH_BY_NAME = Object.fromEntries(D.champions.map(c => [c.name, c]));
   const TRAITS = Object.fromEntries(D.traits.map(t => [t.name, t]));
+
+  /* ---------- Unidades invocadas (CommunityDragon 15.14) ----------
+     Não entram na loja nem no pool; ficam no tabuleiro com summon = true. */
+  const SUMMON_ICON = n => `https://raw.communitydragon.org/15.14/game/assets/characters/${n}/hud/${n}_square.tft_set14.png`;
+  const SUMMONS = {
+    'R-080T': { id: 'R-080T', name: 'R-080T', cost: 0, summon: true, role: 'APTank', traits: [], hp: 500, ad: 45, as: 0.7, armor: 40, mr: 40, range: 1, mana0: 50, mana: 100, abilityName: 'Fúria das Máquinas', icon: SUMMON_ICON('tft14_summonlevel2') },
+    'T-43X': { id: 'T-43X', name: 'T-43X', cost: 0, summon: true, role: 'APTank', traits: [], hp: 800, ad: 80, as: 0.75, armor: 50, mr: 50, range: 1, mana0: 50, mana: 120, abilityName: 'RawrXD', icon: SUMMON_ICON('tft14_summonlevel4') },
+  };
+  // inimigos oficiais da Horuja (Cyber City) que não são campeões de loja
+  const NPC_ICON = n => `https://raw.communitydragon.org/15.14/game/assets/characters/${n}/hud/${n}_square.tft_set14.png`;
+  Object.assign(SUMMONS, {
+    'Drone Mech': { id: 'Drone Mech', name: 'Drone Mech', cost: 0, npc: true, role: 'ADCarry', traits: [], hp: 250, ad: 18, as: 0.8, armor: 10, mr: 10, range: 3, mana0: 0, mana: 60, abilityName: 'Monitoramento', icon: 'https://raw.communitydragon.org/15.14/game/assets/ux/tft/championsplashes/tft_minion.png' },
+    'Tropa Mech': { id: 'Tropa Mech', name: 'Tropa Mech', cost: 0, npc: true, role: 'ADTank', traits: [], hp: 1400, ad: 130, as: 0.75, armor: 50, mr: 50, range: 1, mana0: 0, mana: 0, abilityName: 'Protocolo de Dispersão', icon: NPC_ICON('tft14_npc_super') },
+    'Tibbers': { id: 'Tibbers', name: 'Tibbers', cost: 0, npc: true, role: 'APTank', traits: [], hp: 1200, ad: 120, as: 0.7, armor: 60, mr: 60, range: 1, mana0: 0, mana: 0, abilityName: 'Colapso', icon: NPC_ICON('tft14_annietibbers') },
+  });
+  Object.assign(CH, SUMMONS);
+  Object.assign(CH_BY_NAME, SUMMONS);
+  /* Nitro: Cromo por estrela de cada Nitro único (Horuja/Double Up/Hyper Roll usam a 2ª tabela),
+     granadas e laser por estágio (2, 3, 4, 5+), cura fixa. Fontes: wiki (notas da 14.2) e tft.tools. */
+  const NITRO = {
+    chromePerStar: { normal: [2, 3, 6, 12], chaos: [4, 6, 10, 14] },
+    upgradeAt: 200, grenade: [100, 120, 140, 160], laser: [425, 450, 475, 500], heal: 130, stun: 1, targets: 3,
+  };
+  const nitroStageIdx = stage => Math.min(3, Math.max(0, stage - 2));
   const ITEMS = Object.fromEntries(D.items.map(i => [i.id, i]));
   const COMPONENTS = D.items.filter(i => !i.from).map(i => i.id);
   const FULL_ITEMS = D.items.filter(i => i.from && i.id !== 'ThiefsGloves').map(i => i.id);
@@ -50,8 +74,45 @@ const TFTEngine = (() => {
     LesserDuplicator: { name: 'Duplicador de Campeão Inferior', maxCost: 3, icon: 'assets/maps/tft/icons/items/hexcore/tft_consumable_championduplicator_iii.png', text: 'Arraste até um campeão de custo 3 ou menos para receber uma cópia dele.' },
     ChampionDuplicator: { name: 'Duplicador de Campeão', maxCost: 5, icon: 'assets/maps/particles/tft/item_icons/consumables/championduplicator_v.png', text: 'Arraste até um campeão para receber uma cópia dele.' },
     Reforger: { name: 'Reforjador', icon: 'assets/maps/tft/icons/items/hexcore/tft_consumable_itemreroller.png', text: 'Arraste até uma unidade para trocar os itens dela por outros do mesmo tipo.' },
+    Kingpin: { name: 'Chapéu de Rei do Crime', icon: 'https://raw.communitydragon.org/15.14/game/assets/maps/particles/tft/item_icons/traits/set14/tft14_mob_bosshat.tft_set14.png', text: 'Arraste até um campeão Transgressor para promovê-lo a Rei do Crime e melhorar a habilidade dele.' },
     Recombobulator: { name: 'Recombobulador de Bolso', maxCost: 2, icon: 'assets/maps/tft/icons/items/hexcore/tft17_carouselmarket_recombobulator.png', text: 'Arraste até um campeão de custo 1 ou 2 para transformá-lo em um de custo maior, mantendo as estrelas.' },
   };
+  /* ---------- Itens ExoTec (15.14): só campeões ExoTec equipam; _R = versão Radiante (10 ExoTec) ---------- */
+  const EXO_ICON = n => `https://raw.communitydragon.org/15.14/game/assets/maps/particles/tft/item_icons/tft14/tft14_item_${n}.tft_set14.png`;
+  const EXOTECH = {
+    Exo_Pulse: { name: 'Estabilizador de Pulso', icon: 'jhincyberneticitem', fx: { AD: 0.3, CritChance: 30, ExecuteThresholdPercent: 0.12, RedundantCritDamage: 0.1 } },
+    Exo_Pulse_R: { name: 'Silenciadora de Pulso', icon: 'jhincyberneticitem_radiant', fx: { AD: 0.44, CritChance: 44, ExecuteThresholdPercent: 0.44, RedundantCritDamage: 0.44 }, alwaysCritDmg: true },
+    Exo_Chassis: { name: 'Carcaça Corrompida', icon: 'mordekaisercyberneticitem', fx: { Health: 200, HealthSiphonAmt: 0.1, ShieldDuration: 5, ShieldEffectivenessPercent: 0.15, SiphonFrequency: 7, NumEnemies: 1 } },
+    Exo_Chassis_R: { name: 'Carcaça Harmonizada', icon: 'mordekaisercyberneticitem_radiant', fx: { Health: 400, HealthSiphonAmt: 0.08, ShieldDuration: 8, ShieldEffectivenessPercent: 1, SiphonFrequency: 1, NumEnemies: 3 } },
+    Exo_Holobow: { name: 'Holoarco', icon: 'varuscyberneticitem', fx: { AD: 0.15, AP: 30, AS: 25, BonusManaOnHit: 2, CritChanceOnCast: 40, Duration: 5, Mana: 15 } },
+    Exo_Holobow_R: { name: 'Holoarco Visante', icon: 'varuscyberneticitem_radiant', fx: { AD: 0.15, AP: 40, AS: 20, BonusManaOnHit: 10, CritChanceOnCast: 100, Duration: 8, Mana: 30 } },
+    Exo_Coil: { name: 'Ciberespiral', icon: 'sejuanicyberneticitem', fx: { Armor: 65, MagicResist: 65, HealingPercent: 0.12, MarkDuration: 8 } },
+    Exo_Coil_R: { name: 'Ciberespiral Confiscada', icon: 'sejuanicyberneticitem_radiant', fx: { Armor: 100, MagicResist: 100, HealingPercent: 0.75, MarkDuration: 10 } },
+    Exo_Flux: { name: 'Capacitor de Fluxo', icon: 'zericyberneticitem', fx: { AD: 0.25, AS: 25, ChargeCap: 4, FlatArmorReduction: 10, ShockDamage: 0.08 } },
+    Exo_Flux_R: { name: 'Capacitor de Fluxo Carregado', icon: 'zericyberneticitem_radiant', fx: { AD: 0.3, AS: 50, ChargeCap: 1, FlatArmorReduction: 15, ShockDamage: 0.2 } },
+    Exo_Lantern: { name: 'Lanterna Repulsora', icon: 'jaxcyberneticitem', fx: { BonusPercentHP: 0.05, Health: 444, Interval: 3, PercHealthDamage: 0.06, radius: 1 } },
+    Exo_Lantern_R: { name: 'Lanterna Anuladora', icon: 'jaxcyberneticitem_radiant', fx: { BonusPercentHP: 0.5, Health: 777, Interval: 1, PercHealthDamage: 0.1, radius: 1 } },
+    Exo_Fangs: { name: 'Hiperpresas', icon: 'naafiricyberneticitem', fx: { AD: 0.3, AP: 30, MarkDuration: 4, StatOmnivamp: 0.15, StoredDamage: 0.3 } },
+    Exo_Fangs_R: { name: 'Presas Otimizadas', icon: 'naafiricyberneticitem_radiant', fx: { AD: 0.4, AP: 40, StatOmnivamp: 0.3, StoredDamage: 1 }, instant: true },
+  };
+  /* ---------- Mods de Trait do Deus das Redes (15.14) ---------- */
+  const MOD_ICON = n => `https://raw.communitydragon.org/15.14/game/assets/maps/particles/tft/item_icons/tft14_gotn_mods/tft14_modtrait_${n}.tft_set14.png`;
+  const TRAIT_MODS = {
+    'Nitro': ['Modificador de Nitro', 'nitro'], 'Dínamo': ['Modificador de Dínamo', 'dynamo'], 'Demônio Urbano': ['Modificador Demônio Urbano', 'streetdemon'],
+    'Bastião': ['Modificador de Bastião', 'bastion'], 'Atirador': ['Modificador de Atirador', 'marksman'], 'Carrasco': ['Modificador de Carrasco', 'executioner'],
+    'Estratégico': ['Modificador de Estratégico', 'strategist'], 'Divinicorp': ['Modificador de DiviniCorp', 'divinicorp'], 'Boom Bot': ['Modificador de Boom Bot', 'boombots'],
+    'Esquadrão Anima': ['Modificador Esquadrão Anima', 'animasquad'], 'Boi Dourado': ['Modificador de Boi Dourado', 'goldenox'], 'Dizimador': ['Modificador de Dizimador', 'slayer'],
+    'ExoTec': ['Modificador de ExoTec', 'exotech'], 'Cifra': ['Modificador de Cifra', 'cypher'], 'Vanguarda': ['Modificador de Vanguarda', 'vanguard'],
+    'Brutamontes': ['Modificador de Brutamontes', 'bruiser'], 'Tecnológico': ['Modificador de Tecnológico', 'techie'], 'Transgressor': ['Modificador de Transgressor', 'syndicate'],
+    'Fumegante': ['Modificador de Fumegante', 'rapidfire'],
+  };
+  const modId = trait => `Mod_${trait}`;
+  for (const [trait, [name, icon]] of Object.entries(TRAIT_MODS)) {
+    ITEMS[modId(trait)] = { id: modId(trait), name, from: null, special: true, use: 'TraitMod', mod: trait, icon: MOD_ICON(icon), fx: {},
+      text: `Arraste até um campeão: ele passa a se beneficiar de ${trait} para sempre, sem contar para a trait. Cada campeão só pode ter 1 Mod.` };
+  }
+  const EXO_BASE = Object.keys(EXOTECH).filter(k => !k.endsWith('_R'));
+  for (const [id, e] of Object.entries(EXOTECH)) ITEMS[id] = { id, name: e.name, from: null, special: true, exotech: true, radiant: id.endsWith('_R'), icon: EXO_ICON(e.icon), fx: e.fx, exo: e };
   for (const [id, c] of Object.entries(CONSUMABLES)) ITEMS[id] = { id, name: c.name, from: null, special: true, use: id, icon: c.icon, text: c.text, fx: {} };
 
   /* ---------- Habilidades ----------
@@ -61,15 +122,31 @@ const TFTEngine = (() => {
      splash + radius = dano em volta, stun, shield/shieldHp/shieldDur,
      heal/healHp, hpGain, aura (dano por s) + auraDur, buffAS + buffDur,
      sunder/shred (fatia armadura/RM), wound, dot (duração em s). */
+  /* Rei do Crime (Chapéu do Chefão): tier 1 com 3/5 Transgressores, tier 3 com 7 */
+  const KINGPIN = {
+    'Darius': { range: [2, 4], falloff: 0.05, healPer: 70, healHp: 0.02 },
+    'Miss Fortune': { waves: 3, pierce: 0.4 },
+    'Shaco': { reach: 3, bonus: [0.5, 0.66], recast: 0.75 },
+    'Twisted Fate': { card: [245, 365, 550], truePct: 0.5, goldChance: 0.06, gold: 2 },
+    'Braum': { resists: [30, 80], period: [4, 2], hpPct: 0.1, resistPct: [1, 1.5, 2] },
+  };
   const ABILITIES = {
+    // granadas nos 3 inimigos mais próximos, atordoam e curam; dano por estágio em makeChampionUnit
+    'R-080T': { dmg: [100], type: 'm', hits: 3, nearestHits: true, stun: 1, heal: [130] },
+    'T-43X': { dmg: [100], type: 'm', hits: 3, nearestHits: true, stun: 1, heal: [130] },
+    // Drone Mech: disparo de 115% do DA (PercentAttackDamage oficial)
+    'Drone Mech': { ad: 1.15, type: 'p' },
+    // Tibbers: passivo (Vel. de Ataque e queimadura em volta), sem conjuração
+    'Tibbers': { tibbers: { as: 0.6, burn: 5 } },
     'Alistar': { steps: [{ shape: 'target', dmg: [240, 360, 600], type: 'm', stun: 2 }] },
     'Dr. Mundo': { ad: 2, type: 'p', heal: [75, 115, 175], healHp: 0.02 },
     'Jax': { dmg: [110, 165, 250], type: 'm', radius: 1, splash: [110, 165, 250], shield: [350, 425, 525], shieldDur: 4 },
     'Kindred': { steps: [{ shape: 'target', travel: 9, ad: [5.2, 5.2, 5.75], dmg: [20, 30, 45], type: 'p', overkill: true }] },
     "Kog'Maw": { buffAS: 0.8, buffDur: 5, dmg: [9, 14, 20], ad: 0.4, type: 'p' },
     'Morgana': { dmg: [400, 600, 1000], type: 'm', dot: 16 },
-    'Nidalee': { dmg: [220, 330, 500], type: 'm', heal: [100, 125, 210] },
-    'Poppy': { shield: [425, 500, 600], shieldDur: 3, aim: { far: 4 }, steps: [{ shape: 'area', radius: 1, travel: 9, dmg: [100, 150, 225], armorPct: [1.6, 2.4, 3.6], otherMul: 0.4, type: 'm' }] },
+    // + AmpedDamage aos 2 (+1 por Amp) mais próximos e cura extra por alvo
+    'Nidalee': { dmg: [220, 330, 500], type: 'm', heal: [100, 125, 210], ampTargets: { dmg: [75, 115, 170], n: 2, perAmp: 1, healPer: [20, 25, 40] } },
+    'Poppy': { shield: [425, 500, 600], shieldDur: 3, aim: { far: 4 }, steps: [{ shape: 'area', radius: 1, travel: 9, dmg: [100, 150, 225], armorPct: [1.6, 2.4, 3.6], otherMul: 0.4, bossOther: true, type: 'm' }] },
     'Seraphine': { steps: [{ shape: 'line', len: 'edge', dmg: [250, 375, 600], reduce: 0.4, type: 'm' }] },
     'Shaco': { ad: 3, dmg: [40, 60, 90], type: 'p', target: 'low' },
     'Sylas': { dmg: [100, 150, 225], type: 'm', radius: 1, splash: [100, 150, 225], heal: [150, 200, 250] },
@@ -81,13 +158,14 @@ const TFTEngine = (() => {
     'Illaoi': { dmg: [150, 225, 350], type: 'm', radius: 1, splash: [60, 90, 140], heal: [350, 400, 600], shred: 0.3 },
     'Jhin': { ad: 1.64, type: 'p', hits: 4, sunder: 0.2 },
     'LeBlanc': { dmg: [75, 115, 170], type: 'm', volley: 5 },
-    'Naafiri': { ad: 2.75, type: 'p' },
+    // 3 companheiros (0,75 DA) e 1 Alfa (+1 por Amp, 1,65 DA) atacam o alvo; passivo de 15% de Omnivamp
+    'Naafiri': { ad: 2.75, type: 'p', pack: { mates: 3, mateAd: 0.75, alphas: 1, alphaAd: 1.65 }, passiveVamp: 0.15 },
     'Rhaast': { ad: 5.25, type: 'p', stun: 1.75, heal: [220, 250, 300], healHp: 0.1 },
     'Shyvana': { hpGain: [210, 285, 360], aura: [18, 27, 40], auraDur: 99 },
     'Skarner': { dmg: [40, 60, 90], type: 'm', radius: 1, splash: [40, 60, 90], shield: [325, 375, 450], shieldDur: 3 },
     'Twisted Fate': { steps: [{ shape: 'target', travel: 11, dmg: [220, 330, 500], type: 'm' }, { shape: 'nearest', n: 1, travel: 11, dmg: [220, 330, 500], type: 'm' }] },
     'Vayne': { ad: 1.6, dmg: [10, 15, 25], type: 't' },
-    'Veigar': { dmg: [320, 450, 600], type: 'm', radius: 1, splash: [125, 170, 240] },
+    'Veigar': { dmg: [320, 450, 600], type: 'm', radius: 1, splash: [125, 170, 240], bossSplash: true },
     'Braum': { dmg: [100, 150, 240], type: 'm', radius: 1, splash: [100, 150, 240], shield: [375, 400, 450], shieldHp: 0.1, shieldDur: 4 },
     'Draven': { aim: { line: true }, steps: [{ shape: 'line', len: 'edge', ad: [3.7, 3.7, 3.9], dmg: [30, 45, 80], reduce: 0.2, type: 'p' }, { shape: 'line', len: 'edge', delay: 0.5, ad: [2.4, 2.4, 2.5], reduce: 0.2, type: 'p', sameLine: true }] },
     'Elise': { dmg: [54, 81, 125], type: 'm', volley: 4 },
@@ -100,8 +178,10 @@ const TFTEngine = (() => {
     'Rengar': { ad: 3, type: 'p', target: 'low', heal: [140, 145, 150] },
     'Senna': { steps: [{ shape: 'line', beyond: 2, ad: [2.8, 2.8, 3], dmg: [20, 30, 45], type: 'p' }] },
     'Varus': { dmg: [200, 300, 480], type: 'm', stun: 1, radius: 1, splash: [100, 150, 240] },
-    'Yuumi': { dmg: [100, 150, 235], type: 'm', hits: 3 },
-    'Annie': { steps: [{ shape: 'target', travel: 9, dmg: [230, 345, 1200], type: 'm' }, { shape: 'nearest', n: 2, includeMain: true, delay: 0.12, travel: 11, dmg: [42, 63, 300], type: 'm' }] },
+    // passivo: +3 de Mana por segundo por Amp
+    'Yuumi': { dmg: [100, 150, 235], type: 'm', hits: 3, manaPerAmp: 3 },
+    // bolas de fogo menores: 2 (+1 por Amp)
+    'Annie': { steps: [{ shape: 'target', travel: 9, dmg: [230, 345, 1200], type: 'm' }, { shape: 'nearest', n: 2, nPerAmp: 1, includeMain: true, delay: 0.12, travel: 11, dmg: [42, 63, 300], type: 'm' }] },
     'Aphelios': { aim: { group: 2, range: 'attack' }, chakram: { base: 4, attacks: 8, ad: [0.11, 0.11, 1] }, steps: [{ shape: 'area', radius: 2, travel: 14, ad: [2.2, 2.2, 6], dmg: [20, 30, 100], type: 'p' }] },
     'Brand': { aim: { group: 1, range: 'attack' }, steps: [{ shape: 'area', radius: 1, travel: 8, dmg: [260, 390, 1500], type: 'm' }, { shape: 'nearest', n: 4, delay: 0.15, travel: 8, dmg: [100, 150, 600], type: 'm' }] },
     "Cho'Gath": { hpGain: [70, 100, 500], steps: [{ shape: 'cone', len: 3, dmg: [100, 150, 1500], hpPct: 0.03, type: 'm' }] },
@@ -113,12 +193,13 @@ const TFTEngine = (() => {
     'Xayah': { ad: 2, dmg: [20, 30, 200], type: 'p', hits: 4 },
     'Zed': { ad: 2.7, dmg: [40, 60, 800], type: 'p', target: 'low', hits: 3 },
     'Zeri': { buffAS: 0.9, buffDur: 5, ad: 0.4, type: 'p' },
-    'Ziggs': { aim: { plus: true, range: 'attack' }, steps: [{ shape: 'plus', radius: 1, travel: 7, dmg: [265, 400, 1500], far: [130, 200, 900], soloMul: 2, type: 'm' }] },
+    'Ziggs': { aim: { plus: true, range: 'attack' }, steps: [{ shape: 'plus', radius: 1, travel: 7, dmg: [265, 400, 1500], far: [130, 200, 900], bossFar: true, soloMul: 2, type: 'm' }] },
     'Aurora': { dmg: [280, 420, 5000], type: 'm', hits: 3 },
     'Garen': { shield: [700, 1000, 21337], shieldDur: 1.5, refund: { atMost: 2, mana: 30 }, steps: [{ shape: 'target', ad: [6.5, 6.5, 30], type: 'p' }, { shape: 'line', len: 'edge', delay: 0.15, ad: [2.6, 2.6, 15], type: 'p', skipMain: true }] },
     'Kobuko': { dmg: [300, 450, 13370], type: 'm', stun: 1.5, radius: 1, splash: [150, 225, 1337] },
     'Renekton': { ad: 1, dmg: [310, 465, 1000], type: 'p', radius: 1, splash: [155, 232, 500], hpGain: [400, 650, 10000] },
-    'Samira': { ad: 0.9, type: 'p', volley: 8 },
+    // 22 balas (+1 por Amp) de 0,9 DA cada
+    'Samira': { ad: 0.9, type: 'p', volley: 22, volleyPerAmp: 1 },
     'Urgot': { buffAS: 0.8, buffDur: 5, dmg: [8, 12, 100], ad: 0.3, type: 'p' },
     'Viego': { dmg: [200, 300, 10000], type: 'm', radius: 2, splash: [90, 135, 10000] },
     'Zac': { dmg: [140, 210, 1000], type: 'm', radius: 2, stun: 1, stunAoe: true, heal: [80, 100, 2000] },
@@ -127,54 +208,86 @@ const TFTEngine = (() => {
   /* ---------- Textos curtos (dicas da tela) ---------- */
   const TRAIT_TEXT = {
     'Brutamontes': 'Equipe recebe +100 de Vida; Brutamontes recebem % de Vida.',
-    'Bastião': 'Equipe recebe Armadura e RM; Bastiões recebem mais, em dobro nos primeiros 10s.',
+    'Bastião': 'Equipe recebe Armadura e RM; Bastiões recebem mais, em dobro nos primeiros 10s. (6): quem não é Bastião recebe +25 a mais.',
     'Vanguarda': 'Escudo por % da Vida no início e com 50% de Vida; durabilidade enquanto há escudo.',
-    'Dizimador': 'Recebem % de Dano de Ataque e Vampirismo Universal.',
+    'Dizimador': 'Recebem % de Dano de Ataque e Omnivamp. A cura excedente cura o Dizimador com menos Vida em 50% do excesso.',
     'Fumegante': 'Equipe +10% de Vel. de Ataque; Fumegantes acumulam mais a cada ataque (até 10x).',
     'Estratégico': 'Duas linhas de trás: amplificação de dano. Duas da frente: durabilidade. Estratégicos recebem o triplo.',
     'Atirador': 'Recebem % de Dano de Ataque, em dobro após 8s.',
-    'Boi Dourado': 'Recebem amplificação de dano e têm chance de dar ouro ao abater.',
-    'Boom Bot': 'A cada 400 de dano causado, disparam um míssil de dano mágico no inimigo próximo.',
-    'Tecnológico': 'Recebem Poder de Habilidade; inimigos atingidos pela habilidade causam 10% menos dano por 3s.',
+    'Boi Dourado': 'Recebem amplificação de dano e chance de ouro ao abater. Gastar 8 de ouro numa rodada em atualizações (contam em dobro) ou EXP dá +1% permanente e aumenta a exigência (precisam ter lutado na rodada anterior). (6): o espólio pode ser um componente.',
+    'Boom Bot': 'A cada 400 de dano causado, disparam um míssil de dano mágico no inimigo próximo; 8% do dano sofrido conta. (6): dois mísseis.',
+    'Tecnológico': 'Recebem Poder de Habilidade; inimigos atingidos pela habilidade causam 10% menos dano por 3s (18% com 8).',
     'Dínamo': 'A cada 3s a equipe recebe Mana; Dínamos recebem o dobro.',
-    'Carrasco': 'Habilidades podem causar crítico; recebem chance e dano crítico.',
+    'Carrasco': 'Habilidades podem causar crítico; recebem chance e dano crítico. Com o alvo abaixo de 20% de Vida, o dano crítico bônus dobra. (5): durabilidade.',
     'A.M.P.': 'Recebem Vida e aumentam o dano da habilidade conforme a Amplificação. (adaptado)',
     'Esquadrão Anima': 'Recebem Armadura, RM e amplificação; uma arma dispara a cada 4s causando 6% da Vida máxima do alvo. (adaptado: sem escolha de arma)',
-    'ExoTec': 'Recebem Vida e Vel. de Ataque por item equipado, contando 1 item a mais. (adaptado: sem itens ExoTec)',
+    'ExoTec': 'Recebe itens ExoTec (1 aleatório com 3, 5 e 7), que só ExoTec equipam. ExoTec recebem Vida e Vel. de Ataque por item equipado. (10): seus itens ExoTec viram Radiantes.',
     'Demônio Urbano': 'Aliados nas casas pintadas recebem Vida, DA e PH; Demônios recebem o dobro. (adaptado: casas fixas)',
     'Transgressor': 'Recebem Vida e amplificação; o mais forte usa o Chapéu e causa +30% com a habilidade. (adaptado)',
-    'Divinicorp': 'Cada Divinicorp diferente dá um bônus à equipe (PH, resistências, DA, Vida, crítico, Vel. de Ataque); Divinicorps recebem o dobro.',
+    'Divinicorp': 'Cada Divinicorp diferente dá um bônus à equipe (Morgana PH, Rhaast resistências, Senna DA, Gragas Vida, Vex crítico, Renekton Vel. de Ataque, Emblema Omnivamp); Divinicorps recebem o dobro.',
     'Ciberchefão': 'O Ciberchefão mais forte recebe % de Vida e PH, e a habilidade atinge +1 inimigo.',
     'Cifra': 'Recebem DA e PH; +1 de ouro ao perder um combate. (adaptado: sem Informação)',
-    'Nitro': 'A cada rodada acumula Cromo pelas estrelas dos Nitro; o Nitro mais forte recebe Vida e PH por Cromo. (adaptado: sem R-080T)',
-    'Mata-almas': 'Viego cura 25% da Vida e causa +10% de dano a cada abate. (adaptado: sem holograma)',
+    'Nitro': 'A cada rodada, cada Nitro diferente em campo dá Cromo ao R-080T pela estrela (2/3/6/12; 4/6/10/14 na Horuja). Cada Cromo dá Vida e PH ao robô. Com 200 de Cromo ele vira T-43X.',
+    'Mata-almas': 'Recebe uma cópia holográfica do inimigo de maior custo que o Viego ajudou a abater na rodada anterior. Ela tem 900/1350/9001 de Vida e causa 30%/40%/200% do dano (pela estrela do Viego).',
     'Soberano': 'Renekton atinge o aliado da casa atrás no início (40% da Vida) e recebe parte da Vida e do DA dele.',
-    'Deus das Redes': 'Garen recebe +25% de Vida e DA. (adaptado: sem Arsenal)',
-    'Vírus': 'Zac recebe +30% de Vida e +30 de PH. (adaptado: sem Pedaços na loja)',
+    'Deus das Redes': 'Depois de 2 combates entre jogadores, abre um Arsenal de Mods de Trait: o Mod faz um campeão se beneficiar de uma trait para sempre, sem contar para ela. Cada Mod seguinte exige 1 combate a mais. Cada campeão só pode ter 1 Mod.',
+    'Vírus': 'O Vírus infecta sua loja: ao atualizar, 20% de chance de um Bloblet. Comprar um Bloblet dá ao Zac mais forte +1,5% de Vida máxima e +1 de PH para sempre.',
     'Atirador de Elite': 'Causa mais dano a alvos mais distantes.',
   };
 
-  const ITEM_TEXT = {
-    RabadonsDeathcap: 'Amplifica o dano.', InfinityEdge: 'A habilidade pode causar crítico.',
-    FrozenHeart: 'Início: +20 de Mana. Com 40% de Vida: +15 de Mana e escudo de 20%.', Redemption: 'Regenera 2% da Vida perdida por segundo.',
-    ThiefsGloves: 'Equipa 2 itens aleatórios a cada combate e ocupa os 3 espaços.', GuinsoosRageblade: '+7% de Vel. de Ataque acumulada por segundo.',
-    IonicSpark: 'Reduz 30% da RM de inimigos a 2 casas; dano quando eles conjuram.', SteraksGage: 'Com 60% de Vida: escudo de 40%.',
-    DragonsClaw: 'Cura 2,5% da Vida máxima a cada 2s.', PowerGauntlet: 'Críticos dão +5% de dano por 5s (até 4x).',
-    GargoyleStoneplate: '+10 de Armadura e RM por inimigo mirando o usuário.', BrambleVest: 'Sofre 5% menos dano de ataques; ao ser atingido causa 100 em volta (2s).',
-    MadredsBloodrazor: '+15% de dano contra tanques.', RedBuff: 'A cada 2s queima e fere um inimigo próximo.',
-    UnstableConcoction: '+15% de DA, +15 de PH e 12% de Vampirismo.', GuardianAngel: 'Com 60% de Vida: 1s inalvejável, limpa efeitos e cura 20% da Vida perdida.',
-    TitansResolve: 'Acumula 2% de DA e 2 de PH ao atacar ou sofrer dano (até 25x).', RunaansHurricane: 'Ataques acumulam 4% de DA (até 15x); depois, +15% de Vel. de Ataque.',
-    Bloodthirster: 'Com 40% de Vida: escudo de 25%.', ArchangelsStaff: '+20 de PH a cada 5s.',
-    SpearOfShojin: 'Ataques dão +5 de Mana.', SpectralGauntlet: 'Reduz 30% da Armadura de inimigos a 2 casas; +15 de resistências por 15s.',
-    Leviathan: 'Ataques dão +2 de Mana (4 no crítico).', Morellonomicon: 'Ataques e habilidades queimam e ferem.',
-    RapidFireCannon: 'Ataques e habilidades queimam e ferem.', Crownguard: 'Início: escudo de 25% por 8s; depois, +25 de PH.',
-    AdaptiveHelm: 'Tanques: +30 de resistências. Demais: +10% de DA e +10 de PH.', LastWhisper: 'Dano reduz 30% da Armadura do alvo por 3s.',
-    BlueBuff: 'Recebe 10% a mais de DA e PH.', JeweledGauntlet: 'A habilidade pode causar crítico.',
-    NightHarvester: '5% de durabilidade; 15% acima de 50% de Vida.', Quicksilver: 'Imune a atordoamento por 18s; +3% de Vel. de Ataque por segundo.',
-    Deathblade: 'Amplifica o dano.', WarmogsArmor: 'Recebe 18% de Vida máxima.',
-    StatikkShiv: 'Dano reduz 30% da RM do alvo por 5s.', HextechGunblade: 'Cura o aliado mais ferido em 20% do dano causado.',
-    MagneticRemover: 'Arraste até uma unidade: todos os itens dela voltam intactos para o banco de itens.',
+  /* textos dos itens montados com os números oficiais (fx), os mesmos que o combate usa */
+  const IT = id => (ITEMS[id] ? ITEMS[id].fx : {});
+  const p1 = v => `${String(Math.round(v * 1000) / 10).replace('.', ',')}%`;
+  const ITEM_TEXT_FN = {
+    RabadonsDeathcap: f => `+${p1(f.BonusDamage)} de amplificação de dano.`,
+    Deathblade: f => `+${p1(f.BonusDamage)} de amplificação de dano.`,
+    InfinityEdge: f => `A habilidade pode causar crítico. Se já podia, recebe +${p1(f.CritDamageToGive)} de dano crítico.`,
+    JeweledGauntlet: f => `A habilidade pode causar crítico. Se já podia, recebe +${p1(f.CritDamageToGive)} de dano crítico.`,
+    FrozenHeart: f => `Uma vez por combate, com ${f.HealthThreshold}% de Vida: escudo de ${f.ShieldHealthPercent}% da Vida máxima por ${f.ShieldDuration}s e +${f.Stats} de Armadura e RM.`,
+    Redemption: f => `Regenera ${p1(f.MissingHealthHeal)} da Vida perdida por segundo (até ${f.MaxHeal} por vez).`,
+    ThiefsGloves: () => 'Equipa 2 itens aleatórios a cada combate e ocupa os 3 espaços.',
+    GuinsoosRageblade: f => `+${f.AttackSpeedPerStack}% de Vel. de Ataque acumulada por segundo.`,
+    IonicSpark: f => `Reduz ${f.MRShred}% da RM de inimigos a ${f.HexRange} casas. Quando eles conjuram, sofrem dano mágico de ${f.ManaRatio}% da Mana gasta.`,
+    SteraksGage: f => `Com ${f.HealthThreshold}% de Vida: escudo de ${p1(f.PercentHealthShield)} da Vida máxima que decai em ${f.ShieldDuration}s.`,
+    DragonsClaw: f => `+${p1(f.PercentMaxHP)} de Vida máxima. A cada ${f.HealthRegenInterval}s, cura ${String(f.PercentHealthDamage).replace(".", ",")}% da Vida máxima.`,
+    PowerGauntlet: f => `Críticos dão +${p1(f.BuffDamageAmp)} de amplificação por ${f.Duration}s (até ${f.MaxStacks}x).`,
+    GargoyleStoneplate: f => `+${f.ArmorPerEnemy} de Armadura e RM por inimigo mirando o usuário.`,
+    BrambleVest: f => `+${p1(f.PercentMaxHP)} de Vida máxima. Sofre ${p1(f.AutoDamageReduction)} menos dano de ataques; ao ser atingido, causa ${f['1StarAoEDamage']} de dano mágico em volta (${f.ICD}s).`,
+    MadredsBloodrazor: f => `+${p1(f.DamageAmp)} de amplificação contra inimigos com mais de ${f.HealthThreshold} de Vida máxima.`,
+    RedBuff: f => `+${p1(f.BonusPercentHP)} de Vida máxima. A cada ${f.ICD}s, aplica ${f.BurnPercent}% de Queimadura e ${f.GrievousWoundsPercent}% de Ferimento em um inimigo a ${f.HexRange} casas por ${f.BurnDuration}s.`,
+    UnstableConcoction: f => `+${p1(f.AD_NotStatBar)} de DA, +${f.AP_NotStatBar} de PH e ${p1(f.StatOmnivamp_NotStatBar)} de Omnivamp. Acima de ${p1(f.HealthThreshold)} de Vida, dobra DA e PH; abaixo, dobra o Omnivamp.`,
+    GuardianAngel: f => `Uma vez por combate, com ${f.HealthThreshold}% de Vida: fica inalvejável por ${f.StealthDuration}s, limpa efeitos negativos e recebe +${f.AttackSpeed}% de Vel. de Ataque.`,
+    TitansResolve: f => `Acumula ${p1(f.StackingAD)} de DA e ${f.StackingSP} de PH ao atacar ou sofrer dano (até ${f.StackCap}x). No máximo, +${f.BonusResistsAtStackCap} de Armadura e RM.`,
+    RunaansHurricane: f => `Cada ataque acumula +${p1(f.ADOnAttack)} de DA.`,
+    Bloodthirster: f => `Uma vez por combate, com ${f.HealthThreshold}% de Vida: escudo de ${f.ShieldHealthPercent}% da Vida máxima por até ${f.ShieldDuration}s.`,
+    ArchangelsStaff: f => `+${f.APPerInterval} de PH a cada ${f.IntervalSeconds}s.`,
+    SpearOfShojin: f => `Ataques dão +${f.FlatManaRestore} de Mana.`,
+    SpectralGauntlet: f => `Reduz ${f.ARReductionAmount}% da Armadura de inimigos a ${f.HexRange} casas. +${f.BonusResists} de Armadura e RM nos primeiros ${f.BonusResistDuration}s.`,
+    Leviathan: f => `Depois de conjurar, recebe +${f.AttackSpeedToGive}% de Vel. de Ataque por ${f.ASDuration}s.`,
+    Morellonomicon: f => `Ataques e habilidades aplicam ${f.BurnPercent}% de Queimadura e ${f.GrievousWoundsPercent}% de Ferimento por ${f.BurnDuration}s.`,
+    RapidFireCannon: f => `Ataques e habilidades aplicam ${f.BurnPercent}% de Queimadura e ${f.HealingReductionPct}% de Ferimento por ${f.Duration}s.`,
+    Crownguard: f => `Início: escudo de ${f.ShieldSize}% da Vida máxima por ${f.ShieldDuration}s; quando acaba, +${f.ShieldBonusAP} de PH.`,
+    AdaptiveHelm: f => `Duas linhas da frente: +${f.FrontRowBonusResists} de Armadura e RM e +${f.FrontLineManaPerHit} de Mana ao sofrer ataque. Duas de trás: +${f.BackRowBonusAP} de PH e +${f.ManaPerTickrate} de Mana a cada ${f.ManaTickrate}s.`,
+    LastWhisper: f => `Dano físico reduz ${f.ArmorReductionPercent}% da Armadura do alvo por ${f.ArmorBreakDuration}s.`,
+    BlueBuff: f => `Depois de conjurar, recupera ${f.ManaRefund} de Mana. Ao participar de um abate, causa +${p1(f.DamageAmp)} de dano por ${f.TakedownTimer}s.`,
+    NightHarvester: f => `${p1(f.BaseDurability)} de durabilidade; ${p1(f.EmpoweredDurability)} acima de ${p1(f.ThresholdForEmpower)} de Vida.`,
+    Quicksilver: f => `Imune a controle por ${f.SpellShieldDuration}s; nesse tempo, +${p1(f.ProcAttackSpeed)} de Vel. de Ataque a cada ${f.ProcInterval}s.`,
+    WarmogsArmor: f => `+${p1(f.BonusPercentHP)} de Vida máxima.`,
+    StatikkShiv: f => `Ataques e habilidades reduzem ${f.MRShred}% da RM do alvo por ${f.MRShredDuration}s.`,
+    HextechGunblade: f => `Cura o aliado com menos Vida em ${p1(f.AllyHealing)} do dano causado.`,
   };
+  const exoText = {
+    Exo_Pulse: f => `Executa inimigos abaixo de ${p1(f.ExecuteThresholdPercent)} de Vida. A habilidade pode causar crítico; se já podia, +${p1(f.RedundantCritDamage)} de dano crítico.`,
+    Exo_Chassis: f => `Escudos ${p1(f.ShieldEffectivenessPercent)} mais fortes no portador. A cada ${f.SiphonFrequency}s, drena ${p1(f.HealthSiphonAmt)} da Vida máxima do portador de ${f.NumEnemies > 1 ? `${f.NumEnemies} inimigos próximos` : 'o alvo'} e vira Escudo por ${f.ShieldDuration}s.`,
+    Exo_Holobow: f => `Ataques críticos dão +${f.BonusManaOnHit} de Mana. Depois de conjurar, +${f.CritChanceOnCast}% de chance de crítico por ${f.Duration}s.`,
+    Exo_Coil: f => `Ataques e habilidades marcam inimigos por ${f.MarkDuration}s. Cura ${p1(f.HealingPercent)} do dano causado a marcados.`,
+    Exo_Flux: f => `${f.ChargeCap > 1 ? `A cada ${f.ChargeCap} ataques, o próximo` : 'Um ataque sim, outro não,'} causa ${p1(f.ShockDamage)} da Vida máxima do alvo como dano físico e tira ${f.FlatArmorReduction} de Armadura.`,
+    Exo_Lantern: f => `+${p1(f.BonusPercentHP)} de Vida. A cada ${f.Interval}s, causa ${p1(f.PercHealthDamage)} da Vida máxima do portador como dano mágico a inimigos a ${f.radius} casa.`,
+    Exo_Fangs: f => (f.MarkDuration ? `Guarda ${p1(f.StoredDamage)} do dano causado a cada inimigo; depois de ${f.MarkDuration}s, causa o valor guardado nele e no inimigo mais próximo.` : `Causa ${p1(f.StoredDamage)} do dano no inimigo mais próximo logo depois.`),
+  };
+  for (const id of Object.keys(EXOTECH)) ITEM_TEXT_FN[id] = f => `Só ExoTec. ${exoText[id.replace(/_R$/, '')](f)}`;
+  const ITEM_TEXT = { MagneticRemover: 'Arraste até uma unidade: todos os itens dela voltam intactos para o banco de itens.' };
+  for (const [id, fn] of Object.entries(ITEM_TEXT_FN)) if (ITEMS[id]) ITEM_TEXT[id] = fn(IT(id));
 
   /* bônus de cada faixa, com os mesmos valores que applyTraits usa no combate */
   const pct = v => `${Math.round(v * 100)}%`;
@@ -199,11 +312,11 @@ const TFTEngine = (() => {
     'Divinicorp': v => `Bônus de cada Divinicorp × ${Math.round(v.DivinicorpBonus * 100) / 100}`,
     'Ciberchefão': v => `${v.min >= 4 ? 'Todos recebem' : 'O mais forte recebe'} +${pct(num(v.BossPercentHealth || v.BigBossPercentHealth))} de Vida e +${num(v.BossAP || v.BigBossAP)} de PH`,
     'Cifra': v => `+${pct(v.AttackDamage)} de DA e +${v.AbilityPower} de PH`,
-    'Nitro': v => `+${v.HealthPerScrap} de Vida e +${v.APPerScrap} de PH por Cromo`,
-    'Mata-almas': () => 'Cura 25% da Vida e +10% de dano por abate',
+    'Nitro': v => (v.min >= 4 ? 'O robô também dispara um laser gigante' : `Invoca o R-080T (+${v.HealthPerScrap} de Vida e +${v.APPerScrap} de PH por Cromo)`),
+    'Mata-almas': v => `Holograma com ${v.Level1Health}/${v.Level2Health}/${v.Level3Health} de Vida e ${Math.round(v.Level1Damage * 100)}%/${Math.round(v.Level2Damage * 100)}%/${Math.round(v.Level3Damage * 100)}% do dano`,
     'Soberano': v => `Recebe ${pct(v.PercentHPGain)} da Vida e ${pct(v.PercentADGain)} do DA do aliado atrás`,
-    'Deus das Redes': () => '+25% de Vida e de DA',
-    'Vírus': () => '+30% de Vida e +30 de PH',
+    'Deus das Redes': v => `Arsenal a cada ${v.rounds}+ combates entre jogadores`,
+    'Vírus': v => `${v.ChanceToSee}% de Bloblet na loja; +${Math.round(v.BonusPercentHPPerStack * 1000) / 10}% de Vida e +${v.BonusAPPerStack} de PH por Bloblet`,
     'Atirador de Elite': v => `+${v.PercentDamageIncrease}% de dano por casa de distância`,
   };
   const traitTiers = name => TRAITS[name].tiers.map(v => ({ min: v.min, text: TRAIT_TIER_TEXT[name](v) }));
@@ -353,7 +466,7 @@ const TFTEngine = (() => {
     };
     for (const [name, star, items, count = 1] of round.units || []) {
       const ch = CH_BY_NAME[name];
-      for (let i = 0; i < count; i++) units.push({ c: ch.id, star, items: items.slice(), uid: null, ...spot(ch.range) });
+      for (let i = 0; i < count; i++) units.push({ c: ch.id, star, items: items.slice(), uid: null, stage: 1 + Math.floor(idx / 10), ...spot(ch.range) });
     }
     const creeps = (round.creeps || []).map(key => { const pos = spot(CREEPS[key].range); return { key, spot: `${pos.x},${pos.y}` }; });
     return { units, creeps, chrome: 0 };
@@ -398,13 +511,47 @@ const TFTEngine = (() => {
     return info;
   }
 
+  /* Cromo do Nitro ao fim de cada rodada: cada Nitro único em campo dá Cromo pela estrela (a maior, se houver cópias) */
+  function nitroChrome(g) {
+    for (const p of alivePlayers(g)) {
+      const counts = traitCountsOf(Object.values(p.board));
+      if (!activeTier('Nitro', counts['Nitro'] || 0)) continue;
+      const best = {};
+      for (const u of Object.values(p.board)) if (!u.summon && CH[u.c].traits.includes('Nitro')) best[u.c] = Math.max(best[u.c] || 0, u.star);
+      const table = NITRO.chromePerStar[g.mode === 'chaos' ? 'chaos' : 'normal'];
+      p.chrome = (p.chrome || 0) + Object.values(best).reduce((t, star) => t + table[Math.min(4, star) - 1], 0);
+      syncMech(g, p);
+    }
+  }
+
+  /* Boi Dourado: gastar ouro numa mesma rodada (atualizações contam em dobro) dá +1% de amplificação
+     permanente e aumenta a exigência. Exige que os Boi Dourado tenham lutado na rodada anterior.
+     Exigência inicial 8 (wiki); +1% e aumento de 7/4/3 por faixa saem dos campos sem nome da 15.14 (suposição). */
+  const OX = { first: 8, ampPerProc: 1, increase: { 2: 7, 4: 4, 6: 3 } };
+  function spendOx(p, gold) {
+    p.oxSpent = (p.oxSpent || 0) + gold;
+    const tier = activeTier('Boi Dourado', traitCountsOf(Object.values(p.board))['Boi Dourado'] || 0);
+    if (!tier || !p.oxFought || p.oxProc) return;
+    const need = p.oxNeed || OX.first;
+    if (p.oxSpent < need) return;
+    p.oxProc = true;
+    p.oxStacks = (p.oxStacks || 0) + OX.ampPerProc;
+    p.oxNeed = need + OX.increase[tier.min];
+  }
+
+  // Boi Dourado (6): componentes que caíram no combate
+  function dropComps(g, p, n) { for (let i = 0; i < n; i++) p.items.push(randPick(g, COMPONENTS)); }
+
   function finishChaos(g) {
+    nitroChrome(g);
     const p = g.players[0];
     const c = g.combat;
     const f = c.fights[0];
     const round = CHAOS_ROUNDS[g.roundIdx];
     settleAugments(g, c);
     p.gold += f.goldDrops[0];
+    dropComps(g, p, (f.compDrops || [0, 0])[0]);
+    p.soulCopy = f.soulKill ? f.soulKill[0] : null;
     const won = f.winner === 0;
     if (won) {
       grantReward(g, p, round.reward);
@@ -451,8 +598,9 @@ const TFTEngine = (() => {
   const randPick = (g, list) => list[Math.floor(rand(g) * list.length)];
   const addLog = (g, text) => { g.log.push(text); if (g.log.length > 40) g.log.shift(); };
 
-  const allUnits = p => [...p.bench.filter(Boolean), ...Object.values(p.board)];
-  const boardCount = p => Object.keys(p.board).length;
+  // invocações (robô da Nitro) não são campeões: ficam fora de venda, pool, cópias e limite do time
+  const allUnits = p => [...p.bench.filter(Boolean), ...Object.values(p.board).filter(u => !u.summon)];
+  const boardCount = p => Object.values(p.board).filter(u => !u.summon).length;
   const copiesValue = star => (star === 1 ? 1 : star === 2 ? 3 : 9);
   const sellPrice = u => {
     const cost = CH[u.c].cost;
@@ -501,19 +649,25 @@ const TFTEngine = (() => {
     }
     return null;
   }
+  // custo do Bloblet não publicado: 1 de ouro (suposição registrada no MUDAE_TFT.md)
+  const BLOBLET_COST = 1;
   function refreshShop(g, p) {
     const lv = Math.min(RULES.maxLevel, p.level + (playerMods(g, p).shopLevelDelta || 0));
     p.shop = p.shop.map(() => rollShopSlot(g, lv));
+    const virus = activeTier('Vírus', traitCountsOf(Object.values(p.board))['Vírus'] || 0);
+    p.shopBlob = virus && rand(g) * 100 < virus.ChanceToSee ? Math.floor(rand(g) * p.shop.length) : -1;
   }
 
+  const levelCap = p => Math.min(RULES.maxLevel, p.levelCap || RULES.maxLevel);
   function gainXp(p, amount) {
-    if (p.level >= RULES.maxLevel) return;
+    const cap = levelCap(p);
+    if (p.level >= cap) return;
     p.xp += amount;
-    while (p.level < RULES.maxLevel && p.xp >= RULES.xpToLevel[p.level]) {
+    while (p.level < cap && p.xp >= RULES.xpToLevel[p.level]) {
       p.xp -= RULES.xpToLevel[p.level];
       p.level++;
     }
-    if (p.level >= RULES.maxLevel) p.xp = 0;
+    if (p.level >= cap) p.xp = 0;
   }
 
   function firstFreeBench(p) { return p.bench.findIndex(x => !x); }
@@ -527,7 +681,13 @@ const TFTEngine = (() => {
     if (copies.length < 3) return;
     const keep = copies.find(x => x.key) || copies[0];
     const items = [];
-    for (const x of copies.slice(0).sort((a, b) => (a === keep ? -1 : b === keep ? 1 : 0)).slice(0, 3)) {
+    const used = copies.slice(0).sort((a, b) => (a === keep ? -1 : b === keep ? 1 : 0)).slice(0, 3);
+    // Mod de Trait e Chapéu de Rei do Crime passam para a cópia que fica (Mod a mais volta como item)
+    for (const x of used) {
+      if (x.u.kingpin) keep.u.kingpin = true;
+      if (x.u.traitMod) { if (!keep.u.traitMod) keep.u.traitMod = x.u.traitMod; else if (x !== keep) p.items.push(modId(x.u.traitMod)); }
+    }
+    for (const x of used) {
       items.push(...x.u.items);
       if (x !== keep) { if (x.key) delete p.board[x.key]; else p.bench[x.b] = null; }
     }
@@ -564,7 +724,77 @@ const TFTEngine = (() => {
     for (const [key, u] of Object.entries(p.board)) if (u.uid === uid) { delete p.board[key]; return u; }
     return null;
   }
-  function findUnit(p, uid) { return allUnits(p).find(u => u.uid === uid) || null; }
+  function findUnit(p, uid) { return allUnits(p).find(u => u.uid === uid) || Object.values(p.board).find(u => u.uid === uid) || null; }
+
+  /* Deus das Redes: conta combates entre jogadores com o Garen em campo; ao completar, abre um Arsenal com 3 Mods */
+  function netgodAfterPvp(g, p) {
+    const v = activeTier('Deus das Redes', traitCountsOf(Object.values(p.board))['Deus das Redes'] || 0);
+    if (!v) return;
+    p.netgod = p.netgod || { left: v.rounds, step: v.rounds };
+    if (--p.netgod.left > 0) return;
+    p.netgod.step += v.RoundIncrement;
+    p.netgod.left = p.netgod.step;
+    const opts = [];
+    const pool = Object.keys(TRAIT_MODS).slice();
+    while (opts.length < 3 && pool.length) opts.push(modId(pool.splice(Math.floor(rand(g) * pool.length), 1)[0]));
+    p.choices.push({ title: 'Arsenal de Mods de Trait', opts });
+  }
+
+  function syncExo(g, p) {
+    const count = traitCountsOf(Object.values(p.board))['ExoTec'] || 0;
+    const tier = activeTier('ExoTec', count);
+    const due = !tier ? 0 : tier.min >= 7 ? 3 : tier.min >= 5 ? 2 : 1;
+    p.exoGiven = p.exoGiven || [];
+    while (p.exoGiven.length < due) {
+      const left = EXO_BASE.filter(k => !p.exoGiven.includes(k));
+      if (!left.length) break;
+      const id = randPick(g, left);
+      p.exoGiven.push(id);
+      p.items.push(id);
+    }
+    if (tier && tier.min >= 10 && !p.exoRadiant) {
+      p.exoRadiant = true;
+      const up = id => (ITEMS[id] && ITEMS[id].exotech && !ITEMS[id].radiant ? id + '_R' : id);
+      p.items = p.items.map(up);
+      for (const u of [...allUnits(p), ...Object.values(p.board).filter(x => x.summon)]) u.items = u.items.map(up);
+    }
+  }
+
+  /* Chapéu do Chefão: 1 ao ativar 3 Transgressores, mais 1 com 5. Se um Chefão sair do jogo, o chapéu volta.
+     Bots colocam o chapéu no Transgressor mais forte. */
+  function syncHats(g, p) {
+    const count = traitCountsOf(Object.values(p.board))['Transgressor'] || 0;
+    const tier = activeTier('Transgressor', count);
+    const due = tier ? tier.NumBosses : 0;
+    while ((p.hatsGiven || 0) < due) { p.hatsGiven = (p.hatsGiven || 0) + 1; p.items.push('Kingpin'); }
+    const worn = allUnits(p).filter(u => u.kingpin).length;
+    const held = p.items.filter(i => i === 'Kingpin').length;
+    for (let i = worn + held; i < (p.hatsGiven || 0); i++) p.items.push('Kingpin');
+    if (!p.bot) return;
+    const free = () => p.items.indexOf('Kingpin');
+    const cands = Object.values(p.board).filter(u => !u.summon && !u.kingpin && KINGPIN[CH[u.c].name] && [...CH[u.c].traits, ...emblemsOf(u)].includes('Transgressor'))
+      .sort((a, b) => (b.star * 10 + CH[b.c].cost) - (a.star * 10 + CH[a.c].cost));
+    for (const u of cands) { const i = free(); if (i < 0) break; u.kingpin = true; p.items.splice(i, 1); }
+  }
+
+  /* Robô da Nitro: aparece no tabuleiro com 3+ Nitro, vira T-43X com 200 de Cromo e some
+     (devolvendo os itens) se a trait desligar. O jogador pode movê-lo e equipá-lo. */
+  function syncMech(g, p) {
+    const entry = Object.entries(p.board).find(([, u]) => u.summon);
+    const active = !!activeTier('Nitro', traitCountsOf(Object.values(p.board))['Nitro'] || 0);
+    if (!active) {
+      if (entry) { p.items.push(...entry[1].items); delete p.board[entry[0]]; }
+      return;
+    }
+    const form = (p.chrome || 0) >= NITRO.upgradeAt ? 'T-43X' : 'R-080T';
+    if (entry) { entry[1].c = form; return; }
+    let spot = null;
+    for (const y of [0, 1, 2, 3]) {
+      for (const x of [3, 2, 4, 1, 5, 0, 6]) if (!p.board[`${x},${y}`]) { spot = `${x},${y}`; break; }
+      if (spot) break;
+    }
+    if (spot) p.board[spot] = { uid: g.nextUid++, c: form, star: 1, items: [], summon: true };
+  }
 
   const validHex = pos => pos && Number.isInteger(pos.x) && Number.isInteger(pos.y) && pos.x >= 0 && pos.x < 7 && pos.y >= 0 && pos.y < 4;
   const validBench = pos => pos && Number.isInteger(pos.b) && pos.b >= 0 && pos.b < RULES.benchSize;
@@ -680,10 +910,13 @@ const TFTEngine = (() => {
       disableShop(n) { p.shopOff = n; p.shop = p.shop.map(() => null); },
       sellAll() { for (const u of allUnits(p).slice()) { p.gold += sellPrice(u); p.items.push(...u.items); g.pool[u.c] += copiesValue(u.star); removeUnit(p, u.uid); } },
       removeAll() { for (const u of allUnits(p).slice()) { p.items.push(...u.items); g.pool[u.c] += copiesValue(u.star); removeUnit(p, u.uid); } },
-      recombobulateBoard() { for (const u of Object.values(p.board)) { const list = pool(Math.min(5, CH[u.c].cost + 1)); if (list.length) { g.pool[u.c] += copiesValue(u.star); u.c = randPick(g, list).id; g.pool[u.c] = Math.max(0, g.pool[u.c] - copiesValue(u.star)); } } },
+      recombobulateBoard() { for (const u of Object.values(p.board).filter(x => !x.summon)) { const list = pool(Math.min(5, CH[u.c].cost + 1)); if (list.length) { g.pool[u.c] += copiesValue(u.star); u.c = randPick(g, list).id; g.pool[u.c] = Math.max(0, g.pool[u.c] - copiesValue(u.star)); } } },
       pandoraBench(n) { p.bench.forEach((u, i) => { if (!u || i < p.bench.length - n) return; const list = pool(CH[u.c].cost); if (list.length) { g.pool[u.c] += copiesValue(u.star); u.c = randPick(g, list).id; g.pool[u.c] = Math.max(0, g.pool[u.c] - copiesValue(u.star)); } }); },
       pandoraItems() { p.items = p.items.map(i => (COMPONENTS.includes(i) ? randPick(g, COMPONENTS) : FULL_ITEMS.includes(i) ? randPick(g, FULL_ITEMS) : i)); },
       permAll(perm) { allUnits(p).forEach(u => addPerm(u, perm)); },
+      capLevel(n) { p.levelCap = n; if (p.level > n) p.level = n; },
+      refreshShop() { refreshShop(g, p); },
+      activeTraits() { const counts = traitCountsOf(Object.values(p.board)); return Object.entries(counts).filter(([n, k]) => k > 1 && activeTier(n, k)).length; },
       randomPerm(f, opts) { if (p.lastStarUp) addPerm(p.lastStarUp, randPick(g, opts)); },
       shopOfCost(cost) { const list = pool(cost); p.shop = p.shop.map(() => (list.length ? randPick(g, list).id : null)); },
       stealFromShop(limit) { const i = p.shop.findIndex(c => c && CH[c].cost <= limit); if (i >= 0) { const c = p.shop[i]; p.shop[i] = null; give(c); } },
@@ -747,6 +980,12 @@ const TFTEngine = (() => {
 
   /* ---------- Ações do jogador ---------- */
   function act(g, who, a) {
+    const err = actInner(g, who, a);
+    const p = g.players && g.players[who];
+    if (!err && p && p.alive) { syncMech(g, p); syncHats(g, p); syncExo(g, p); }
+    return err;
+  }
+  function actInner(g, who, a) {
     const p = g.players[who];
     if (!p || !a || g.phase === 'end' || g.phase === 'lobby') return 'Fora de hora.';
     if (!p.alive) return 'Você foi eliminado.';
@@ -757,6 +996,14 @@ const TFTEngine = (() => {
     switch (a.a) {
       case 'buy': {
         const i = a.slot;
+        if (Number.isInteger(i) && p.shopBlob === i) {
+          if (p.shopOff > 0) return 'Loja desabilitada por um aumento.';
+          if (p.gold < BLOBLET_COST) return 'Ouro insuficiente.';
+          p.gold -= BLOBLET_COST;
+          p.blobs = (p.blobs || 0) + 1;
+          p.shopBlob = -1;
+          return null;
+        }
         const champ = Number.isInteger(i) ? p.shop[i] : null;
         if (!champ) return 'Espaço vazio.';
         const cost = CH[champ].cost;
@@ -776,14 +1023,23 @@ const TFTEngine = (() => {
         const mods = playerMods(g, p);
         const paid = !mods.freeShop && p.freeRerolls <= 0;
         if (paid && p.gold < RULES.rerollCost) return 'Ouro insuficiente.';
-        if (paid) { p.gold -= RULES.rerollCost; if (mods.xpOnGoldReroll) augApi(g, p, null).xp(mods.xpOnGoldReroll); }
+        if (paid) {
+          p.gold -= RULES.rerollCost;
+          spendOx(p, RULES.rerollCost * 2);
+          if (mods.xpOnGoldReroll) augApi(g, p, null).xp(mods.xpOnGoldReroll);
+          // Consumo Consciente: a cada N atualizações compradas, EXP
+          if (mods.xpEveryRerolls) {
+            p.augState.paidRerolls = (p.augState.paidRerolls || 0) + 1;
+            if (p.augState.paidRerolls % mods.xpEveryRerolls.n === 0) augApi(g, p, null).xp(mods.xpEveryRerolls.xp);
+          }
+        }
         else if (!mods.freeShop) p.freeRerolls--;
         if (mods.rerollRefund && rand(g) < mods.rerollRefund) p.freeRerolls++;
         refreshShop(g, p);
         return null;
       }
       case 'xp':
-        if (p.level >= RULES.maxLevel) return 'Nível máximo.';
+        if (p.level >= levelCap(p)) return 'Nível máximo.';
         {
           const mods = playerMods(g, p);
           if (mods.noBuyXp) return 'Um aumento impede comprar EXP.';
@@ -794,8 +1050,10 @@ const TFTEngine = (() => {
             const xpCost = Math.max(0, RULES.xpCost + (mods.xpCostDelta || 0));
             if (p.gold < xpCost) return 'Ouro insuficiente.';
             p.gold -= xpCost;
+            spendOx(p, xpCost);
           }
           augApi(g, p, null).xp(RULES.xpGain + (mods.xpBuyBonus || 0));
+          runHook(g, p, 'boughtXp');
         }
         return null;
       case 'lock':
@@ -807,6 +1065,7 @@ const TFTEngine = (() => {
         if (!(validBench(a.to) || validHex(a.to))) return 'Destino inválido.';
         if ((validHex(a.from) || validHex(a.to)) && !planning) return 'O combate já começou.';
         const other = readSpot(p, a.to);
+        if ((u.summon && validBench(a.to)) || (other && other.summon && validBench(a.from))) return 'O robô fica no tabuleiro.';
         const fieldLimit = p.level + (playerMods(g, p).teamBonus || 0);
         if (validBench(a.from) && validHex(a.to) && !other && boardCount(p) >= fieldLimit) return `Limite de ${fieldLimit} em campo: suba de nível.`;
         writeSpot(p, a.from, other);
@@ -816,6 +1075,7 @@ const TFTEngine = (() => {
       case 'sell': {
         const target = findUnit(p, a.uid);
         if (!target) return 'Sem unidade.';
+        if (target.summon) return 'O robô não pode ser vendido.';
         if (!planning && !p.bench.includes(target)) return 'O combate já começou.';
         removeUnit(p, a.uid);
         p.gold += sellPrice(target);
@@ -838,13 +1098,30 @@ const TFTEngine = (() => {
           u.items = [];
           return null;
         }
+        if (u.summon && ((ITEMS[id].use && ITEMS[id].use !== 'Reforger') || ITEMS[id].emblem)) return 'Não funciona no robô.';
         if (ITEMS[id].use) {
           const use = ITEMS[id].use;
-          const limit = CONSUMABLES[use].maxCost;
+          const limit = CONSUMABLES[use] ? CONSUMABLES[use].maxCost : 0;
           if (limit && CH[u.c].cost > limit) return `Só funciona até custo ${limit}.`;
+          if (use === 'TraitMod') {
+            if (u.summon) return 'Não funciona no robô.';
+            if (u.traitMod) return 'Este campeão já tem um Mod.';
+            if ([...CH[u.c].traits, ...emblemsOf(u)].includes(ITEMS[id].mod)) return 'Este campeão já tem essa característica.';
+            u.traitMod = ITEMS[id].mod;
+            p.items.splice(a.item, 1);
+            return null;
+          }
+          if (use === 'Kingpin') {
+            const traits = [...CH[u.c].traits, ...emblemsOf(u)];
+            if (!traits.includes('Transgressor') || !KINGPIN[CH[u.c].name]) return 'Só funciona em um campeão Transgressor.';
+            if (u.kingpin) return 'Este campeão já é Rei do Crime.';
+            u.kingpin = true;
+            p.items.splice(a.item, 1);
+            return null;
+          }
           if (use === 'Reforger') {
             if (!u.items.length) return 'Esta unidade não tem itens.';
-            u.items = u.items.map(x => (ITEMS[x].emblem ? x : randPick(g, COMPONENTS.includes(x) ? COMPONENTS : FULL_ITEMS)));
+            u.items = u.items.map(x => (ITEMS[x].emblem || ITEMS[x].exotech ? x : randPick(g, COMPONENTS.includes(x) ? COMPONENTS : FULL_ITEMS)));
           } else if (use === 'Recombobulator') {
             const list = D.champions.filter(c => c.cost === CH[u.c].cost + 1 && g.pool[c.id] > 0);
             if (!list.length) return 'Sem campeões disponíveis.';
@@ -860,6 +1137,7 @@ const TFTEngine = (() => {
           return null;
         }
         if (ITEMS[id].emblem && (CH[u.c].traits.includes(ITEMS[id].emblem) || u.items.includes(id))) return 'Esta unidade já tem essa característica.';
+        if (ITEMS[id].exotech && (u.summon || ![...CH[u.c].traits, ...emblemsOf(u)].includes('ExoTec'))) return 'Só campeões ExoTec podem usar este item.';
         const comp = COMPONENTS.includes(id);
         if (u.items.includes('ThiefsGloves')) return 'Luvas do Ladrão ocupam todos os espaços.';
         if (id === 'ThiefsGloves' && u.items.length) return 'A unidade precisa estar sem itens.';
@@ -975,6 +1253,7 @@ const TFTEngine = (() => {
   function nextRound(g) {
     HOOK_G = g;
     g.roundIdx++;
+    for (const p of g.players) { p.oxSpent = 0; p.oxProc = false; }
     if (g.mode === 'chaos') return chaosNextRound(g);
     if (!g.augTiers) g.augTiers = rollTiers(g);
     g.combat = null;
@@ -1017,7 +1296,13 @@ const TFTEngine = (() => {
     }
   }
 
+  // chamado logo antes de cada combate: completa o time, sincroniza o robô e marca se o Boi Dourado lutou
   function autoField(p) {
+    autoFieldInner(p);
+    if (HOOK_G) { syncMech(HOOK_G, p); syncHats(HOOK_G, p); syncExo(HOOK_G, p); }
+    p.oxFought = !!activeTier('Boi Dourado', traitCountsOf(Object.values(p.board))['Boi Dourado'] || 0);
+  }
+  function autoFieldInner(p) {
     while (boardCount(p) < p.level + (HOOK_G ? playerMods(HOOK_G, p).teamBonus || 0 : 0)) {
       const b = p.bench.findIndex(Boolean);
       if (b < 0) return;
@@ -1118,8 +1403,8 @@ const TFTEngine = (() => {
           if (lose && lose.alive && traitCountsOf(Object.values(lose.board))['Cifra'] >= 3) lose.gold += 1;
           addLog(g, `${info.label}: ${f.names[f.winner]} venceu ${f.names[1 - f.winner]}${lose ? ` (−${d})` : ''}`);
         }
-        if (A.alive) A.gold += f.goldDrops[0];
-        if (B && B.alive) B.gold += f.goldDrops[1];
+        if (A.alive) { A.gold += f.goldDrops[0]; dropComps(g, A, (f.compDrops || [0, 0])[0]); }
+        if (B && B.alive) { B.gold += f.goldDrops[1]; dropComps(g, B, (f.compDrops || [0, 0])[1]); }
       }
     } else {
       for (const f of c.fights) {
@@ -1131,18 +1416,12 @@ const TFTEngine = (() => {
         if (f.winner === 0) p.lastResult = { res: 'win', dmg: 0, loot };
         else { const d = dmgFor(f.survivors); p.hp -= d; p.lastResult = { res: 'lose', dmg: d, loot }; }
         p.gold += f.goldDrops[0];
+        dropComps(g, p, (f.compDrops || [0, 0])[0]);
       }
       addLog(g, `${info.label}: monstros`);
     }
 
-    // Cromo do Nitro por estrela em campo (até 200)
-    for (const p of alivePlayers(g)) {
-      const counts = traitCountsOf(Object.values(p.board));
-      if (activeTier('Nitro', counts['Nitro'] || 0)) {
-        const stars = Object.values(p.board).filter(u => CH[u.c].traits.includes('Nitro')).reduce((t, u) => t + u.star, 0);
-        p.chrome = Math.min(200, p.chrome + stars * 3);
-      }
-    }
+    nitroChrome(g);
 
     settleAugments(g, c);
     // Reservas Finais: a primeira eliminação é cancelada
@@ -1153,6 +1432,14 @@ const TFTEngine = (() => {
         p.hp = 1;
         augApi(g, p, null).xp(fr.XP + Math.max(0, p.gold - fr.Gold));
         p.gold = fr.Gold;
+      }
+    }
+    for (const p of alivePlayers(g)) {
+      const ls = playerMods(g, p).lastStand;
+      if (ls && p.hp <= 0 && !p.augState.usedLastStand) {
+        p.augState.usedLastStand = true;
+        p.hp = 1;
+        augApi(g, p, null).permAll({ hp: ls.Health, armor: ls.Resists, mr: ls.Resists, vamp: ls.Omnivamp / 100 });
       }
     }
     g.combat = null;
@@ -1173,9 +1460,12 @@ const TFTEngine = (() => {
         }
         p.gold += (f.augGold || [0, 0])[side];
         p.combats++;
+        if (f.soulKill) p.soulCopy = f.soulKill[side] || null;
         const won = f.winner === side;
         if (won) p.wins++;
-        runHook(g, p, 'after', { pvp: c.kind === 'pvp', won, lost: f.winner !== side && f.winner !== -1, survivors: won ? f.survivors : 0, allyDeaths: (f.deaths || [0, 0])[side], playerDamage: won && c.kind === 'pvp' ? stageDamage(roundInfo(g.roundIdx, g.mode).stage) + f.survivors : 0 });
+        const foe = g.players[side === 0 ? f.b : f.a];
+        if (c.kind === 'pvp') netgodAfterPvp(g, p);
+        runHook(g, p, 'after', { pvp: c.kind === 'pvp', won, foeHigher: !!(foe && foe.hp > p.hp), lost: f.winner !== side && f.winner !== -1, survivors: won ? f.survivors : 0, allyDeaths: (f.deaths || [0, 0])[side], playerDamage: won && c.kind === 'pvp' ? stageDamage(roundInfo(g.roundIdx, g.mode).stage) + f.survivors : 0 });
       });
     }
   }
@@ -1259,9 +1549,18 @@ const TFTEngine = (() => {
      0,1s para a tela reproduzir.
      ============================================================ */
   const teamFromPlayer = p => ({
-    units: Object.entries(p.board).map(([key, u]) => { const [x, y] = key.split(',').map(Number); return { ...u, x, y }; }),
+    units: Object.entries(p.board).map(([key, u]) => {
+      const [x, y] = key.split(',').map(Number);
+      if (!u.summon) return { ...u, x, y };
+      const nitro = traitCountsOf(Object.values(p.board))['Nitro'] || 0;
+      const stage = HOOK_G ? roundInfo(Math.max(0, HOOK_G.roundIdx), HOOK_G.mode).stage : 1;
+      return { ...u, x, y, chrome: p.chrome || 0, laser: nitro >= 4, stage };
+    }),
     chrome: p.chrome,
-    augs: (p.augments || []).map(id => ({ id, state: p.augState[id] || {} })),
+    oxStacks: p.oxStacks || 0,
+    blobs: p.blobs || 0,
+    soulCopy: p.soulCopy || null,
+    augs: (p.augments || []).map(id => ({ id, state: (p.augState[id] = p.augState[id] || {}) })),
     level: p.level,
     playerHp: p.hp,
     stage: HOOK_G ? roundInfo(Math.max(0, HOOK_G.roundIdx), HOOK_G.mode).stage : 1,
@@ -1336,6 +1635,7 @@ const TFTEngine = (() => {
       sunderUntil: 0, sunderV: 0, shredUntil: 0, shredV: 0, burnUntil: 0, woundUntil: 0, debuffUntil: 0,
       dots: [], aura: null, buffUntil: 0, buffAS: 0, once: {}, stacks: {}, boom: 0, boomTier: null, vanguard: null,
       gargBonus: 0, critStacks: [], icd: {}, extraHits: 0, duraV: 0, duraUntil: 0, dmgBy: null, chakram: null,
+      hitters: new Map(), blueUntil: 0, nashUntil: 0, debuffV: 0,
       stat: { p: 0, m: 0, t: 0, reduced: 0, shield: 0, heal: 0, cc: 0, taken: 0, kills: 0 },
     };
   }
@@ -1348,12 +1648,22 @@ const TFTEngine = (() => {
     const hpMul = Math.pow(1.8, raw.star - 1);
     const adMul = Math.pow(1.5, raw.star - 1);
     Object.assign(u, {
-      champ: raw.c, star: raw.star, role: ch.role, spec: ABILITIES[ch.name], traits: ch.traits, lx: raw.x, ly: raw.y,
+      champ: raw.c, star: raw.star, role: ch.role, kingpinHat: !!raw.kingpin, spec: ABILITIES[ch.name], traits: ch.traits, lx: raw.x, ly: raw.y,
       asBase: ch.as, armor: ch.armor, mr: ch.mr, range: ch.range, mana: ch.mana0, maxMana: Math.max(ch.mana, ch.mana0 >= ch.mana ? ch.mana0 : 0),
       items: raw.items.slice(),
     });
     if (ch.mana0 >= ch.mana) u.mana = 0;
     if (raw.fullMana) u.mana = u.maxMana;
+    if (u.spec && u.spec.tibbers) { u.asBonus += u.spec.tibbers.as; u.tibbers = u.spec.tibbers.burn; }
+    if (ch.summon) {
+      const v = TRAITS.Nitro.tiers[0];
+      const i = nitroStageIdx(raw.stage || 1);
+      u.summon = true;
+      u.spec = { ...u.spec, dmg: [NITRO.grenade[i]] };
+      u.chromeHp = (raw.chrome || 0) * v.HealthPerScrap;
+      u.chromeAp = (raw.chrome || 0) * v.APPerScrap;
+      if (raw.laser) u.laser = NITRO.laser[i];
+    }
     u.uid = raw.uid;
     u.cost = ch.cost;
     let ids = raw.items.slice();
@@ -1375,14 +1685,21 @@ const TFTEngine = (() => {
       u.armor += num(fx.Armor);
       u.mr += num(fx.MagicResist);
       u.crit += num(fx.CritChance) / 100;
-      u.manaRegen += num(fx.ManaRegen);
-      u.mana += num(fx.CombatStartMana);
+      // Season 14: "Mana" dos itens é Mana inicial (não há regeneração por item)
+      u.mana += num(fx.Mana);
       u.amp += num(fx.BonusDamage);
-      u.vamp += num(fx.StatOmnivamp) + num(fx.StatOmnivamp_NotStatBar);
+      u.vamp += num(fx.StatOmnivamp);
+      // Mão da Justiça: o bônus de DA/PH e de Omnivamp dobra conforme a Vida (ver hojUpdate)
+      if (itemId === 'UnstableConcoction') {
+        u.hoj = (u.hoj || 0) + 1;
+        u.hojFx = fx;
+        u.vamp += num(fx.StatOmnivamp_NotStatBar);
+      }
     }
     u.baseAd = ch.ad * adMul;
     u.adPct = adPct;
-    u.maxHp = (ch.hp * hpMul + hpFlat) * (1 + hpPct);
+    u.maxHp = (ch.hp * hpMul + hpFlat + (u.chromeHp || 0)) * (1 + hpPct);
+    u.ap += u.chromeAp || 0;
     const perm = raw.perm;
     if (perm) {
       u.maxHp = (u.maxHp + (perm.hp || 0)) * (1 + (perm.hpPct || 0));
@@ -1390,18 +1707,33 @@ const TFTEngine = (() => {
       u.ap += perm.ap || 0;
       u.asBonus += perm.as || 0;
       u.dura += perm.dura || 0;
+      u.armor += perm.armor || 0;
+      u.mr += perm.mr || 0;
+      u.vamp += perm.vamp || 0;
     }
     const emblemTraits = emblemsOf({ itemIds: ids }).filter(t => !ch.traits.includes(t));
     if (emblemTraits.length) u.traits = [...ch.traits, ...emblemTraits];
-    if (u.has.has('InfinityEdge') || u.has.has('JeweledGauntlet')) u.abilityCrit = true;
-    if (u.has.has('BlueBuff')) { u.adPct += 0.1; u.ap += 10; }
-    if (u.has.has('AdaptiveHelm')) {
-      if (TANK_ROLES.has(ch.role)) { u.armor += 30; u.mr += 30; }
-      else { u.adPct += 0.1; u.ap += 10; }
+    if (raw.traitMod && !u.traits.includes(raw.traitMod)) u.traits = [...u.traits, raw.traitMod];
+    // itens ExoTec: guarda os efeitos ativos na unidade
+    for (const i of ids) {
+      const it = ITEMS[i];
+      if (!it || !it.exotech) continue;
+      const key = i.replace(/_R$/, '');
+      u.exo = u.exo || {};
+      u.exo[key] = { ...it.fx, radiant: it.radiant, alwaysCritDmg: !!it.exo.alwaysCritDmg, instant: !!it.exo.instant };
     }
-    if (u.has.has('NightHarvester')) u.dura += 0.05;
-    if (u.has.has('SpectralGauntlet')) { u.armor += 15; u.mr += 15; }
-    if (u.has.has('Quicksilver')) u.ccImmuneUntil = 18;
+    // Gume do Infinito / Manopla: habilidade pode critar; se já podia, cada cópia dá dano crítico (ver finishCrit)
+    u.ieCount = ids.filter(i => i === 'InfinityEdge' || i === 'JeweledGauntlet').length;
+    if (u.ieCount) u.abilityCrit = true;
+    if (u.has.has('AdaptiveHelm')) {
+      const fx = ITEMS.AdaptiveHelm.fx;
+      // duas linhas da frente (ly 0 e 1) x duas de trás, como no Estratégico
+      if (u.ly < 2) { u.armor += fx.FrontRowBonusResists; u.mr += fx.FrontRowBonusResists; u.helmFront = fx.FrontLineManaPerHit; }
+      else { u.ap += fx.BackRowBonusAP; u.helmBack = fx; }
+    }
+    if (u.has.has('NightHarvester')) u.dura += ITEMS.NightHarvester.fx.BaseDurability;
+    if (u.has.has('SpectralGauntlet')) { const fx = ITEMS.SpectralGauntlet.fx; u.armor += fx.BonusResists; u.mr += fx.BonusResists; }
+    if (u.has.has('Quicksilver')) u.ccImmuneUntil = ITEMS.Quicksilver.fx.SpellShieldDuration;
     return u;
   }
 
@@ -1414,7 +1746,8 @@ const TFTEngine = (() => {
   }
 
   /* bônus de traits antes do combate */
-  function applyTraits(team, chrome) {
+  function applyTraits(list, chrome, teamInfo) {
+    const team = Object.assign(list, { oxStacks: (teamInfo && teamInfo.oxStacks) || 0 });
     const champs = team.filter(u => u.champ);
     const counts = traitCountsOf(champs, u => u.champ);
     const shared = {};
@@ -1431,14 +1764,17 @@ const TFTEngine = (() => {
           mine.forEach(u => { u.maxHp *= 1 + v.HealthBonus; });
           break;
         case 'Bastião':
-          champs.forEach(u => { u.armor += v.TeamwideArmor; u.mr += v.TeamwideArmor; });
+          champs.forEach(u => {
+            const extra = v.min >= 6 && !u.traits.includes(name) ? v.EnhancedTeamwideArmor : 0;
+            u.armor += v.TeamwideArmor + extra; u.mr += v.TeamwideArmor + extra;
+          });
           mine.forEach(u => { u.armor += v.BonusArmor * 2; u.mr += v.BonusMR * 2; u.bastion = v.BonusArmor; });
           break;
         case 'Vanguarda':
           mine.forEach(u => { u.vanguard = v; });
           break;
         case 'Dizimador':
-          mine.forEach(u => { u.adPct += v.AttackDamage; u.vamp += v.Healing; });
+          mine.forEach(u => { u.adPct += v.AttackDamage; u.vamp += v.Healing; u.slayerOverheal = v.OverhealPercent; });
           break;
         case 'Fumegante':
           champs.forEach(u => { u.asBonus += v.TeamBonus; });
@@ -1454,29 +1790,36 @@ const TFTEngine = (() => {
           mine.forEach(u => { u.adPct += v.BonusAD; u.gunner = v; });
           break;
         case 'Boi Dourado':
-          mine.forEach(u => { u.amp += v.DamageAmp; u.goldChance = v.KillDrop; });
+          mine.forEach(u => { u.amp += v.DamageAmp + (team.oxStacks || 0) / 100; u.goldChance = v.KillDrop; u.compChance = num(v.ComponentDropChance); });
           break;
         case 'Boom Bot':
           mine.forEach(u => { u.boomTier = v; });
           break;
         case 'Tecnológico':
-          mine.forEach(u => { u.ap += v.APBonus; u.tech = true; });
+          // (8): inimigos atingidos causam 18% menos dano, em vez de 10%
+          mine.forEach(u => { u.ap += v.APBonus; u.tech = { v: v.min >= 8 ? v.EnhancedDebuff : v.DamageAmpDebuff, dur: v.DebuffDuration }; });
           break;
         case 'Dínamo':
           shared.dynamo = v.Mana;
           break;
         case 'Carrasco':
-          mine.forEach(u => { u.abilityCrit = true; u.crit += v.CRIT_PERCENT; u.critDmg += v.CRIT_DAMAGE; });
+          mine.forEach(u => {
+            u.abilityCrit = true; u.traitAbilityCrit = true; u.crit += v.CRIT_PERCENT; u.critDmg += v.CRIT_DAMAGE;
+            // abaixo de 20% de Vida do alvo, o dano crítico bônus dobra (ver hit); (5) durabilidade
+            u.execBonus = { dmg: v.CRIT_DAMAGE, below: v.HealthThreshold };
+            u.dura += num(v.DamageReduction);
+          });
           break;
         case 'A.M.P.':
-          mine.forEach(u => { u.maxHp += v.HPAmt; u.abilityAmp += 0.05 * v.SuperchargeAmount; });
+          // Amp: Samira +1 bala, Nidalee +1 alvo, Yuumi +3 de Mana/s, Naafiri +1 Alfa, Annie +1 bola de fogo (por Amp)
+          mine.forEach(u => { u.maxHp += v.HPAmt; u.ampLevel = v.SuperchargeAmount; });
           break;
         case 'Esquadrão Anima':
           mine.forEach(u => { u.armor += v.Resists; u.mr += v.Resists; u.amp += v.DamageAmp; u.anima = true; });
           break;
         case 'ExoTec':
           mine.forEach(u => {
-            const n = u.items.length + 1;
+            const n = u.items.length;
             u.maxHp += v.HealthBonus * n;
             u.asBonus += (v.ASBonus * n) / 100;
           });
@@ -1492,38 +1835,44 @@ const TFTEngine = (() => {
           break;
         case 'Transgressor':
           mine.forEach(u => { u.maxHp += v.MobHealth; u.amp += v.DamageAmp; });
-          mine.slice().sort((a, b) => b.star - a.star).slice(0, v.NumBosses).forEach(u => { u.abilityAmp += 0.3; });
+          mine.filter(u => u.kingpinHat && KINGPIN[CH[u.champ].name]).slice(0, v.NumBosses).forEach(u => {
+            u.kingpin = { tier: v.min >= 7 ? 1 : 0, fx: KINGPIN[CH[u.champ].name] };
+            const k = u.kingpin.fx;
+            if (k.resists) { u.armor += k.resists[u.kingpin.tier]; u.mr += k.resists[u.kingpin.tier]; }
+          });
           break;
         case 'Divinicorp': {
           const has = id => mine.some(u => CH[u.champ].name === id);
+          const emblem = mine.some(u => !CH[u.champ].traits.includes(name));
           const bonus = v.DivinicorpBonus;
           champs.forEach(u => {
             const mul = bonus * (u.traits.includes(name) ? 2 : 1);
-            if (has('Morgana')) u.ap += 8 * mul;
+            if (has('Morgana')) u.ap += 9 * mul;
             if (has('Rhaast')) { u.armor += 6 * mul; u.mr += 6 * mul; }
-            if (has('Senna')) u.adPct += 0.07 * mul;
+            if (has('Senna')) u.adPct += 0.08 * mul;
             if (has('Gragas')) u.maxHp += 50 * mul;
-            if (has('Vex')) u.crit += 0.09 * mul;
+            if (has('Vex')) u.crit += 0.07 * mul;
             if (has('Renekton')) u.asBonus += 0.05 * mul;
+            if (emblem) u.vamp += 0.03 * mul;
           });
           break;
         }
         case 'Ciberchefão': {
-          const bosses = v.min >= 4 ? mine : [strongest(mine)];
-          bosses.forEach(u => { u.maxHp *= 1 + num(v.BossPercentHealth || v.BigBossPercentHealth); u.ap += num(v.BossAP || v.BigBossAP); u.extraHits = 1; });
+          const top = strongest(mine);
+          (v.min >= 4 ? mine : [top]).forEach(u => { u.cyberboss = true; });
+          const hpPct = v.min >= 4 ? v.BigBossPercentHealth : v.BossPercentHealth, ap = v.min >= 4 ? v.BigBossAP : v.BossAP;
+          top.maxHp *= 1 + num(hpPct); top.ap += num(ap);
           break;
         }
         case 'Cifra':
           mine.forEach(u => { u.adPct += v.AttackDamage; u.ap += v.AbilityPower; });
           break;
-        case 'Nitro': {
-          const u = strongest(mine);
-          u.maxHp += chrome * v.HealthPerScrap;
-          u.ap += chrome * v.APPerScrap;
+        case 'Nitro':
+          // o Cromo vai para o robô (makeChampionUnit); a trait em si não dá atributo aos Nitro
           break;
-        }
         case 'Mata-almas':
-          mine.forEach(u => { u.soul = true; });
+          // marca o Viego: os abates em que ele ajudou definem o holograma da próxima rodada
+          mine.forEach(u => { u.soul = v; });
           break;
         case 'Soberano':
           mine.forEach(u => {
@@ -1536,11 +1885,15 @@ const TFTEngine = (() => {
           });
           break;
         case 'Deus das Redes':
-          mine.forEach(u => { u.maxHp *= 1.25; u.adPct += 0.25; });
+          // efeito fora do combate: Arsenal de Mods de Trait (netgodAfterPvp)
           break;
-        case 'Vírus':
-          mine.forEach(u => { u.maxHp *= 1.3; u.ap += 30; });
+        case 'Vírus': {
+          // cada Bloblet comprado: +1,5% de Vida máxima e +1 de PH no Zac mais forte
+          const zac = strongest(mine);
+          const n = (teamInfo && teamInfo.blobs) || 0;
+          if (zac && n) { zac.maxHp *= 1 + v.BonusPercentHPPerStack * n; zac.ap += v.BonusAPPerStack * n; }
           break;
+        }
         case 'Atirador de Elite':
           mine.forEach(u => { u.sniper = v.PercentDamageIncrease / 100; });
           break;
@@ -1548,6 +1901,18 @@ const TFTEngine = (() => {
       }
     }
     team.forEach(u => {
+      if (u.spec && u.spec.manaPerAmp && u.ampLevel) u.manaRegen += u.spec.manaPerAmp * u.ampLevel;
+      if (u.spec && u.spec.passiveVamp) u.vamp += u.spec.passiveVamp;
+      // Gume/Manopla: cópias além da que liberou o crítico (ou todas, se a trait já liberava) viram dano crítico
+      if (u.ieCount) {
+        const extra = u.ieCount - (u.traitAbilityCrit ? 0 : 1);
+        if (extra > 0) u.critDmg += extra * ITEMS.InfinityEdge.fx.CritDamageToGive;
+      }
+      if (u.exo && u.exo.Exo_Pulse) {
+        const pz = u.exo.Exo_Pulse;
+        if (pz.alwaysCritDmg || u.abilityCrit) u.critDmg += pz.RedundantCritDamage;
+        u.abilityCrit = true;
+      }
       u.ad = u.baseAd * (1 + (u.adPct || 0));
       u.hp = u.maxHp;
     });
@@ -1565,19 +1930,23 @@ const TFTEngine = (() => {
     u.ad = u.baseAd * (1 + u.adPct);
     return statsOf(u);
   }
-  function previewBoard(board, chrome) {
+  // info: oxStacks e blobs do jogador, para a prévia bater com o combate
+  function previewBoard(board, chrome, info = {}) {
     const rng = makeRng(1);
+    const nitro = traitCountsOf(Object.values(board))['Nitro'] || 0;
     const list = Object.entries(board).map(([key, raw], i) => {
       const [x, y] = key.split(',').map(Number);
-      const u = makeChampionUnit({ ...raw, x, y }, i + 1, 0, rng);
+      const extra = raw.summon ? { chrome: chrome || 0, laser: nitro >= 4 } : {};
+      const u = makeChampionUnit({ ...raw, ...extra, x, y }, i + 1, 0, rng);
       u.uid = raw.uid;
       return u;
     });
-    applyTraits(list, chrome || 0);
+    applyTraits(list, chrome || 0, { oxStacks: info.oxStacks || 0, blobs: info.blobs || 0 });
     return Object.fromEntries(list.map(u => [u.uid, statsOf(u)]));
   }
 
-  function simulate(teamA, teamB, seed) {
+  // probe (só testes): chamado a cada passo com (t, units)
+  function simulate(teamA, teamB, seed, probe) {
     const rng = makeRng(seed);
     const units = [];
     let nextId = 1;
@@ -1586,7 +1955,22 @@ const TFTEngine = (() => {
       const list = [];
       for (const raw of team.units || []) list.push(makeChampionUnit(raw, nextId++, side, rng));
       for (const k of team.creeps || []) list.push(makeCreep(k, nextId++, side));
-      shared[side] = applyTraits(list, team.chrome || 0);
+      shared[side] = applyTraits(list, team.chrome || 0, team);
+      const viego = list.find(u => u.soul);
+      if (viego && team.soulCopy && CH[team.soulCopy.c]) {
+        const v = viego.soul, lv = Math.min(3, viego.star);
+        const free = [];
+        for (let dc = -1; dc <= 1; dc++) for (let dr = -1; dr <= 1; dr++) free.push([viego.lx + dc, viego.ly + dr]);
+        const spot = free.find(([x, y]) => x >= 0 && x < 7 && y >= 0 && y < 4 && !list.some(o => o.lx === x && o.ly === y));
+        if (spot) {
+          const holo = makeChampionUnit({ c: team.soulCopy.c, star: team.soulCopy.star || 1, x: spot[0], y: spot[1], items: [] }, nextId++, side, rng);
+          holo.holo = true;
+          holo.maxHp = holo.hp = v[`Level${lv}Health`];
+          holo.holoMul = v[`Level${lv}Damage`];
+          holo.ad = holo.baseAd * (1 + (holo.adPct || 0));
+          list.push(holo);
+        }
+      }
       units.push(...list);
     });
 
@@ -1595,7 +1979,7 @@ const TFTEngine = (() => {
     const cellKey = (c, r) => `${c},${r}`;
     units.forEach(u => occ.set(cellKey(u.c, u.r), u.id));
     const byId = new Map(units.map(u => [u.id, u]));
-    const goldDrops = [0, 0];
+    const goldDrops = [0, 0], compDrops = [0, 0], soulKill = [null, null];
     const augHooks = [null, null];
     const augGold = [0, 0];
     const permGains = [];
@@ -1639,14 +2023,30 @@ const TFTEngine = (() => {
       return null;
     }
 
-    function addShield(u, amount, dur) { u.shields.push({ v: amount, until: t + dur }); events.push(['sh', u.id]); }
+    // decay: o escudo cai em linha reta até zero ao longo da duração (Sterak)
+    function addShield(u, amount, dur, decay) {
+      if (u.exo && u.exo.Exo_Chassis) amount *= 1 + u.exo.Exo_Chassis.ShieldEffectivenessPercent;
+      u.shields.push({ v: amount, until: t + dur, decay: decay ? amount / dur : 0 }); events.push(['sh', u.id]);
+    }
     const shieldTotal = u => u.shields.reduce((s, x) => s + x.v, 0);
     function heal(u, amount) {
-      if (!u.alive || amount <= 0) return;
+      if (!u.alive || !(amount > 0) || !Number.isFinite(amount)) return;
       const real = amount * (u.woundUntil > t ? 0.67 : 1);
+      // Enfeitiçador Saciado: cura excedente vira escudo, até o limite
+      if (u.sated && u.sated.until > t) {
+        const over = real - (u.maxHp - u.hp);
+        const room = u.sated.max - (u.sated.given || 0);
+        if (over > 0 && room > 0) { const v = Math.min(over, room); u.sated.given = (u.sated.given || 0) + v; addShield(u, v, 99); }
+      }
+      const overflow = real - (u.maxHp - u.hp);
       u.stat.heal += Math.min(real, u.maxHp - u.hp);
       u.hp = Math.min(u.maxHp, u.hp + real);
+      if (u.slayerOverheal && overflow > 0) {
+        const low = alive(u.side).filter(x => x.slayerOverheal && x.hp < x.maxHp).sort((a, b) => a.hp / a.maxHp - b.hp / b.maxHp)[0];
+        if (low) { const v = Math.min(low.maxHp - low.hp, overflow * u.slayerOverheal); low.hp += v; low.stat.heal += v; }
+      }
       if (real >= 15) events.push(['h', u.id, Math.round(real)]);
+      if (u.hoj) hojUpdate(u);
     }
     function stun(u, sec, src) {
       if (!u.alive || u.ccImmuneUntil > t) return;
@@ -1660,8 +2060,25 @@ const TFTEngine = (() => {
       occ.delete(cellKey(u.c, u.r));
       events.push(['x', u.id]);
       if (src) src.stat.kills++;
-      if (src && src.goldChance && rng() < src.goldChance) { goldDrops[src.side]++; events.push(['g', src.id]); }
-      if (src && src.soul) { heal(src, src.maxHp * 0.25); src.amp += 0.1; }
+      if (src && src.goldChance && rng() < src.goldChance) {
+        // (6): o espólio pode ser um componente
+        if (src.compChance && rng() < src.compChance) { compDrops[src.side]++; events.push(['g', src.id]); }
+        else { goldDrops[src.side]++; events.push(['g', src.id]); }
+      }
+      // Mata-almas: guarda o inimigo de maior custo que o Viego ajudou a abater
+      if (u.champ && !u.summon && !u.holo) {
+        for (const x of units) {
+          if (!x.soul || x.side === u.side || !u.hitters.has(x.id)) continue;
+          const cost = CH[u.champ].cost;
+          if (!soulKill[x.side] || cost > soulKill[x.side].cost) soulKill[x.side] = { c: u.champ, star: u.star, cost };
+        }
+      }
+      // Efeito Azul: abate ou participação (dano nos últimos 3s) dá amplificação por alguns segundos
+      for (const x of units) {
+        if (!x.alive || x.side === u.side || !x.has.has('BlueBuff')) continue;
+        const last = u.hitters.get(x.id);
+        if (x === src || (last != null && last >= t - 3)) x.blueUntil = t + ITEMS.BlueBuff.fx.TakedownTimer;
+      }
       const own = augHooks[u.side], foe = augHooks[1 - u.side];
       if (own) own.allyDeath.forEach(fn => fn(u, src));
       if (foe) foe.enemyDeath.forEach(fn => fn(u, src));
@@ -1674,24 +2091,56 @@ const TFTEngine = (() => {
       if (hk) hk.hpBelow.forEach((h, i) => { const k = 'aug' + i; if (pct <= h.pct && !u.once[k]) { u.once[k] = true; h.fn(u); } });
       const once = (key, limit, fn) => { if (pct <= limit && !u.once[key]) { u.once[key] = true; fn(); } };
       if (u.vanguard) once('van', 0.5, () => addShield(u, u.maxHp * u.vanguard.ShieldPercentAmount, u.vanguard.ShieldDuration));
-      if (u.has.has('SteraksGage')) once('sterak', 0.6, () => addShield(u, u.maxHp * 0.4, 4));
-      if (u.has.has('Bloodthirster')) once('blood', 0.4, () => addShield(u, u.maxHp * 0.25, 5));
-      if (u.has.has('FrozenHeart')) once('vow', 0.4, () => { addShield(u, u.maxHp * 0.2, 60); u.mana += 15; });
-      if (u.has.has('GuardianAngel')) once('edge', 0.6, () => {
-        u.untargetUntil = t + 1; u.stunUntil = 0; heal(u, (u.maxHp - u.hp) * 0.2);
+      const F = id => ITEMS[id].fx;
+      if (u.has.has('SteraksGage')) once('sterak', F('SteraksGage').HealthThreshold / 100, () => addShield(u, u.maxHp * F('SteraksGage').PercentHealthShield, F('SteraksGage').ShieldDuration, true));
+      if (u.has.has('Bloodthirster')) once('blood', F('Bloodthirster').HealthThreshold / 100, () => addShield(u, u.maxHp * F('Bloodthirster').ShieldHealthPercent / 100, F('Bloodthirster').ShieldDuration));
+      if (u.has.has('FrozenHeart')) once('vow', F('FrozenHeart').HealthThreshold / 100, () => {
+        const fx = F('FrozenHeart');
+        addShield(u, u.maxHp * fx.ShieldHealthPercent / 100, fx.ShieldDuration);
+        u.armor += fx.Stats; u.mr += fx.Stats;
       });
+      if (u.has.has('GuardianAngel')) once('edge', F('GuardianAngel').HealthThreshold / 100, () => {
+        const fx = F('GuardianAngel');
+        u.untargetUntil = t + fx.StealthDuration;
+        // limpa efeitos negativos
+        u.stunUntil = 0; u.sunderUntil = 0; u.shredUntil = 0; u.burnUntil = 0; u.woundUntil = 0; u.debuffUntil = 0; u.dots = [];
+        u.asBonus += fx.AttackSpeed / 100;
+      });
+      hojUpdate(u);
+    }
+
+    /* Mão da Justiça: acima de 50% de Vida dobra DA e PH; abaixo, dobra o Omnivamp */
+    function hojUpdate(u) {
+      if (!u.hoj || !u.alive) return;
+      const fx = u.hojFx;
+      const high = u.hp / u.maxHp > fx.HealthThreshold;
+      if (high === u.hojHigh) return;
+      const apply = (state, sign) => {
+        if (state === true) { u.adPct += sign * fx.AD_NotStatBar * u.hoj; u.ap += sign * fx.AP_NotStatBar * u.hoj; }
+        if (state === false) u.vamp += sign * fx.StatOmnivamp_NotStatBar * u.hoj;
+      };
+      apply(u.hojHigh, -1);
+      apply(high, 1);
+      u.ad = u.baseAd * (1 + u.adPct);
+      u.hojHigh = high;
     }
 
     function hit(src, tgt, raw, type, o = {}) {
-      if (!tgt.alive || tgt.untargetUntil > t || raw <= 0) return 0;
+      if (!tgt.alive || tgt.untargetUntil > t || !(raw > 0) || !Number.isFinite(raw)) return 0;
       let amount = raw;
       let crit = false;
-      if ((o.attack || (o.ability && src.abilityCrit)) && !o.noProc && rng() < src.crit) { amount *= src.critDmg; crit = true; }
+      if ((o.attack || (o.ability && src.abilityCrit)) && !o.noProc && rng() < src.crit) {
+        // Carrasco: alvo abaixo de 20% de Vida, o dano crítico bônus da trait dobra
+        const exec = src.execBonus && tgt.hp / tgt.maxHp < src.execBonus.below ? src.execBonus.dmg : 0;
+        amount *= src.critDmg + exec; crit = true;
+      }
+      if (src.holoMul) amount *= src.holoMul; // holograma do Mata-almas causa % do dano
       let amp = 1 + src.amp + (o.ability ? src.abilityAmp : 0);
-      if (src.has.has('MadredsBloodrazor') && TANK_ROLES.has(tgt.role)) amp += 0.15;
+      if (src.has.has('MadredsBloodrazor') && tgt.maxHp > ITEMS.MadredsBloodrazor.fx.HealthThreshold) amp += ITEMS.MadredsBloodrazor.fx.DamageAmp;
+      if (src.blueUntil > t) amp += ITEMS.BlueBuff.fx.DamageAmp;
       amp += src.critStacks.filter(s => s > t).length * 0.05;
       if (src.sniper) amp += src.sniper * dist(src, tgt);
-      if (src.debuffUntil > t) amp *= 0.9;
+      if (src.debuffUntil > t) amp *= 1 - (src.debuffV || 0.1);
       const srcHooks = src.side != null ? augHooks[src.side] : null;
       if (srcHooks) for (const fn of srcHooks.damageMul) amp += fn(src);
       if (t > 30) amp *= 1 + (t - 30) * 0.25;   // prorrogação
@@ -1702,9 +2151,14 @@ const TFTEngine = (() => {
       let final = type === 't' ? amount : amount * 100 / (100 + res);
       let dura = tgt.dura + (tgt.duraUntil > t ? tgt.duraV : 0);
       if (tgt.vanguard && tgt.shields.length) dura += tgt.vanguard.min >= 6 ? tgt.vanguard.EnhancedDurability : tgt.vanguard.DamageReductionPct;
-      if (tgt.has.has('NightHarvester') && tgt.hp / tgt.maxHp > 0.5) dura += 0.1;
+      if (tgt.has.has('NightHarvester')) {
+        const fx = ITEMS.NightHarvester.fx;
+        if (tgt.hp / tgt.maxHp > fx.ThresholdForEmpower) dura += fx.EmpoweredDurability - fx.BaseDurability;
+      }
       final *= 1 - Math.min(0.8, dura);
-      if (o.attack && tgt.has.has('BrambleVest')) final *= 0.95;
+      if (o.attack && tgt.has.has('BrambleVest')) final *= 1 - ITEMS.BrambleVest.fx.AutoDamageReduction;
+      if (o.attack && tgt.helmFront) tgt.mana += tgt.helmFront;
+      if (src.id && tgt.hitters) tgt.hitters.set(src.id, t);
 
       const dealt = final;
       src.stat[type] += dealt;
@@ -1738,27 +2192,78 @@ const TFTEngine = (() => {
       if (!o.noProc) {
         if (src.has.has('LastWhisper')) { tgt.sunderUntil = t + 3; tgt.sunderV = Math.max(tgt.sunderV, 0.3); }
         if (src.has.has('StatikkShiv')) { tgt.shredUntil = t + 5; tgt.shredV = Math.max(tgt.shredV, 0.3); }
-        if (src.has.has('Morellonomicon') || src.has.has('RapidFireCannon')) { tgt.burnUntil = t + 10; tgt.woundUntil = t + 10; }
-        if (o.ability && src.tech) tgt.debuffUntil = t + 3;
-        if (o.attack && tgt.has.has('BrambleVest') && (tgt.icd.bramble || 0) <= t) {
-          tgt.icd.bramble = t + 2;
-          enemiesOf(tgt).filter(x => dist(x, tgt) <= 1).forEach(x => hit(tgt, x, 100 * (tgt.brambleMul || 1), 'm', { noProc: true }));
+        const burn = (dur) => { tgt.burnUntil = Math.max(tgt.burnUntil, t + dur); tgt.woundUntil = Math.max(tgt.woundUntil, t + dur); };
+        if (src.has.has('Morellonomicon')) burn(ITEMS.Morellonomicon.fx.BurnDuration);
+        if (src.has.has('RapidFireCannon')) burn(ITEMS.RapidFireCannon.fx.Duration);
+        if (o.ability && src.tech) {
+          tgt.debuffV = tgt.debuffUntil > t ? Math.max(tgt.debuffV || 0, src.tech.v) : src.tech.v;
+          tgt.debuffUntil = t + src.tech.dur;
         }
-        if (src.has.has('TitansResolve') && (src.stacks.titan || 0) < 25) { src.stacks.titan = (src.stacks.titan || 0) + 1; src.adPct += 0.02; src.ap += 2; src.ad = src.baseAd * (1 + src.adPct); }
-        if (tgt.has.has('TitansResolve') && (tgt.stacks.titan || 0) < 25) { tgt.stacks.titan = (tgt.stacks.titan || 0) + 1; tgt.adPct += 0.02; tgt.ap += 2; tgt.ad = tgt.baseAd * (1 + tgt.adPct); }
+        if (o.attack && tgt.has.has('BrambleVest') && (tgt.icd.bramble || 0) <= t) {
+          const fx = ITEMS.BrambleVest.fx;
+          tgt.icd.bramble = t + fx.ICD;
+          const dmg = num(fx[`${Math.min(4, tgt.star)}StarAoEDamage`]) || num(fx['1StarAoEDamage']);
+          enemiesOf(tgt).filter(x => dist(x, tgt) <= 1).forEach(x => {
+            const done = hit(tgt, x, dmg * (tgt.brambleMul || 1), 'm', { noProc: true });
+            if (tgt.brambleHeal) heal(tgt, done * tgt.brambleHeal); // Armadura Espinhosa
+          });
+        }
+        const titan = u => {
+          const fx = ITEMS.TitansResolve.fx;
+          if (!u.has.has('TitansResolve') || (u.stacks.titan || 0) >= fx.StackCap) return;
+          u.stacks.titan = (u.stacks.titan || 0) + 1;
+          u.adPct += fx.StackingAD; u.ap += fx.StackingSP; u.ad = u.baseAd * (1 + u.adPct);
+          if (u.stacks.titan === fx.StackCap) { u.armor += fx.BonusResistsAtStackCap; u.mr += fx.BonusResistsAtStackCap; }
+        };
+        titan(src);
+        titan(tgt);
         const boomOf = (u, value) => {
           if (!u.boomTier || !u.alive) return;
           u.boom += value;
           while (u.boom >= u.boomTier.DamageDealtThreshold) {
             u.boom -= u.boomTier.DamageDealtThreshold;
             const m = nearest(u, enemiesOf(u));
-            if (m) { events.push(['a', u.id, m.id, 'boom']); hit(u, m, u.boomTier.MissileDamage * u.ap / 100, 'm', { noProc: true, ability: true }); }
+            const shots = u.boomTier.min >= 6 ? 2 : 1;
+            for (let k = 0; k < shots; k++) {
+              const tgtM = k === 0 ? m : (nearest(u, enemiesOf(u).filter(x => x !== m && targetable(x))) || m);
+              if (tgtM && tgtM.alive) { events.push(['a', u.id, tgtM.id, 'boom']); hit(u, tgtM, u.boomTier.MissileDamage * u.ap / 100, 'm', { noProc: true, ability: true }); }
+            }
           }
         };
         boomOf(src, dealt);
         if (tgt.boomTier) boomOf(tgt, dealt * tgt.boomTier.DamageTakenMod);
       }
 
+      if (src.exo && tgt.alive && !o.exoProc) {
+        const X = src.exo;
+        if (X.Exo_Coil && (o.attack || o.ability)) tgt.coilUntil = Math.max(tgt.coilUntil || 0, t + X.Exo_Coil.MarkDuration);
+        if (X.Exo_Coil && (tgt.coilUntil || 0) > t) heal(src, dealt * X.Exo_Coil.HealingPercent);
+        if (X.Exo_Fangs && dealt > 0) {
+          const F = X.Exo_Fangs;
+          if (F.instant) {
+            const nb = nearest(tgt, enemiesOf(src).filter(x => x !== tgt && targetable(x)));
+            if (nb) queue.push({ at: t + 0.25, src, run: () => { if (nb.alive && src.alive) hit(src, nb, dealt * F.StoredDamage, 'p', { noProc: true, exoProc: true }); } });
+          } else {
+            tgt.fang = tgt.fang || {};
+            const st = tgt.fang[src.id] || (tgt.fang[src.id] = { v: 0, armed: false });
+            st.v += dealt * F.StoredDamage;
+            if (!st.armed) {
+              st.armed = true;
+              queue.push({ at: t + F.MarkDuration, src, run: () => {
+                const v = st.v; st.v = 0; st.armed = false;
+                if (!src.alive) return;
+                if (tgt.alive) hit(src, tgt, v, 'p', { noProc: true, exoProc: true });
+                const nb = nearest(tgt, enemiesOf(src).filter(x => x !== tgt && targetable(x)));
+                if (nb) hit(src, nb, v, 'p', { noProc: true, exoProc: true });
+              } });
+            }
+          }
+        }
+        if (X.Exo_Holobow && crit && o.attack) src.mana += X.Exo_Holobow.BonusManaOnHit;
+      }
+      if (tgt.hp > 0 && src.exo && src.exo.Exo_Pulse && tgt.alive && tgt.hp / tgt.maxHp < src.exo.Exo_Pulse.ExecuteThresholdPercent) {
+        tgt.hp = 0; // execução
+      }
       if (tgt.hp <= 0) kill(tgt, src); else checkThresholds(tgt);
       return dealt;
     }
@@ -1806,7 +2311,7 @@ const TFTEngine = (() => {
     }
 
     function spellDamage(u, spec) {
-      const base = spec.dmg ? spec.dmg[u.star - 1] * u.ap / 100 : 0;
+      const base = spec.dmg ? byStar(spec.dmg, u.star) * u.ap / 100 : 0;
       return base + (spec.ad ? spec.ad * u.ad : 0);
     }
 
@@ -1858,12 +2363,13 @@ const TFTEngine = (() => {
       } else if (st.shape === 'nearest') {
         const pool = en.filter(x => st.includeMain || x !== main)
           .sort((a, b) => hexDist(a.c, a.r, cx, cy) - hexDist(b.c, b.r, cx, cy) || a.id - b.id)
-          .slice(0, st.n || 1);
+          .slice(0, (st.n || 1) + (st.nPerAmp || 0) * (u.ampLevel || 0));
         for (const x of pool) { landOn(u, st, x, dmg); count++; }
       } else if (st.shape === 'area') {
         const center = unitAt(en, cx, cy) || (main && main.alive ? main : null);
         for (const x of en.filter(y => hexDist(y.c, y.r, cx, cy) <= (st.radius || 1))) {
           const isCenter = x === center;
+          if (st.bossOther && !u.cyberboss && !isCenter) continue; // Ciberchefão: forma final atinge em volta
           const other = st.other ? byStar(st.other, u.star) * u.ap / 100 : st.otherMul ? dmg * st.otherMul : dmg;
           landOn(u, st, x, isCenter ? dmg : other);
           count++;
@@ -1894,6 +2400,7 @@ const TFTEngine = (() => {
         const solo = hitList.length === 1 ? (st.soloMul || 1) : 1;
         for (const x of hitList) {
           const near = hexDist(x.c, x.r, cx, cy) <= (st.radius || 1);
+          if (st.bossFar && !u.cyberboss && !near) continue; // Ciberchefão: forma final atinge a fileira e a coluna
           landOn(u, st, x, (near ? dmg : byStar(st.far, u.star) * u.ap / 100) * solo);
           count++;
         }
@@ -1933,19 +2440,84 @@ const TFTEngine = (() => {
       });
     }
 
+    /* Chefão: o Shaco troca o alvo pelo inimigo com menos Vida no alcance e aparece atrás dele */
+    function kingpinTarget(u, main) {
+      const k = u.kingpin;
+      if (!k || !k.fx.reach) return main;
+      const low = enemiesOf(u).filter(x => targetable(x) && dist(u, x) <= k.fx.reach).sort((a, b) => a.hp / a.maxHp - b.hp / b.maxHp)[0];
+      if (!low) return main;
+      u.target = low;
+      return low;
+    }
+    /* Chefão: efeito extra de cada campeão depois da habilidade */
+    function kingpinAfter(u, spec, main) {
+      const k = u.kingpin;
+      if (!k || !main) return;
+      const f = k.fx, tier = k.tier;
+      const name = CH[u.champ].name;
+      if (name === 'Darius') {
+        // alcance maior com perda de 5% por casa; cura por inimigo atingido
+        const far = enemiesOf(u).filter(x => targetable(x) && dist(u, x) > 1 && dist(u, x) <= f.range[tier]);
+        far.forEach(x => hit(u, x, u.ad * spec.ad * Math.max(0, 1 - f.falloff * (dist(u, x) - 1)), 'p', { ability: true }));
+        const n = enemiesOf(u).filter(x => dist(u, x) <= f.range[tier]).length;
+        heal(u, n * (f.healPer + f.healHp * u.maxHp));
+      } else if (name === 'Miss Fortune') {
+        // mais 3 levas; com 7, cada bala também atravessa e atinge outro inimigo com 40%
+        for (let i = 0; i < f.waves; i++) {
+          queue.push({ at: t + 0.15 * ((spec.volley || 1) + i), src: u, run: () => {
+            const en = enemiesOf(u).filter(targetable);
+            if (!en.length || !u.alive) return;
+            const x = pick(rng, en);
+            hit(u, x, spellDamage(u, spec), 'p', { ability: true });
+          } });
+        }
+        if (tier === 1) for (const x of enemiesOf(u).filter(y => targetable(y) && y !== main && dist(y, main) <= 1)) hit(u, x, spellDamage(u, spec) * f.pierce * (spec.volley || 1), 'p', { ability: true });
+      } else if (name === 'Shaco') {
+        // dano adicional logo depois do golpe; se abater, conjura de novo com 75%
+        queue.push({ at: t + 0.06, src: u, run: () => {
+          if (!u.alive) return;
+          if (main.alive) hit(u, main, spellDamage(u, spec) * f.bonus[tier], 'p', { ability: true });
+          if (!main.alive) {
+            const next = kingpinTarget(u, null);
+            if (next) hit(u, next, spellDamage(u, spec) * (1 + f.bonus[tier]) * f.recast, 'p', { ability: true });
+          }
+        } });
+      } else if (name === 'Twisted Fate') {
+        // carta especial (vermelha: área de 1 casa; azul: 50% verdadeiro); com 7, as duas
+        const dmg = byStar(f.card, u.star) * u.ap / 100;
+        const red = x => { hit(u, x, dmg, 'm', { ability: true }); enemiesOf(u).filter(y => y !== x && targetable(y) && dist(y, x) <= 1).forEach(y => hit(u, y, dmg, 'm', { ability: true })); };
+        const blue = x => { hit(u, x, dmg * (1 - f.truePct), 'm', { ability: true }); hit(u, x, dmg * f.truePct, 't', { ability: true }); };
+        if (tier === 1) {
+          red(main);
+          const second = enemiesOf(u).filter(x => x !== main && targetable(x)).sort((a, b) => dist(main, a) - dist(main, b))[0];
+          blue(second || main);
+        } else if (rng() < 0.5) red(main); else blue(main);
+        if (rng() < f.goldChance) { goldDrops[u.side] += f.gold; events.push(['g', u.id]); }
+      }
+    }
+
     function cast(u) {
       const spec = u.spec;
       if (!spec) { u.mana = 0; return; }
-      const main = abilityTarget(u, spec);
+      const main = kingpinTarget(u, abilityTarget(u, spec));
+      const spent = u.maxMana;
       u.mana = 0;
       u.castUntil = t + 0.5;
       events.push(['c', u.id, main ? main.id : 0]);
 
-      // Centelha Iônica de inimigos próximos reage à conjuração
+      // Centelha Iônica de inimigos próximos reage à conjuração: % da Mana gasta
       for (const e of enemiesOf(u)) {
-        if (e.has.has('IonicSpark') && dist(e, u) <= 2) hit(e, u, u.maxMana * 1.5, 'm', { noProc: true });
+        const fx = ITEMS.IonicSpark.fx;
+        if (e.has.has('IonicSpark') && dist(e, u) <= fx.HexRange) hit(e, u, spent * fx.ManaRatio / 100, 'm', { noProc: true });
       }
       if (!u.alive) return;
+      if (u.has.has('BlueBuff')) u.mana += ITEMS.BlueBuff.fx.ManaRefund;
+      if (u.has.has('Leviathan')) u.nashUntil = t + ITEMS.Leviathan.fx.ASDuration;
+      if (u.exo && u.exo.Exo_Holobow && !u.holoOn) {
+        const H = u.exo.Exo_Holobow;
+        u.holoOn = true; u.crit += H.CritChanceOnCast / 100;
+        queue.push({ at: t + H.Duration, src: u, run: () => { if (u.holoOn) { u.holoOn = false; u.crit -= H.CritChanceOnCast / 100; } } });
+      }
 
       if (augHooks[u.side]) augHooks[u.side].cast.forEach(fn => fn(u));
       if (spec.channel) u.castUntil = t + spec.channel;
@@ -1956,29 +2528,50 @@ const TFTEngine = (() => {
       }
       if (spec.teamAS) for (const ally of alive(u.side)) ally.asBonus += spec.teamAS;
 
-      if (spec.shield) addShield(u, spec.shield[u.star - 1] * u.ap / 100 + (spec.shieldHp || 0) * u.maxHp, spec.shieldDur || 4);
-      if (spec.heal) heal(u, spec.heal[u.star - 1] * u.ap / 100 + (spec.healHp || 0) * u.maxHp);
-      if (spec.hpGain) { const g = spec.hpGain[u.star - 1] * u.ap / 100; u.maxHp += g; u.hp += g; }
-      if (spec.aura) u.aura = { dps: spec.aura[u.star - 1] * u.ap / 100, until: t + spec.auraDur, radius: spec.auraRadius || 1, heal: spec.auraHeal || 0 };
+      if (spec.shield) addShield(u, byStar(spec.shield, u.star) * u.ap / 100 + (spec.shieldHp || 0) * u.maxHp, spec.shieldDur || 4);
+      if (spec.heal) heal(u, byStar(spec.heal, u.star) * u.ap / 100 + (spec.healHp || 0) * u.maxHp);
+      if (spec.hpGain) { const g = byStar(spec.hpGain, u.star) * u.ap / 100; u.maxHp += g; u.hp += g; }
+      if (spec.aura) u.aura = { dps: byStar(spec.aura, u.star) * u.ap / 100, until: t + spec.auraDur, radius: spec.auraRadius || 1, heal: spec.auraHeal || 0 };
       if (spec.buffAS) { u.buffUntil = t + spec.buffDur; u.buffAS = spec.buffAS; }
-      if (spec.steps) { castSteps(u, spec, main); return; }
+      if (spec.steps) { castSteps(u, spec, main); kingpinAfter(u, spec, main); return; }
       if (!main) return;
 
       const hits = (spec.hits || 1) + u.extraHits;
-      const victims = [main, ...enemiesOf(u).filter(x => x !== main && targetable(x)).sort((a, b) => dist(main, a) - dist(main, b)).slice(0, hits - 1)];
-      for (let i = 0; i < (spec.volley || 1); i++) {
+      const from = spec.nearestHits ? u : main;
+      const victims = spec.nearestHits
+        ? enemiesOf(u).filter(targetable).sort((a, b) => dist(u, a) - dist(u, b)).slice(0, hits)
+        : [main, ...enemiesOf(u).filter(x => x !== main && targetable(x)).sort((a, b) => dist(from, a) - dist(from, b)).slice(0, hits - 1)];
+      if (spec.ampTargets) {
+        const at = spec.ampTargets;
+        const extra = enemiesOf(u).filter(x => x !== main && targetable(x)).sort((a, b) => dist(u, a) - dist(u, b)).slice(0, at.n + at.perAmp * (u.ampLevel || 0));
+        extra.forEach(x => hit(u, x, byStar(at.dmg, u.star) * u.ap / 100, 'm', { ability: true }));
+        heal(u, byStar(at.healPer, u.star) * (extra.length + 1));
+      }
+      if (spec.pack) {
+        const pk = spec.pack, alphas = pk.alphas + (u.ampLevel || 0);
+        for (let i = 0; i < pk.mates; i++) queue.push({ at: t + 0.2 + i * 0.1, run: () => { if (main.alive && u.alive) hit(u, main, u.ad * pk.mateAd, 'p', { ability: true }); }, src: u });
+        for (let i = 0; i < alphas; i++) queue.push({ at: t + 0.5 + i * 0.15, run: () => { if (main.alive && u.alive) hit(u, main, u.ad * pk.alphaAd, 'p', { ability: true }); }, src: u });
+      }
+      if (u.laser) {
+        // laser gigante: atravessa o alvo e atinge todos os inimigos na linha
+        const cells = new Set(hexLine(u.c, u.r, main.c, main.r, 14).map(([c, r]) => c + ',' + r));
+        events.push(['a', u.id, main.id, 'laser']);
+        enemiesOf(u).filter(x => targetable(x) && cells.has(x.c + ',' + x.r)).forEach(x => hit(u, x, u.laser * u.ap / 100, 'm', { ability: true }));
+      }
+      for (let i = 0; i < (spec.volley || 1) + (spec.volleyPerAmp || 0) * (u.ampLevel || 0); i++) {
         victims.forEach((v, n) => queue.push({ at: t + i * 0.15 + n * 0.02, src: u, tgt: v, spec }));
       }
-      if (spec.radius) {
+      if (spec.radius && (!spec.bossSplash || u.cyberboss)) {
         const around = enemiesOf(u).filter(x => !victims.includes(x) && dist(main, x) <= spec.radius);
         for (const x of around) {
-          if (spec.splash) hit(u, x, spec.splash[u.star - 1] * u.ap / 100, spec.type || 'm', { ability: true });
+          if (spec.splash) hit(u, x, byStar(spec.splash, u.star) * u.ap / 100, spec.type || 'm', { ability: true });
           if (spec.splashAd) hit(u, x, spec.splashAd * u.ad, spec.type || 'p', { ability: true });
           if (spec.stunAoe) stun(x, spec.stun, u);
           if (spec.wound) x.woundUntil = t + 5;
         }
         if (spec.stunAoe) stun(main, spec.stun, u);
       } else if (spec.stunAoe) stun(main, spec.stun, u);
+      kingpinAfter(u, spec, main);
     }
 
     function attack(u, tgt) {
@@ -1994,6 +2587,20 @@ const TFTEngine = (() => {
       } else {
         hit(u, tgt, u.ad, 'p', { attack: true });
       }
+      if (u.exo && u.exo.Exo_Flux && tgt.alive) {
+        const F = u.exo.Exo_Flux;
+        u.fluxCharge = (u.fluxCharge || 0) + 1;
+        if (u.fluxCharge > F.ChargeCap) {
+          u.fluxCharge = 0;
+          hit(u, tgt, tgt.maxHp * F.ShockDamage, 'p', { noProc: true, exoProc: true });
+          tgt.armor = Math.max(0, tgt.armor - F.FlatArmorReduction);
+        }
+      }
+      if (u.kingpin && u.kingpin.fx.period && t >= (u.kpNext || 0)) {
+        const f = u.kingpin.fx;
+        u.kpNext = t + f.period[u.kingpin.tier];
+        hit(u, tgt, f.hpPct * u.maxHp + byStar(f.resistPct, u.star) * u.armor, 'm', { ability: true });
+      }
       if (augHooks[u.side]) augHooks[u.side].attackHit.forEach(fn => fn(u, tgt));
       if (u.manaOnAttack) u.mana += u.manaOnAttack;
       if (u.chakram && u.chakram.left > 0 && tgt.alive) {
@@ -2003,15 +2610,10 @@ const TFTEngine = (() => {
       if (!u.alive) return;
       if (spec && spec.attacksPerCast) u.mana += u.maxMana / spec.attacksPerCast;
       else if (!u.casting) u.mana += 10;
-      if (u.has.has('SpearOfShojin')) u.mana += 5;
-      if (u.has.has('Leviathan')) u.mana += rng() < u.crit ? 4 : 2;
+      if (u.has.has('SpearOfShojin')) u.mana += ITEMS.SpearOfShojin.fx.FlatManaRestore;
       if (u.smoke && (u.stacks.smoke || 0) < u.smoke.max) { u.stacks.smoke = (u.stacks.smoke || 0) + 1; u.asBonus += u.smoke.per; }
-      if (u.has.has('RunaansHurricane')) {
-        const n = (u.stacks.kraken || 0) + 1;
-        u.stacks.kraken = n;
-        if (n <= 15) { u.adPct += 0.04; u.ad = u.baseAd * (1 + u.adPct); }
-        else if (n === 16) u.asBonus += 0.15;
-      }
+      // Fúria do Cráquem (Season 14): cada ataque acumula DA, sem limite
+      if (u.has.has('RunaansHurricane')) { u.adPct += ITEMS.RunaansHurricane.fx.ADOnAttack; u.ad = u.baseAd * (1 + u.adPct); }
     }
 
     function everySecond(sec) {
@@ -2029,19 +2631,35 @@ const TFTEngine = (() => {
       for (const u of units) {
         if (!u.alive) continue;
         u.mana += u.manaRegen;
-        if (u.has.has('GuinsoosRageblade')) u.asBonus += 0.07;
-        if (u.has.has('Quicksilver') && sec <= 18) u.asBonus += 0.03;
-        if (u.has.has('Redemption')) heal(u, (u.maxHp - u.hp) * 0.02);
-        if (u.has.has('DragonsClaw') && sec % 2 === 0) heal(u, u.maxHp * 0.025);
-        if (u.has.has('ArchangelsStaff') && sec % 5 === 0) u.ap += 20;
-        if (u.has.has('Crownguard') && sec === 8) u.ap += 25;
-        if (u.has.has('SpectralGauntlet') && sec === 15) { u.armor -= 15; u.mr -= 15; }
+        const F = id => ITEMS[id].fx;
+        if (u.has.has('GuinsoosRageblade')) u.asBonus += F('GuinsoosRageblade').AttackSpeedPerStack / 100;
+        if (u.has.has('Quicksilver') && sec <= F('Quicksilver').SpellShieldDuration && sec % F('Quicksilver').ProcInterval === 0) u.asBonus += F('Quicksilver').ProcAttackSpeed;
+        // Semblante Espiritual: % da Vida perdida por segundo, até MaxHeal por cura
+        if (u.has.has('Redemption')) heal(u, Math.min(F('Redemption').MaxHeal, (u.maxHp - u.hp) * F('Redemption').MissingHealthHeal));
+        if (u.has.has('DragonsClaw') && sec % F('DragonsClaw').HealthRegenInterval === 0) heal(u, u.maxHp * F('DragonsClaw').PercentHealthDamage / 100);
+        if (u.has.has('ArchangelsStaff') && sec % F('ArchangelsStaff').IntervalSeconds === 0) u.ap += F('ArchangelsStaff').APPerInterval;
+        if (u.has.has('Crownguard') && sec === F('Crownguard').ShieldDuration + (u.crownBoost ? u.crownBoost.dur : 0)) u.ap += F('Crownguard').ShieldBonusAP;
+        if (u.has.has('SpectralGauntlet') && sec === F('SpectralGauntlet').BonusResistDuration) { u.armor -= F('SpectralGauntlet').BonusResists; u.mr -= F('SpectralGauntlet').BonusResists; }
+        if (u.helmBack && sec % u.helmBack.ManaTickrate === 0) u.mana += u.helmBack.ManaPerTickrate;
+        if (u.exo && u.exo.Exo_Chassis && sec % u.exo.Exo_Chassis.SiphonFrequency === 0) {
+          const C = u.exo.Exo_Chassis;
+          const list = C.NumEnemies > 1 ? enemiesOf(u).filter(targetable).sort((a, b) => dist(u, a) - dist(u, b)).slice(0, C.NumEnemies) : [u.target && u.target.alive ? u.target : nearest(u, enemiesOf(u).filter(targetable))].filter(Boolean);
+          let got = 0;
+          for (const e of list) got += hit(u, e, u.maxHp * C.HealthSiphonAmt, 'm', { noProc: true, exoProc: true });
+          if (got > 0) addShield(u, got, C.ShieldDuration);
+        }
+        if (u.exo && u.exo.Exo_Lantern && sec % u.exo.Exo_Lantern.Interval === 0) {
+          const L = u.exo.Exo_Lantern;
+          for (const e of enemiesOf(u)) if (dist(u, e) <= L.radius) hit(u, e, u.maxHp * L.PercHealthDamage, 'm', { noProc: true, exoProc: true });
+        }
         if (u.bastion && sec === 10) { u.armor -= u.bastion; u.mr -= u.bastion; u.bastion = 0; }
         if (u.gunner && sec === u.gunner.EnhancedTime) { u.adPct += u.gunner.BonusAD; u.ad = u.baseAd * (1 + u.adPct); }
         if (u.gunner && u.gunner.RepeatTime > 0 && sec > u.gunner.EnhancedTime && (sec - u.gunner.EnhancedTime) % u.gunner.RepeatTime === 0) {
           u.adPct += u.gunner.RepeatBonus; u.ad = u.baseAd * (1 + u.adPct);
         }
-        if (u.has.has('GargoyleStoneplate')) u.gargBonus = enemiesOf(u).filter(e => e.target === u).length * 10;
+        if (u.has.has('GargoyleStoneplate')) u.gargBonus = enemiesOf(u).filter(e => e.target === u).length * F('GargoyleStoneplate').ArmorPerEnemy;
+        // Tibbers: queima e fere inimigos adjacentes
+        if (u.tibbers) for (const e of enemiesOf(u)) if (dist(u, e) <= 1) { e.burnUntil = Math.max(e.burnUntil, t + u.tibbers); e.woundUntil = Math.max(e.woundUntil, t + u.tibbers); }
         if (u.has.has('RedBuff') && sec % 2 === 0) {
           const e = nearest(u, enemiesOf(u));
           if (e && dist(u, e) <= 2) { e.burnUntil = t + 10; e.woundUntil = t + 10; }
@@ -2127,7 +2745,12 @@ const TFTEngine = (() => {
     /* início: escudos e efeitos instantâneos */
     for (const u of units) {
       if (u.vanguard) addShield(u, u.maxHp * u.vanguard.ShieldPercentAmount, u.vanguard.ShieldDuration);
-      if (u.has.has('Crownguard')) addShield(u, u.maxHp * 0.25, 8);
+      if (u.has.has('Crownguard')) {
+        // Proteção Real: escudo mais forte e mais longo
+        const b = u.crownBoost || { mul: 0, dur: 0 };
+        addShield(u, u.maxHp * ITEMS.Crownguard.fx.ShieldSize / 100 * (1 + b.mul), ITEMS.Crownguard.fx.ShieldDuration + b.dur);
+      }
+      hojUpdate(u);
       if (u.overlord && u.overlord.victim.alive) applyTrue(u.overlord.victim, u.overlord.victim.maxHp * u.overlord.dmg, u);
     }
 
@@ -2146,7 +2769,11 @@ const TFTEngine = (() => {
     while (t < MAX_T && alive(0).length && alive(1).length) {
       t += DT;
       tick++;
-      for (const u of units) if (u.shields.length) u.shields = u.shields.filter(s => s.until > t && s.v > 0);
+      for (const u of units) {
+        if (!u.shields.length) continue;
+        for (const s of u.shields) if (s.decay) s.v -= s.decay * DT;
+        u.shields = u.shields.filter(s => s.until > t && s.v > 0);
+      }
       if (tick % 20 === 0) everySecond(tick / 20);
       for (const hk of augHooks) {
         if (!hk) continue;
@@ -2177,7 +2804,8 @@ const TFTEngine = (() => {
         if (!u.target) continue;
         if (dist(u, u.target) <= u.range) {
           u.atkT += DT;
-          const speed = Math.min(5, u.asBase * (1 + u.asBonus + (u.buffUntil > t ? u.buffAS : 0)));
+          const nash = u.nashUntil > t ? ITEMS.Leviathan.fx.AttackSpeedToGive / 100 : 0;
+          const speed = Math.min(5, u.asBase * (1 + u.asBonus + nash + (u.buffUntil > t ? u.buffAS : 0)));
           if (u.atkT >= 1 / speed) { u.atkT = 0; attack(u, u.target); }
         } else if (u.moveT <= t) {
           let best = pathStep(u, u.target);
@@ -2196,6 +2824,7 @@ const TFTEngine = (() => {
           }
         }
       }
+      if (probe) probe(t, units);
       if (tick % 2 === 0) snapshot();
     }
     snapshot();
@@ -2204,7 +2833,7 @@ const TFTEngine = (() => {
     augHooks.forEach((hk, side) => { if (hk) hk.end.forEach(fn => fn(alive(side))); });
     const winner = a0 && !a1 ? 0 : a1 && !a0 ? 1 : -1;
     return {
-      winner, survivors: winner === 0 ? a0 : winner === 1 ? a1 : 0, duration: t, goldDrops, frames, permGains, augGold,
+      winner, survivors: winner === 0 ? a0 : winner === 1 ? a1 : 0, duration: t, goldDrops, compDrops, soulKill, frames, permGains, augGold,
       deaths: [units.filter(u => u.side === 0 && !u.alive).length, units.filter(u => u.side === 1 && !u.alive).length],
       meta: units.map(u => ({
         id: u.id, side: u.side, champ: u.champ || null, creep: u.creep || null, star: u.star, maxMana: u.maxMana, items: u.itemIds, stats: u.start, // itemIds inclui o que as Luvas sortearam
@@ -2291,7 +2920,7 @@ const TFTEngine = (() => {
         name: me.name, hp: me.hp, gold: me.gold, level: me.level, xp: me.xp,
         xpNext: me.level >= RULES.maxLevel ? 0 : RULES.xpToLevel[me.level], streak: me.streak, ready: me.ready,
         lastResult: me.lastResult, picked: me.picked, traits: traitSummary(me), alive: me.alive, placement: me.placement,
-        bench: me.bench, board: me.board, items: me.items, shop: me.shop, locked: me.locked, carousel: me.carousel, chrome: me.chrome,
+        bench: me.bench, board: me.board, items: me.items, shop: me.shop, shopBlob: me.shopBlob == null ? -1 : me.shopBlob, blobs: me.blobs || 0, oxStacks: me.oxStacks || 0, oxNeed: me.oxNeed || 8, locked: me.locked, carousel: me.carousel, chrome: me.chrome,
         augments: me.augments, offer: me.offer, choices: me.choices, freeRerolls: me.freeRerolls,
       },
       // dos outros só vão as traits: tabuleiro, banco, itens e loja aparecem (as unidades) só no combate

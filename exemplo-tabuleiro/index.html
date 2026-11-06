@@ -1,0 +1,49 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+
+<head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Waifu Arena — tabuleiro de teste</title>
+    <link rel="icon" type="image/webp" href="Mudae.webp" />
+    <link rel="stylesheet" href="style.css" />
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Bangers&family=Cinzel:wght@700;900&family=Orbitron:wght@500;800&family=Press+Start+2P&family=Playfair+Display:ital,wght@1,900&family=Great+Vibes&family=UnifrakturMaguntia&family=Russo+One&family=Permanent+Marker&family=Mochiy+Pop+One&family=Creepster&family=Righteous&family=Kaushan+Script&display=swap" />
+    <link rel="stylesheet" href="card-effects-tracker.css" />
+    <link rel="stylesheet" href="waifuarena.css" />
+    <link rel="stylesheet" href="waifuarena-battle.css" />
+    <!-- mesma política do tracker: as fotos do Mudae carregam sem referrer -->
+    <meta name="referrer" content="no-referrer">
+    <style>
+        .demo-bar { display: flex; align-items: center; justify-content: space-between; gap: 12px; flex-wrap: wrap;
+            max-width: 1680px; margin: 0 auto; padding: 14px 24px 0; color: var(--muted); font-size: 12px; }
+        .demo-bar b { color: var(--text); }
+            .demo-nav { display: flex; gap: 6px; flex-wrap: wrap; }
+        .demo-nav a { padding: 5px 10px; border-radius: 8px; border: 1px solid var(--border); color: var(--muted); text-decoration: none; font-size: 11px; }
+        .demo-nav a.on { color: var(--cyan); border-color: var(--cyan); }
+    </style>
+</head>
+
+<!--
+  Cópia do tabuleiro da Waifu Arena para testes (pasta exemplo-tabuleiro).
+  - Personagens de exemplo em demo-tracker.js (no lugar do tracker).
+  - Contra o bot funciona offline; o online usa a mesma sala (PeerJS) do tracker.
+  - Mudanças aqui não afetam o Mudae-Tracker.
+-->
+<body>
+    <div class="demo-bar">
+        <nav class="demo-nav"><a href="index.html" class="on">Original</a><a href="exemplo-1.html">Exemplo 1</a></nav>
+        <span><b>Tabuleiro de teste</b> · personagens de exemplo · mudanças aqui não afetam o Mudae-Tracker</span>
+        <button type="button" class="pill cyan" id="demoReset">Apagar dados salvos do exemplo</button>
+    </div>
+
+    <main id="app" class="app-wide"></main>
+
+    <script src="demo-tracker.js"></script>
+    <script src="waifuarena.js"></script>
+    <script src="waifuarena-battle.js"></script>
+    <script src="card-effects.js"></script>
+</body>
+
+</html>

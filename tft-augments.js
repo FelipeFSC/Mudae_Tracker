@@ -42,7 +42,7 @@ const TFT_AUG_IMPL = (() => {
   def('TFT9_Augment_Commander_TeamingUp1', { now(p, f) { p.comps(f.NumComponents); for (let i = 0; i < f.NumChamps; i++) p.unit(3); } });
   def('TFT9_Augment_BigGrabBag', { now(p, f) { p.comps(f.NumItems); p.gold(f.Gold); p.reforger(f.NumReforgers); } });
   def('TFT9_Augment_IronAssets', { now(p, f) { p.anvil('comp'); p.gold(f.Gold); } });
-  def('TFT9_Augment_OneTwosThree', { now(p, f) { for (let i = 0; i < f.tier1champs; i++) p.unit(1); p.unit(2); p.unit(3); } });
+  def('TFT9_Augment_OneTwosThree', { now(p, f) { for (let i = 0; i < f.tier1champs; i++) p.unit(1); for (let i = 0; i < (f.NumChamps || 1); i++) p.unit(2); p.unit(3); } });
   def('TFT9_Augment_MissedConnections', { now(p) { p.allOfCost(1); } });
   def('TFT6_Augment_OneTwoFive', { now(p, f) { p.comps(f.NumComponents); p.gold(f.Gold); p.unit(5); } });
   def('TFT6_Augment_ItemGrabBag1', { now(p, f) { for (let i = 0; i < f.NumItems; i++) p.fullItem(); } });
@@ -89,11 +89,12 @@ const TFT_AUG_IMPL = (() => {
     round(p, f) { p.permAll({ hp: f.HealthPerInterest * p.lastInterest() }); },
     mods(m, f) { m.interestCap = f.MaxInterest; },
   });
-  def('TFT6_Augment_TradeSector', { now(p, f) { p.gold(f.Gold); p.rerolls(f.RerollsNow); }, round(p, f) { p.rerolls(f.RerollCount); } });
+  // 15.14: 1 atualização grátis por rodada (a descrição não traz número próprio) e ouro na hora
+  def('TFT6_Augment_TradeSector', { now(p, f) { p.gold(f.Gold); }, round(p) { p.rerolls(1); } });
   def('TFT_Augment_CalledShot', { now(p, f) { p.gold(f.Gold); p.setStreak(f.Streak); } });
   def('TFT6_Augment_CalculatedLoss', { after(p, f, r) { if (r.lost) { p.gold(f.Gold); p.rerolls(1); } } });
   def('TFT6_Augment_GachaAddict', { mods(m, f) { m.rerollRefund = f.RerollPercent / 100; } });
-  def('TFT6_Augment_ThriftShop', { now(p, f) { p.gold(f.Gold); }, mods(m, f) { m.noBuyXp = true; m.xpOnGoldReroll = f.XP; } });
+  def('TFT6_Augment_ThriftShop', { now(p, f) { p.gold(f.Gold); }, mods(m, f) { m.xpEveryRerolls = { n: f.Numrolls, xp: f.XP }; } });
   def('TFT6_Augment_MaxLevel10', { now(p, f) { p.xp(f.InitialXP); }, mods(m, f) { m.xpBuyBonus = f.XP; } });
   def('TFT_Augment_UpwardMobility', { level(p, f) { p.healPlayer(f.Health); p.rerolls(f.Rerolls); }, mods(m) { m.xpCostDelta = -1; } });
   def('TFT9_Augment_HighEndSector', { now(p, f) { p.gold(f.Gold); }, level(p, f, n) { p.rerolls(n + f.BonusRollPerLevel); } });
@@ -124,7 +125,6 @@ const TFT_AUG_IMPL = (() => {
     combat(c, f) { c.units.filter(u => u.cost === 5).forEach(u => { hpPct(u, f.BonusHealth); as(u, f.AttackSpeed); }); },
   });
   def('TFT_Augment_PatienceIsAVirtue', {
-    now(p, f) { p.rerolls(f.InitialRerolls); },
     round(p, f) { if (p.boughtLastRound() === 0) p.rerolls(f.FreeRerolls); },
   });
   def('TFT_Augment_CraftedCrafting', { crafted(p, f) { p.rerolls(f.Rerolls); } });
@@ -144,11 +144,11 @@ const TFT_AUG_IMPL = (() => {
   def('TFT_Augment_FiresalePlus', { now(p, f) { p.gold(f.Gold); }, round(p, f) { p.stealFromShop(f.CostLimit); } });
   def('TFT_Augment_InvestedPlus', {
     now(p, f) { p.gold(f.Gold); },
-    after(p, f) { const over = Math.min(p.goldNow(), f.MaxGold) - f.GoldThreshold; if (over > 0) p.rerolls(Math.floor(over / f.GoldPerReroll)); },
+    round(p, f) { const over = Math.min(p.goldNow(), f.MaxGold) - f.GoldThreshold; if (over > 0) p.rerolls(Math.floor(over / f.GoldPerReroll)); },
   });
   def('TFT_Augment_InvestedPlusPlus', I.TFT_Augment_InvestedPlus);
-  def('TFT_Augment_WorthTheWaitGold', { now(p, f) { const s = p.state(); s.c = p.unit(f.UnitTier); }, round(p) { const c = p.state().c; if (c) p.champ(c); } });
-  def('TFT_Augment_WorthTheWaitPrismatic', { now(p, f) { const s = p.state(); s.c = p.unit(f.UnitTier); if (s.c) p.champ(s.c); }, round: I.TFT_Augment_WorthTheWaitGold.round });
+  def('TFT_Augment_WorthTheWaitGold', { now(p, f) { const s = p.state(); s.c = p.unit(f.UnitTier, 2); s.wait = f.Delay || 0; }, round(p) { const s = p.state(); if (s.wait > 0) { s.wait--; return; } if (s.c) p.champ(s.c); } });
+  def('TFT_Augment_WorthTheWaitPrismatic', { now(p, f) { const s = p.state(); s.c = p.unit(f.UnitTier); s.wait = 0; }, round: I.TFT_Augment_WorthTheWaitGold.round });
   def('TFT_Augment_SliceOfLife', { stage(p, f, info) { const cost = Math.min(5, info.stage); if (!p.state().done) { for (let i = 0; i < 2; i++) p.unit(cost); if (cost === 5) p.state().done = true; } } });
   def('TFT_Augment_HardCommit', {
     now(p, f) { const s = p.state(); s.t = p.emblem(); p.gold(f.GoldPerStage); p.unitOfTrait(s.t, Math.min(5, p.stageNow())); },
@@ -165,7 +165,7 @@ const TFT_AUG_IMPL = (() => {
   });
   def('TFT_Augment_Replication', null);
   def('TFT9_Augment_BuildingACollectionPlusPlus', {
-    now(p, f) { p.comps(f.UpfrontItems); p.state().left = f.roundsofbonusitems; },
+    now(p, f) { p.comps(1); p.state().left = f.roundsofbonusitems - 1; },
     round(p) { const s = p.state(); if (s.left > 0) { s.left--; p.comps(1); } },
   });
   def('TFT9_Augment_CustomerIsAlwaysRight', { now(p) { p.comps(1); }, mods(m) { m.compsToAnvil = true; } });
@@ -173,8 +173,8 @@ const TFT_AUG_IMPL = (() => {
     now(p, f) { p.comps(f.component); },
     after(p, f, r) { if (r.won && p.count('w', 1) % f.WinsNeeded === 0) p.comps(1); },
   });
-  def('TFT11_Augment_Slammin', { now(p, f) { p.gold(f.Gold); }, after(p, f, r) { if (r.pvp && p.noBenchItems()) p.xp(f.XP); } });
-  def('TFT11_Augment_Slammin_Plus', { now(p, f) { p.gold(f.Gold); p.xp(f.XPNow); }, after: I.TFT11_Augment_Slammin.after });
+  def('TFT11_Augment_Slammin', { now(p, f) { p.comps(f.components); }, after(p, f, r) { if (r.pvp && p.noBenchItems()) p.xp(f.XP); } });
+  def('TFT11_Augment_Slammin_Plus', { now(p, f) { p.comps(f.components); p.xp(f.XPNow); }, after: I.TFT11_Augment_Slammin.after });
   def('TFT9_Augment_LearningFromExperience2', { after(p, f, r) { if (r.pvp) p.xp(r.won ? f.winxp : f.lossxp); } });
   def('TFT6_Augment_ClearMind', { after(p, f, r) { if (r.pvp && p.benchEmpty()) p.xp(f.XP); } });
   def('TFT7_Augment_ClutteredMind', { now(p, f) { for (let i = 0; i < f.Units; i++) p.unit(1); }, after(p, f, r) { if (r.pvp && p.benchFull()) p.xp(f.XP); } });
@@ -185,12 +185,12 @@ const TFT_AUG_IMPL = (() => {
     now(p, f) { const s = p.state(); s.bank = p.goldNow() + f.BaseGold; p.gold(-p.goldNow()); s.n = 0; },
     after(p, f, r) { const s = p.state(); if (r.pvp && s.bank != null && ++s.n === f.rounds) { p.gold(s.bank); s.bank = null; } },
   });
-  def('TFT_Augment_Survivor', { now(p, f) { p.gold(f.InitialGold); }, round(p, f) { const s = p.state(); if (!s.done && p.playersOut() >= f.PlayersDead) { s.done = true; p.gold(f.Gold); } } });
+  def('TFT_Augment_Survivor', { round(p, f) { const s = p.state(); if (!s.done && p.playersOut() >= f.PlayersDead) { s.done = true; p.gold(f.Gold); } } });
   def('TFT_Augment_SpeedyDoubleKill', { now(p) { p.item('GuinsoosRageblade'); }, round(p, f) { const s = p.state(); if (!s.done && p.playersOut() >= 2) { s.done = true; p.gold(f.GoldAmount); } } });
   def('TFT_Augment_GoldenQuest', { round(p, f) { const s = p.state(); if (!s.done && p.goldNow() >= f.goldrequired) { s.done = true; p.unit(5, 2); p.fullItem(); p.fullItem(); } } });
   def('TFT_Augment_TitanicTitan', { now(p, f) { p.healPlayer(f.Heal, true); } });
   def('TFT9_Augment_TiniestTitanPlus', { now(p, f) { p.gold(f.InitialGold); }, after(p, f, r) { if (r.pvp) { p.healPlayer(f.Heal); p.gold(f.Gold); } } });
-  def('TFT7_Augment_SacrificialPact', { now(p, f) { p.gold(f.Gold); }, round(p, f, info) { if (info.type === 'pvp') p.healPlayer(f.Heal); }, mods(m, f) { m.xpWithHealth = f.HealthCost; } });
+  def('TFT7_Augment_SacrificialPact', { round(p, f, info) { if (info.type === 'pvp') p.healPlayer(f.Heal); }, mods(m, f) { m.xpWithHealth = f.HealthCost; } });
   def('TFT_Augment_NineLives', { now(p, f) { p.setPlayerHp(f.NumberOfLives); }, mods(m, f) { m.lossDamage = f.HealthLoss; m.noPlayerHeal = true; } });
   def('TFT9_Augment_FinalReserves', { mods(m, f) { m.finalReserves = f; } });
   def('TFT7_Augment_AFK', { now(p, f) { p.state().left = f.RoundsToSkip; p.lockActions(f.RoundsToSkip); }, round(p, f) { const s = p.state(); if (s.left > 0 && --s.left === 0) p.gold(f.Gold); } });
@@ -198,7 +198,7 @@ const TFT_AUG_IMPL = (() => {
   def('TFT_Augment_QuietQuitting', { now(p, f) { p.state().left = f.NumRounds; p.disableShop(f.NumRounds); }, after(p, f, r) { const s = p.state(); if (r.pvp && s.left > 0 && --s.left === 0) { p.gold(f.Gold); p.anvil('item'); } } });
   def('TFT_Augment_HeadStart', { now(p, f) { p.sellAll(); for (let i = 0; i < f.NumUnits; i++) p.unit(f.Tier, 2); p.disableShop(f.RoundsToSkip); } });
   def('TFT_Augment_RestartMission', { now(p) { p.removeAll(); p.unit(3, 2); p.unit(3, 2); p.unit(2, 2); p.unit(2, 2); p.unit(1, 2); } });
-  def('TFT6_Augment_Recombobulator', { now(p, f) { p.recombobulateBoard(); p.removers(f.NumRemovers); p.rerolls(f.FreeRerolls); } });
+  def('TFT6_Augment_Recombobulator', { now(p, f) { p.recombobulateBoard(); p.removers(f.NumRemovers); } });
   def('TFT7_Augment_PandorasBench', { now(p, f) { p.gold(f.Gold); }, round(p, f) { p.pandoraBench(f.BenchSlots); } });
   same(['TFT6_Augment_PandorasItems', 'TFT9_Augment_PandorasItems2', 'TFT9_Augment_Legend_PandorasItems2'], { now(p, f) { p.comps(f.NumComponents); }, round(p) { p.pandoraItems(); } });
   same(['TFT6_Augment_SalvageBin', 'TFT6_Augment_SalvageBinHR', 'TFT8_Augment_SalvageBinPlus'], {
@@ -208,7 +208,7 @@ const TFT_AUG_IMPL = (() => {
   });
   def('TFT_Augment_EyeForAnEye', { after(p, f, r) { const s = p.state(); s.d = (s.d || 0) + r.allyDeaths; while (s.d >= f.AllyDeaths && (s.g || 0) < f.NumComponents) { s.d -= f.AllyDeaths; s.g = (s.g || 0) + 1; p.comps(1); } } });
   def('TFT_Augment_EyeForAnEyePlus', { now(p) { p.comps(1); }, after: I.TFT_Augment_EyeForAnEye.after });
-  def('TFT7_Augment_CursedCrown', { combat(c, f) { c.units.forEach(u => { u.dura += f.DurabilityBonus; }); }, mods(m, f) { m.teamBonus = (m.teamBonus || 0) + f.MaxArmySizeIncrease; m.playerDamageMul = 1 + f.PlayerCombatDamageIncrease / 100; } });
+  def('TFT7_Augment_CursedCrown', { mods(m, f) { m.teamBonus = (m.teamBonus || 0) + f.MaxArmySizeIncrease; m.playerDamageMul = 1 + f.PlayerCombatDamageIncrease / 100; } });
   same(['TFT9_Augment_OneHundredDuckSizedHorses', 'TFT9_Augment_OneHundredDuckSizedHorsesPlus'], {
     now(p, f) { p.gold(f.Gold); },
     combat(c, f) { c.units.forEach(u => hpPct(u, -f.HealthReduction)); },
@@ -232,16 +232,16 @@ const TFT_AUG_IMPL = (() => {
   def('TFT_Augment_BeltOverflow', { now(p, f) { for (let i = 0; i < f.NumItems; i++) p.item('GiantsBelt'); }, combat(c, f) { c.units.forEach(u => hp(u, f.BonusHealth * (u.itemIds || []).filter(x => x === 'GiantsBelt').length)); } });
   def('TFT_Augment_SwordOverflow', { now(p, f) { for (let i = 0; i < f.NumItems; i++) p.item('BFSword'); }, combat(c, f) { c.units.forEach(u => as(u, f.BonusStat * (u.itemIds || []).filter(x => x === 'BFSword').length)); } });
   def('TFT_Augment_WandOverflow', { now(p, f) { for (let i = 0; i < f.NumItems; i++) p.item('NeedlesslyLargeRod'); }, combat(c, f) { c.units.forEach(u => as(u, f.BonusStat * (u.itemIds || []).filter(x => x === 'NeedlesslyLargeRod').length)); } });
-  def('TFT_Augment_CrownguardSpirit', { now(p) { p.item('NeedlesslyLargeRod'); p.item('ChainVest'); }, combat(c, f) { c.units.forEach(u => { u.ap += f.AP; u.armor += f.Armor; }); } });
-  def('TFT_Augment_GuardbreakerSpirit', { now(p) { p.item('SparringGloves'); }, combat(c, f) { c.units.forEach(u => { u.crit += f.CritChance; }); } });
-  def('TFT_Augment_ShojinSpirit', { now(p) { p.item('BFSword'); p.item('TearOfTheGoddess'); }, combat(c, f) { c.units.forEach(u => { adp(u, f.AD); u.mana += f.Mana; }); } });
+  def('TFT_Augment_CrownguardSpirit', { now(p) { p.item('NeedlesslyLargeRod'); }, combat(c, f) { c.units.forEach(u => { u.ap += f.AP; u.armor += f.Armor; }); } });
+  def('TFT_Augment_GuardbreakerSpirit', { now(p) { p.item('SparringGloves'); }, combat(c, f) { c.units.forEach(u => { u.crit += f.CritChance; as(u, f.AS); }); } });
+  def('TFT_Augment_ShojinSpirit', { now(p) { p.item('BFSword'); }, combat(c, f) { c.units.forEach(u => { adp(u, f.AD); u.mana += f.Mana; }); } });
   def('TFT_Augment_CryMeARiver', { now(p) { p.item('TearOfTheGoddess'); }, combat(c, f) { c.units.forEach(u => { u.manaRegen += f.RegenBonus; }); c.after(f.DelayTime, () => c.units.forEach(u => { u.manaRegen += f.UpgradedRegenBonus - f.RegenBonus; })); } });
   def('TFT_Augment_Pyromaniac', { now(p) { p.item('RedBuff'); }, mods(m, f) { m.burnBonus = f.BurnIncrease; } });
   def('TFT14_Augment_BlackMarketBlueBattery', { now(p) { p.item('BlueBuff'); }, combat(c, f) { c.units.forEach(u => { u.ap += f.BonusAP; }); c.onCast(u => { u.mana += f.ManaRestore; }); } });
-  def('TFT7_Augment_BigFriend', { now(p) { p.item('GiantsBelt'); }, combat(c, f) { const big = c.units.filter(u => u.maxHp > f.RequiredHealth); c.units.forEach(u => { if (big.some(b => b !== u && c.dist(b, u) <= 1)) u.dura += f.DamageReductionPercent / 100; }); } });
+  def('TFT7_Augment_BigFriend', { combat(c, f) { const big = c.units.filter(u => u.maxHp > f.RequiredHealth); c.units.forEach(u => { if (big.some(b => b !== u && c.dist(b, u) <= 1)) u.dura += f.DamageReductionPercent / 100; }); } });
   def('TFT7_Augment_BigFriend2', I.TFT7_Augment_BigFriend);
-  same(['TFT6_Augment_CyberneticImplants3'], { now(p) { p.item('BFSword'); }, combat(c, f) { c.units.filter(u => items(u).length).forEach(u => { hp(u, f.HP); adp(u, f.AD); }); } });
-  same(['TFT6_Augment_CyberneticUplink2', 'TFT6_Augment_CyberneticUplink3'], { now(p) { p.item('TearOfTheGoddess'); }, combat(c, f) { c.units.filter(u => items(u).length).forEach(u => { hp(u, f.Health); u.manaRegen += f.ManaRegen; }); } });
+  same(['TFT6_Augment_CyberneticImplants3'], { combat(c, f) { c.units.filter(u => items(u).length).forEach(u => { hp(u, f.HP); adp(u, f.AD); }); } });
+  same(['TFT6_Augment_CyberneticUplink2', 'TFT6_Augment_CyberneticUplink3'], { combat(c, f) { c.units.filter(u => items(u).length).forEach(u => { hp(u, f.Health); u.manaRegen += f.ManaRegen; }); } });
   def('TFT9_Augment_CyberneticBulk3', { combat(c, f) { c.units.filter(u => items(u).length).forEach(u => hp(u, f.Health)); } });
 
   /* ---------- Combate: atributos de equipe ---------- */
@@ -254,7 +254,7 @@ const TFT_AUG_IMPL = (() => {
   def('TFT9_Augment_KnowYourEnemy', { combat(c, f) { c.units.forEach(u => { u.amp += f.BaseDamageAmp / 100; }); } });
   def('TFT_Augment_Superstars', { now(p, f) { p.rerolls(f.Rerolls); }, combat(c, f) { const bonus = f.BaseBonusDamage + f.BonusDamagePer3Star * c.units.filter(u => u.star >= 3).length; c.units.forEach(u => { u.amp += bonus; }); } });
   same(['TFT_Augment_BronzeForLifeI'], { combat(c, f) { const n = c.bronzeTraits(); c.units.forEach(u => { u.amp += f.DamageAmpBonus * n; }); } });
-  def('TFT_Augment_BronzeForLife2', { combat(c, f) { const n = c.bronzeTraits(); c.units.forEach(u => { u.amp += f.DamageAmpBonus * n; res(u, f.Resists * n); }); } });
+  def('TFT_Augment_BronzeForLife2', { combat(c, f) { const n = c.bronzeTraits(); c.units.forEach(u => { u.amp += f.DamageAmpBonus * n; u.dura += f.DurabilityBonus * n; }); } });
   def('TFT6_Augment_Diversify1', { combat(c, f) { const n = c.activeTraits(); c.units.forEach(u => { adp(u, f.AD * n); u.ap += f.AP * n; }); } });
   def('TFT_Augment_ItemCollector1', { combat(c, f) { const n = Math.min(uniqueItems(c), f.MaxCap); c.units.forEach(u => { adp(u, f.AD * n); u.ap += f.AP * n; }); } });
   def('TFT_Augment_ItemCollector2', { combat(c, f) { const n = Math.min(uniqueItems(c), f.MaxCap); c.units.forEach(u => { hp(u, f.BaseHP + f.Health * n); adp(u, f.AD * n); u.ap += f.AP * n; }); } });
@@ -278,13 +278,13 @@ const TFT_AUG_IMPL = (() => {
   same(['TFT7_Augment_BestFriends1', 'TFT7_Augment_BestFriends2'], { combat(c, f) { c.units.forEach(u => { const adj = c.units.filter(o => o !== u && c.dist(o, u) <= 1); if (adj.length === 1 && c.units.filter(o => o !== adj[0] && c.dist(o, adj[0]) <= 1).length === 1) { as(u, f.AS); res(u, f.Armor); } }); } });
   def('TFT_Augment_BulkyBuddies3', { combat(c, f) { const buddies = c.units.filter(u => c.units.filter(o => o !== u && c.dist(o, u) <= 1).length === 1); buddies.forEach(u => hp(u, f.HealthBonus)); c.onAllyDeath(d => { if (buddies.includes(d)) c.alive().filter(u => buddies.includes(u)).forEach(u => c.shield(u, u.maxHp * f.ShieldAmount, f.ShieldDuration)); }); } });
   def('TFT9_Augment_LongDistanceRelationship2', { combat(c, f) { let a = null, b = null, top = -1; for (const x of c.units) for (const y of c.units) { const d = c.dist(x, y); if (x !== y && d > top) { top = d; a = x; b = y; } } if (a && b) { const sa = { ar: a.armor, mr: a.mr, ad: a.adPct, ap: a.ap }, sb = { ar: b.armor, mr: b.mr, ad: b.adPct, ap: b.ap }; a.armor += sb.ar * f.PercentShare; a.mr += sb.mr * f.PercentShare; a.ap += sb.ap * f.PercentShare; a.baseAd += b.baseAd * f.PercentShare; b.armor += sa.ar * f.PercentShare; b.mr += sa.mr * f.PercentShare; b.ap += sa.ap * f.PercentShare; b.baseAd += a.baseAd * f.PercentShare; } } });
-  same(['TFT6_Augment_Twins2', 'TFT6_Augment_Twins3'], { combat(c, f) { const by = {}; c.units.forEach(u => { (by[u.champ] = by[u.champ] || []).push(u); }); Object.values(by).filter(l => l.length === 2).flat().forEach(u => { const v = f.BonusStats; adp(u, v / 100); u.ap *= 1 + v / 100; u.armor *= 1 + v / 100; u.mr *= 1 + v / 100; }); } });
+  same(['TFT6_Augment_Twins2', 'TFT6_Augment_Twins3'], { combat(c, f) { const by = {}; c.units.forEach(u => { (by[u.champ] = by[u.champ] || []).push(u); }); Object.values(by).filter(l => l.length === 2).flat().forEach(u => { const v = f.BonusStats; adp(u, v / 100); u.ap += v; u.armor += v; u.mr += v; }); } });
 
   /* ---------- Combate: no tempo ---------- */
   def('TFT_Augment_ArcaneViktory', { combat(c, f) { const go = () => c.enemies().forEach(e => c.stun(e, f.StunDuration)); c.after(f.FirstStunSeconds, go); c.after(f.SecondStunSeconds, go); } });
   def('TFT_Augment_ClockworkAccelerator', { combat(c, f) { c.every(f.Frequency, () => c.alive().forEach(u => as(u, f.AttackSpeed))); } });
   def('TFT_Augment_Corrosion', { combat(c, f) { c.every(f.Time, () => c.enemies().filter(e => e.ly <= 1).forEach(e => { e.armor = Math.max(0, e.armor - f.ResistLoss); e.mr = Math.max(0, e.mr - f.ResistLoss); })); } });
-  same(['TFT_Augment_BlazingSoul', 'TFT_Augment_BlazingSoul2'], { combat(c, f) { const l = c.units.slice().sort((a, b) => b.asBase - a.asBase); let i = 0; const go = () => { const u = l.filter(x => x.alive)[i++]; if (u) { u.ap *= 1 + f.AbilityPower / 100; as(u, f.AttackSpeed); } }; go(); c.every(f.TransferDuration, go); } });
+  same(['TFT_Augment_BlazingSoul', 'TFT_Augment_BlazingSoul2'], { combat(c, f) { const l = c.units.slice().sort((a, b) => b.asBase - a.asBase); let i = 0; const go = () => { const u = l.filter(x => x.alive)[i++]; if (u) { u.ap += f.AbilityPower; as(u, f.AttackSpeed); } }; go(); c.every(f.TransferDuration, go); } });
   def('TFT_Augment_BackupDancers', { combat(c, f) { c.every(f.Period, () => { const n = c.benchRightOccupied(f.BenchSlots); c.alive().forEach(u => as(u, f.AttackSpeedPerUnit * n)); }); } });
   def('TFT6_Augment_SecondWind1', { combat(c, f) { c.after(f.Delay, () => c.alive().forEach(u => c.heal(u, (u.maxHp - u.hp) * f.HealPercent / 100))); } });
   def('TFT9_Augment_Commander_Ascension', { combat(c, f) { c.after(f.Delay, () => c.alive().forEach(u => { u.amp += f.DamageAmp / 100; })); } });
@@ -299,7 +299,7 @@ const TFT_AUG_IMPL = (() => {
   def('TFT_Augment_AxiomArc3', { now(p) { p.anvil('item'); }, combat(c, f) { c.onKill(k => { k.mana += f.ManaGain; }); } });
   same(['TFT9_Augment_HealingOrbsI', 'TFT9_Augment_HealingOrbsII'], { combat(c, f) { c.onEnemyDeath(d => { const near = c.alive().sort((a, b) => c.dist(a, d) - c.dist(b, d))[0]; if (near) c.heal(near, f.Heal); }); } });
   def('TFT_Augment_NobleSacrifice', { combat(c, f) { let done = false; c.onAllyDeath(d => { if (done) return; done = true; c.alive().forEach(u => { u.armor += f.BaseResists + d.armor * f.SharePerc; u.mr += f.BaseResists + d.mr * f.SharePerc; }); }); } });
-  same(['TFT_Augment_ClimbTheLadder1', 'TFT_Augment_ClimbTheLadder2'], { combat(c, f) { c.onAllyDeath(d => c.alive().filter(u => u.traits.some(t => d.traits.includes(t))).forEach(u => { u.adPct += f.BonusAD; u.ad = u.baseAd * (1 + u.adPct); u.ap *= 1 + f.BonusAP / 100; u.armor += f.BonusArmor; u.mr += f.BonusMR; })); } });
+  same(['TFT_Augment_ClimbTheLadder1', 'TFT_Augment_ClimbTheLadder2'], { combat(c, f) { c.onAllyDeath(d => c.alive().filter(u => u.traits.some(t => d.traits.includes(t))).forEach(u => { u.adPct += f.BonusAD; u.ad = u.baseAd * (1 + u.adPct); u.ap += f.BonusAP; u.armor += f.BonusArmor; u.mr += f.BonusMR; })); } });
   def('TFT10_Augment_GoodForSomethingSilver', { combat(c, f) { c.onAllyDeath(d => { if (!items(d).length && c.chance(f.DropChance)) c.gold(f.Gold); }); } });
   def('TFT_Augment_ChemtechOverdrive', { combat(c, f) { const hexes = c.sample([0, 1, 2, 3, 4, 5, 6], f.NumHexes); c.units.filter(u => u.ly === 1 && hexes.includes(u.lx)).forEach(u => { hp(u, f.Health); as(u, f.AttackSpeed); }); c.onAllyDeath(d => { if (d.ly === 1 && hexes.includes(d.lx)) c.gold(f.Gold); }); } });
   def('TFT_Augment_MirroredMonetization', { now(p, f) { p.gold(f.GoldContained); p.state().left = f.rounds; }, round(p) { const s = p.state(); if (s.left > 0) s.left--; }, combat(c, f) { if (c.state.left > 0) c.onEnemyDeath(() => c.gold(f.PercCost)); } });
@@ -311,7 +311,7 @@ const TFT_AUG_IMPL = (() => {
   def('TFT_Augment_FoodfightTactics', { combat(c, f) { c.after(f.EndSeconds, () => { c.alive().forEach(u => as(u, f.AttackSpeed)); c.onAttackHit((u, t) => { for (let i = 0; i < f.ProjectileCount; i++) c.magicHit(u, t, f.BaseDamage * u.ap / 100); }); }); } });
   def('TFT6_Augment_LudensEcho3', { combat(c, f) { const m = new Map(); const dmg = () => [f.MagicDamage1, f.MagicDamage2, f.MagicDamage3, f.MagicDamage4][Math.min(3, Math.max(0, c.stage - 2))]; c.onCast(u => { const t = (m.get(u.id) || 0) + u.maxMana; m.set(u.id, t % f.ManaThreshold); if (t >= f.ManaThreshold) { const e = c.enemiesNear(u)[0]; if (e) { c.magicHit(u, e, dmg()); const s = c.enemiesNear(e).find(x => x !== e); if (s) c.magicHit(u, s, dmg()); } } }); } });
   def('TFT_Augment_HowlingGale', { combat(c, f) { let pool = 0; c.onCast(u => { pool += u.maxMana; while (pool >= f.ManaPerWhirlwind) { pool -= f.ManaPerWhirlwind; const e = c.enemies()[0]; if (e) c.enemies().filter(x => c.dist(x, e) <= 2).forEach(x => c.stun(x, f.StunDuration)); } }); } });
-  def('TFT_Augment_ThornPlatedArmor', { now(p) { p.item('BrambleVest'); }, combat(c, f) { c.units.forEach(u => { u.brambleMul = 1 + [f.DamageAmp1, f.DamageAmp2, f.DamageAmp3, f.DamageAmp4][Math.min(3, Math.max(0, c.stage - 2))]; }); } });
+  def('TFT_Augment_ThornPlatedArmor', { now(p) { p.item('BrambleVest'); }, combat(c, f) { c.units.forEach(u => { u.brambleMul = 1 + [f.DamageAmp1, f.DamageAmp2, f.DamageAmp3, f.DamageAmp4][Math.min(3, Math.max(0, c.stage - 2))]; u.brambleHeal = f.Heal || 0; }); } });
   def('TFT_Augment_UnleashTheBeast', null);
 
   /* ---------- Vida por características ---------- */
@@ -340,6 +340,87 @@ const TFT_AUG_IMPL = (() => {
   });
   def('TFT_Augment_SpiritLink1', { combat(c, f) { const missing = Math.max(0, 100 - c.playerHp); const pct = f.BaseRegenBonus + (Math.floor(missing / 10) * f.RegenPerMissingHP) / 100; c.every(f.RegenPeriod, () => c.alive().forEach(u => c.heal(u, u.maxHp * pct))); } });
   def('TFT_Augment_TragicalBlade_placeholder', null);
+
+  /* ---------- Aumentos da Season 14 que faltavam (CommunityDragon 15.14) ---------- */
+  same(['TFT_Augment_AllForOneI', 'TFT_Augment_AllForOneII'], {
+    now(p, f) { for (let i = 0; i < f.NumChampsToGrant; i++) p.unit(f.Tier); },
+    combat(c, f) { const n = new Set(c.units.filter(u => u.cost === 1).map(u => u.champ)).size; c.units.forEach(u => { hpPct(u, f.PercHP * n); u.amp += f.DamageAmp * n; }); },
+  });
+  def('TFT_Augment_BadLuckProtection', {
+    now(p) { p.item('SparringGloves'); },
+    // sem críticos: cada 5% de chance vira 5% de DA
+    combat(c, f) { c.units.forEach(u => { adp(u, Math.floor(u.crit * 100 / f.CritChancePercent + 1e-9) * f.ADPerCrit); u.crit = 0; u.abilityCrit = false; }); },
+  });
+  def('TFT_Augment_BRB', {
+    now(p, f) { p.state().left = f.RoundsToSkip; p.lockActions(f.RoundsToSkip); },
+    round(p, f) { const s = p.state(); if (s.left > 0 && --s.left === 0) for (let i = 0; i < f.anvils; i++) p.anvil('item'); },
+  });
+  same(['TFT_Augment_BulkyBuddies1', 'TFT_Augment_BulkyBuddies2'], I.TFT_Augment_BulkyBuddies3);
+  def('TFT_Augment_Dhampyr', {
+    combat(c, f) { c.units.forEach(u => { u.vamp += f.OmnivampStatBonus; }); },
+    after(p, f, r) { if (r.pvp && r.won && r.playerDamage) p.healPlayer(Math.round(r.playerDamage * f.Omnivamp)); },
+  });
+  same(['TFT_Augment_DiversifiedPortfolio1', 'TFT_Augment_DiversifiedPortfolio2'], {
+    now(p, f) { p.gold(f.InstantGold); },
+    round(p, f) { p.gold(Math.floor(p.activeTraits() / f.TraitsActive) * f.GoldRate); },
+  });
+  def('TFT_Augment_DualPurpose', {
+    round(p) { p.state().paid = false; },
+    boughtXp(p, f) { const s = p.state(); if (!s.paid) { s.paid = true; p.gold(f.goldtogive); } p.refreshShop(); },
+  });
+  def('TFT_Augment_Kingslayer', {
+    now(p, f) { p.gold(f.Gold); },
+    after(p, f, r) { if (r.pvp && r.won) p.gold(r.foeHigher ? f.WinBonusGold : f.WinGold); },
+  });
+  def('TFT_Augment_Manaflow2', I.TFT_Augment_Manaflow1);
+  def('TFT_Augment_MaxCap', { now(p, f) { p.capLevel(7); p.gold(f.AugmentGold); }, mods(m) { m.teamBonus = (m.teamBonus || 0) + 1; } });
+  same(['TFT_Augment_Mentorship1', 'TFT_Augment_Mentorship2'], {
+    combat(c, f) { c.units.forEach(u => { if (c.units.some(o => o !== u && o.cost > u.cost && c.dist(o, u) <= 1)) { as(u, f.AS); hp(u, f.Health); } }); },
+  });
+  def('TFT_Augment_PairOfFours', {
+    now(p, f) { for (let i = 0; i < f.NumChampsToGrant; i++) p.unit(f.Tier); },
+    combat(c, f) { const fours = c.units.filter(u => u.cost === 4); if (fours.length === f.NumCopies) fours.forEach(u => { hp(u, f.Health); as(u, f.AttackSpeed); }); },
+  });
+  def('TFT_Augment_PiercingLotus1', I.TFT_Augment_PiercingLotus2);
+  def('TFT_Augment_SatedSpellweaver', {
+    combat(c, f) {
+      c.units.forEach(u => { u.sated = { until: 0, max: f.MaxShield, given: 0, on: false }; });
+      c.onCast(u => {
+        if (!u.sated) return;
+        if (!u.sated.on) { u.sated.on = true; u.vamp += f.Omnivamp; }
+        u.sated.until = c.now() + f.Duration;
+        // cada conjuração agenda a checagem; só a última encontra o efeito vencido
+        c.after(u.sated.until, () => { if (u.sated.on && u.sated.until <= c.now() + 1e-9) { u.sated.on = false; u.vamp -= f.Omnivamp; } });
+      });
+    },
+  });
+  def('TFT_Augment_SubscriptionService', {
+    now(p, f) { p.shopOfCost(f.ChampionTier); p.gold(f.GoldPerStage); },
+    stage(p, f) { p.shopOfCost(f.ChampionTier); p.gold(f.GoldPerStage); },
+  });
+  def('TFT_Augment_TraitTracker', {
+    combat(c, f) { if (c.activeTraits() >= f.NumTraits) c.state.reached = true; },
+    after(p, f) { const s = p.state(); if (s.reached && !s.done) { s.done = true; for (let i = 0; i < f.NumEmblems; i++) p.emblem(); } },
+  });
+  def('TFT_Augment_WealthyRehab2', {
+    combat(c, f) { c.units.forEach(u => { u.vamp += f.Omnivamp; }); c.onEnd(() => { const s = c.state; s.healed = (s.healed || 0) + c.units.reduce((t, u) => t + u.stat.heal, 0); if (!s.paid && s.healed >= f.HealingThreshold) { s.paid = true; c.gold(f.Gold); } }); },
+  });
+  def('TFT10_Augment_CrownGuarded', { now(p) { p.item('Crownguard'); }, combat(c, f) { c.units.forEach(u => { u.crownBoost = { mul: f.effectincrease, dur: f.DurationIncrease }; }); } });
+  // duração do escudo não publicada: dura até o fim do combate (suposição registrada no MUDAE_TFT.md)
+  def('TFT10_Augment_InspiringEpitaph', { combat(c, f) { c.onAllyDeath(d => { const near = c.alive().sort((a, b) => c.dist(a, d) - c.dist(b, d))[0]; if (near) { c.shield(near, near.maxHp * f.ShieldRatio, 99); as(near, f.AttackSpeed); } }); } });
+  def('TFT6_Augment_CyberneticImplants2', I.TFT6_Augment_CyberneticImplants3);
+  def('TFT9_Augment_CyberneticBulk2', I.TFT9_Augment_CyberneticBulk3);
+  def('TFT7_Augment_LastStand', { mods(m, f) { m.lastStand = f; } });
+  def('TFT9_Augment_BlindingSpeed', { now(p) { p.item('MadredsBloodrazor'); p.item('GuinsoosRageblade'); p.item('RecurveBow'); p.removers(1); } });
+  def('TFT9_Augment_NotToday', { now(p) { p.item('GuardianAngel'); }, combat(c, f) { c.units.filter(u => (u.itemIds || []).includes('GuardianAngel')).forEach(u => as(u, f.AS / 100)); } });
+  def('TFT9_Augment_TiniestTitan', { after(p, f, r) { if (r.pvp) { p.healPlayer(f.Heal); p.gold(f.Gold); } } });
+  // dependem de sistemas que não existem aqui: Bonecos de Treinamento, Itens de Suporte, Artefatos,
+  // orbes extras, itens temporários em combate, loja em tempo real, Voidlings, travas de reserva
+  ['TFT_Augment_PrismaticPipeline', 'TFT_Augment_Scavenger', 'TFT_Augment_ShopGlitch', 'TFT_Augment_Sponging',
+    'TFT_Augment_SupportMining', 'TFT_Augment_SupportMiningPlus', 'TFT_Augment_TowerDefense', 'TFT_Augment_Voidborne',
+    'TFT_Augment_VoidborneHR', 'TFT11_Augment_WanderingTrainerGold', 'TFT9_Augment_WanderingTrainer',
+    'TFT9_Augment_Commander_TeamingUp2', 'TFT9_Augment_PhreakyFriday', 'TFT9_Augment_PhreakyFridayPlus',
+    'TFT_Augment_NoScoutNoPivot'].forEach(id => def(id, null));
 
   return I;
 })();

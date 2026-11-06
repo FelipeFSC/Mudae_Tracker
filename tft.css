@@ -172,6 +172,10 @@ body.dragging .cell.own { background: rgba(34, 211, 238, .25); }
 .hexpic::after { content: ""; position: absolute; inset: 5%; clip-path: var(--hex); background: var(--bg); z-index: 0; }
 .hexpic .pic { position: absolute; inset: 5%; width: 90%; height: 90%; object-fit: cover; object-position: 50% 15%; clip-path: var(--hex); z-index: 1; pointer-events: none; }
 .cost1 { --c: var(--cost1); } .cost2 { --c: var(--cost2); } .cost3 { --c: var(--cost3); } .cost4 { --c: var(--cost4); } .cost5 { --c: var(--cost5); }
+/* invocações e inimigos da Horuja (sem custo de loja): robô da Nitro, holograma, Tibbers, Drones */
+.cost0 { --c: #e2583e; }
+.shop-card.bloblet { --c: #8b5cf6; }
+.shop-card.bloblet .pic { object-fit: contain; background: #1b1430; }
 .unit.enemy:not(.fight) { opacity: .65; }
 .unit.enemy .hexpic { filter: saturate(.85); }
 .stars { position: absolute; top: -4%; left: 0; right: 0; text-align: center; font-size: clamp(8px, 1.1cqw, 13px); line-height: 1; color: #cbd5e1; text-shadow: 0 1px 2px #000; z-index: 3; pointer-events: none; }

@@ -714,7 +714,29 @@ const TFTFx = (() => {
     if (!from || !to) return;
     const meta = cfg.metas.get(id);
     const ranged = meta && meta.champ && E.CH[meta.champ].range > 2;
-    if (kind === 'boom' || kind === 'anima') {
+    if (kind === 'laser') {
+      // laser gigante da Nitro: feixe que atravessa o alvo até a borda, abre e fecha
+      add({
+        dur: 0.55,
+        draw(p) {
+          const a = px(from), b = px(to);
+          const ang = Math.atan2(b.y - a.y, b.x - a.x);
+          const len = cellSize() * 16;
+          const open = p < 0.2 ? p / 0.2 : 1 - (p - 0.2) / 0.8;
+          const w = cellSize() * 0.42 * Math.max(0, open);
+          ctx.translate(a.x, a.y);
+          ctx.rotate(ang);
+          const grad = ctx.createLinearGradient(0, -w, 0, w);
+          grad.addColorStop(0, 'rgba(249,115,22,0)');
+          grad.addColorStop(0.35, 'rgba(249,115,22,0.85)');
+          grad.addColorStop(0.5, 'rgba(255,247,237,1)');
+          grad.addColorStop(0.65, 'rgba(249,115,22,0.85)');
+          grad.addColorStop(1, 'rgba(249,115,22,0)');
+          ctx.fillStyle = grad;
+          ctx.fillRect(0, -w, len * Math.min(1, p / 0.12), w * 2);
+        },
+      });
+    } else if (kind === 'boom' || kind === 'anima') {
       const color = kind === 'boom' ? '#ec2f9c' : '#22d3ee';
       fxProjectile(from, to, { obj: 'fireball', color, dur: 0.2, size: 0.09 });
     } else if (ranged) {

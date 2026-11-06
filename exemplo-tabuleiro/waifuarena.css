@@ -1,0 +1,346 @@
+/* ============================================================
+   WAIFUARENA.CSS — tela da Waifu Arena (teste de conexão, v0)
+   Usa os componentes do style.css (page-head, panel, field, pill);
+   aqui fica só o que é próprio da tela.
+   ============================================================ */
+
+/* selo de "em teste" no título (deixa claro que ainda não é o jogo) */
+.arena-beta {
+    font-size: 10.5px;
+    font-weight: 800;
+    letter-spacing: 1px;
+    padding: 3px 9px;
+    border-radius: 6px;
+    color: var(--yellow);
+    border: 1px solid rgba(245, 197, 24, 0.45);
+    background: rgba(245, 197, 24, 0.1);
+    box-shadow: 0 0 10px -4px var(--yellow);
+}
+
+.arena-view .subtitle b {
+    color: var(--yellow);
+}
+
+.arena-grid {
+    display: grid;
+    grid-template-columns: minmax(280px, 380px) minmax(240px, 1fr);
+    gap: 20px;
+    align-items: start;
+}
+
+.arena-grid .panel {
+    margin-bottom: 0;
+}
+
+/* sala e jogadores ficam acima da batalha */
+.arena-grid {
+    margin-bottom: 20px;
+}
+
+@media (max-width: 820px) {
+    .arena-grid {
+        grid-template-columns: 1fr;
+    }
+}
+
+.arena-grid .field {
+    margin-bottom: 14px;
+}
+
+.arena-wide {
+    width: 100%;
+    padding: 12px 14px;
+}
+
+/* ---- Status da conexão ---- */
+.arena-status {
+    margin-bottom: 16px;
+    padding: 9px 12px;
+    border-radius: 8px;
+    border: 1px solid var(--border);
+    background: var(--bg-panel-2);
+    color: var(--muted);
+    font-size: 12px;
+    line-height: 1.4;
+}
+
+.arena-status::before {
+    content: "●";
+    margin-right: 8px;
+}
+
+.arena-status[data-state="busy"] { color: var(--cyan); border-color: rgba(34, 211, 238, 0.35); }
+.arena-status[data-state="ok"] { color: var(--green); border-color: rgba(52, 211, 153, 0.4); background: rgba(52, 211, 153, 0.06); }
+.arena-status[data-state="warn"] { color: var(--yellow); border-color: rgba(245, 197, 24, 0.4); background: rgba(245, 197, 24, 0.06); }
+.arena-status[data-state="error"] { color: #ff8fa3; border-color: rgba(255, 92, 122, 0.4); background: rgba(255, 92, 122, 0.06); }
+
+/* ---- Entrar com código ---- */
+.arena-or {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    margin: 16px 0;
+    color: var(--muted-2);
+    font-size: 11px;
+}
+
+.arena-or::before,
+.arena-or::after {
+    content: "";
+    flex: 1;
+    height: 1px;
+    background: var(--border);
+}
+
+.arena-join {
+    display: flex;
+    gap: 8px;
+}
+
+.arena-join input {
+    flex: 1;
+    min-width: 0;
+    text-transform: uppercase;
+    letter-spacing: 3px;
+    font-weight: 700;
+}
+
+.arena-grid input:disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
+}
+
+/* ---- Sala aberta ---- */
+.arena-code-box {
+    display: flex;
+    align-items: center;
+    flex-wrap: wrap;
+    gap: 10px 14px;
+    padding: 14px;
+    border-radius: 10px;
+    border: 1px solid rgba(236, 47, 156, 0.4);
+    background: rgba(236, 47, 156, 0.06);
+    box-shadow: 0 0 18px -8px var(--pink);
+}
+
+.arena-code-label {
+    width: 100%;
+    color: var(--muted);
+    font-size: 10.5px;
+    font-weight: 600;
+    letter-spacing: .8px;
+}
+
+.arena-code {
+    flex: 1;
+    color: var(--pink);
+    font-size: 28px;
+    font-weight: 800;
+    letter-spacing: 6px;
+    text-shadow: 0 0 12px rgba(236, 47, 156, 0.5);
+}
+
+.arena-hint {
+    margin: 12px 0 16px;
+    color: var(--muted);
+    font-size: 11.5px;
+    line-height: 1.5;
+}
+
+/* ---- Jogadores ---- */
+.arena-count {
+    margin-left: auto;
+    color: var(--muted);
+    font-size: 11px;
+}
+
+.arena-players {
+    list-style: none;
+    margin: 0;
+    padding: 0;
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+}
+
+.arena-players li {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 9px 12px;
+    border-radius: 8px;
+    border: 1px solid var(--border);
+    background: var(--bg-panel-2);
+    font-size: 13px;
+}
+
+.arena-players li.me {
+    border-color: rgba(34, 211, 238, 0.4);
+}
+
+.arena-dot {
+    width: 8px;
+    height: 8px;
+    border-radius: 50%;
+    background: var(--green);
+    box-shadow: 0 0 6px var(--green);
+}
+
+.arena-tag {
+    font-size: 9.5px;
+    font-weight: 700;
+    letter-spacing: .5px;
+    padding: 2px 7px;
+    border-radius: 5px;
+    color: var(--yellow);
+    border: 1px solid rgba(245, 197, 24, 0.4);
+    background: rgba(245, 197, 24, 0.08);
+}
+
+.arena-tag.you {
+    color: var(--cyan);
+    border-color: rgba(34, 211, 238, 0.4);
+    background: rgba(34, 211, 238, 0.08);
+}
+
+.arena-empty {
+    color: var(--muted-2);
+    font-size: 12px;
+    padding: 6px 2px;
+    border: 0 !important;
+    background: none !important;
+}
+
+.arena-grid .pill:disabled {
+    opacity: 0.4;
+    cursor: not-allowed;
+}
+
+/* ---- Hub: escolha entre OFFLINE e ONLINE (mesmo desenho do hub do OrbeSolver) ---- */
+.arena-hub[hidden],
+.arena-play[hidden],
+.arena-grid[hidden],
+.wa-battle[hidden] {
+    display: none !important;
+}
+
+.arena-hub {
+    min-height: calc(100vh - 155px);
+    display: grid;
+    place-items: center;
+    padding: 34px 12px 54px;
+}
+
+.arena-hub-inner {
+    width: min(640px, 100%);
+    text-align: center;
+}
+
+.arena-hub-heading {
+    margin: 0 auto 30px;
+    max-width: 650px;
+}
+
+.arena-hub-kicker {
+    display: inline-block;
+    margin-bottom: 10px;
+    color: var(--pink);
+    font: 700 9px var(--mono);
+    letter-spacing: 1.8px;
+}
+
+.arena-hub-heading h1 {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 9px;
+    flex-wrap: wrap;
+    margin-bottom: 8px;
+}
+
+.arena-mode-picker {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 16px;
+    align-items: stretch;
+}
+
+.arena-mode-card {
+    min-height: 190px;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 10px;
+    padding: 24px 18px;
+    cursor: pointer;
+    border: 1px solid rgba(236, 47, 156, 0.34);
+    border-radius: 13px;
+    color: var(--pink);
+    font-family: var(--mono);
+    background: radial-gradient(circle at 50% 25%, rgba(236, 47, 156, 0.10), rgba(236, 47, 156, 0.025) 55%, rgba(255, 255, 255, 0.01));
+    box-shadow: inset 0 0 24px rgba(236, 47, 156, 0.035), 0 0 20px rgba(236, 47, 156, 0.055);
+    transition: transform 0.16s ease, border-color 0.16s ease, box-shadow 0.16s ease;
+}
+
+.arena-mode-card:hover,
+.arena-mode-card:focus-visible {
+    transform: translateY(-3px);
+    outline: none;
+    border-color: rgba(236, 47, 156, 0.72);
+    box-shadow: inset 0 0 28px rgba(236, 47, 156, 0.055), 0 0 28px rgba(236, 47, 156, 0.16);
+}
+
+.arena-mode-command {
+    font-size: 30px;
+    line-height: 1;
+    font-weight: 900;
+    letter-spacing: 1px;
+    text-shadow: 0 0 18px currentColor;
+}
+
+.arena-mode-name {
+    color: var(--text);
+    font-size: 11px;
+    letter-spacing: 0.8px;
+    text-transform: uppercase;
+}
+
+.arena-mode-enter {
+    margin-top: 6px;
+    color: var(--pink);
+    font-size: 8px;
+    letter-spacing: 1px;
+}
+
+@media (max-width: 720px) {
+    .arena-mode-picker {
+        grid-template-columns: 1fr;
+        max-width: 430px;
+        margin: 0 auto;
+    }
+
+    .arena-mode-card {
+        min-height: 125px;
+    }
+}
+
+/* ---- Botão REGRAS no título (mesmo visual do selo .arena-beta) ---- */
+.arena-rules-btn {
+    font-family: inherit;
+    line-height: inherit;
+    cursor: pointer;
+    transition: box-shadow 0.15s ease, background 0.15s ease, transform 0.15s ease;
+}
+
+.arena-rules-btn:hover,
+.arena-rules-btn:focus-visible {
+    outline: none;
+    transform: translateY(-1px);
+    background: rgba(245, 197, 24, 0.18);
+    box-shadow: 0 0 14px -3px var(--yellow);
+}
+
+.arena-play-mode {
+    color: var(--text);
+}
